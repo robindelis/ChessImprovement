@@ -1,0 +1,17 @@
+[ok  ] A. origin check removed, host/sec-fetch/preflight kept: all 4 expected check(s) noticed
+       (property/positive, unaffected by design) check_no_cors_reflection_on_any_route
+       (property/positive, unaffected by design) check_fetch_metadata_blocks_cross_site
+       (property/positive, unaffected by design) check_local_origin_still_works
+       (property/positive, unaffected by design) check_security_headers_present
+[ok  ] B. host check removed -> check_dns_rebinding_is_blunted noticed
+       (note) origin checks that depend on the host rule too: ['check_hostile_origin_cannot_mutate', 'check_cross_origin_preflight_is_refused', 'check_mutating_request_without_origin_is_allowed', 'check_hostile_origin_refused_because_of_the_origin']
+[ok  ] C. Sec-Fetch-Site check removed -> the check noticed
+       (property, unaffected by design) check_no_cors_reflection_on_any_route
+[....] D. pre-fix snapshot vs patched module: who reflects a foreign Origin?
+       pre-fix  GET /api/dashboard -> 200 ACAO='http://attacker.example' ACAC='true'
+       patched  GET /api/dashboard -> 403 ACAO=None ACAC=None
+[ok  ] D. only the pre-fix module reflects a foreign Origin
+
+[ok  ] control: all 9 checks pass with every defence restored
+
+No ablation gaps: each of the Origin, Host and Sec-Fetch-Site rules is covered by a check that fails when that rule is removed, and the pre-fix module demonstrably reflected a foreign Origin where the patched one refuses it.

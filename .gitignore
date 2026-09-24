@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.pkl
+.openings_cache.pkl
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Node / Electron
+node_modules/
+npm-debug.log*
+dist/
+out/
+
+# Binaries / Engine
+bin/
+
+# Secrets — NEVER commit (.env holds the Lichess API token)
+.env
+.env.*
+!.env.example
+
+# Local database — holds real user games, blunders & repertoire
+*.db
+*.db-wal
+*.db-shm
+*.db.bak
+*.bak
+*.sqlite
+*.sqlite3
+repertoire_imports/
+recovered/
+
+# Audit artefacts — reports/patches are local working notes
+audit/reports/*.tmp
+audit/scripts/__pycache__/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/

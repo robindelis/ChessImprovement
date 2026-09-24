@@ -1,0 +1,1329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess Repertoire Studio</title>
+    <link rel="stylesheet" href="/style.css?v=20260926_1">
+    <script src="/vendor/chess.min.js"></script>
+    <script src="/audio.js?v=20260924_2"></script>
+    <script src="/board.js?v=20260926_1"></script>
+</head>
+<body>
+    <header>
+        <div class="brand">
+            <svg width="28" height="28" viewBox="0 0 45 45" fill="none">
+                <path d="M22.5 4L28 13H17L22.5 4Z" fill="#38bdf8"/>
+                <path d="M12 15H33L31 32H14L12 15Z" fill="#0284c7"/>
+                <path d="M9 34H36V40H9V34Z" fill="#0369a1"/>
+            </svg>
+            <div>Chess<span>Repertoire</span>Studio</div>
+        </div>
+
+        <nav class="nav-tabs">
+            <button class="nav-tab active" data-tab="repertoire">Repertoire Builder</button>
+            <button class="nav-tab" data-tab="rep-trainer">Repertoire Trainer</button>
+            <button class="nav-tab" data-tab="scout">Opening Scout</button>
+            <button class="nav-tab" data-tab="settings">Settings</button>
+        </nav>
+
+        <div class="header-actions">
+            <div id="userBadge" class="user-badge" style="display:none;" title="Connected Lichess Account">
+                <span class="user-badge-online-dot" aria-hidden="true"></span>
+                <span id="badgeUsername">RobiDeli</span>
+                <span id="badgeRating" class="rating-pill">1970</span>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <!-- REPERTOIRE BUILDER VIEW (CHESSBOOK STYLE) -->
+        <section id="viewRepertoire" class="view-section active">
+            <!-- Top Controls & Metrics Bar -->
+            <div class="repertoire-top-bar">
+                <div style="display:flex; align-items:center; gap:1.25rem; flex-wrap:wrap;">
+                    <!-- White / Black Repertoire Toggle -->
+                    <div class="repertoire-color-toggle">
+                        <button class="rep-toggle-btn active" id="btnRepWhite" data-color="white">
+                            <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#fff; border:1px solid #94a3b8;"></span>
+                            White Repertoire
+                        </button>
+                        <button class="rep-toggle-btn" id="btnRepBlack" data-color="black">
+                            <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#0f172a; border:1px solid #94a3b8;"></span>
+                            Black Repertoire
+                        </button>
+                    </div>
+
+                    <div class="study-selector-wrap" style="display:flex; align-items:center; gap:0.5rem; background:rgba(30, 41, 59, 0.7); padding:0.3rem 0.6rem; border-radius:8px; border:1px solid #334155;">
+                        <span style="font-size:0.8rem; font-weight:700; color:#38bdf8;">STUDY:</span>
+                        <select id="builderStudySelect" style="padding:0.25rem 0.5rem; border-radius:5px; background:#0f172a; color:#fff; border:1px solid #475569; font-size:0.85rem; max-width:200px;">
+                            <option value="">(All Studies)</option>
+                        </select>
+                        <button id="btnNewStudy" type="button" class="btn-secondary" style="font-size:0.75rem; padding:0.25rem 0.5rem;" title="Create a new study">+ New</button>
+                        <button id="btnGroupSubtree" type="button" class="btn-secondary" style="font-size:0.75rem; padding:0.25rem 0.5rem; display:inline-flex; align-items:center; gap:0.25rem;" title="Make a named sub-block/group starting from current position">
+                            <span>📁</span> Sub-block from Position
+                        </button>
+                    </div>
+
+                    <div class="rep-header-title-box">
+                        <span id="repOpeningTitle" style="font-weight:700; font-size:1.1rem; color:#fff;">Italian Game</span>
+                        <span id="repOpeningEco" style="font-size:0.8rem; color:var(--text-secondary);">Start Position</span>
+                    </div>
+                </div>
+
+                <div class="coverage-box">
+                    <div class="coverage-gauge">
+                        <div class="coverage-gauge-header">
+                            <span>2000+ Coverage</span>
+                            <span id="repCoveragePct" style="color:#38bdf8; font-weight:700;">--%</span>
+                        </div>
+                        <div class="coverage-bar-track">
+                            <div id="repCoverageFill" class="coverage-bar-fill" style="width:0%;"></div>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; align-items:center; gap:0.4rem;">
+                        <label for="repGapThreshold" style="font-size:0.8rem; color:var(--text-secondary); font-weight:600;">Gap Threshold:</label>
+                        <select id="repGapThreshold" style="padding:0.25rem 0.5rem; font-size:0.85rem;">
+                            <option value="3">3%</option>
+                            <option value="5" selected>5%</option>
+                            <option value="8">8%</option>
+                            <option value="10">10%</option>
+                        </select>
+                    </div>
+
+                    <div style="display:flex; align-items:center; gap:0.4rem;">
+                        <label for="repOpeningThreshold" style="font-size:0.8rem; color:var(--text-secondary); font-weight:600;" title="Minimum number of games in the 2000+ master database before a position counts as an opening mistake (AGENTS.md 4.B.3)">Opening Cutoff:</label>
+                        <select id="repOpeningThreshold" style="padding:0.25rem 0.5rem; font-size:0.85rem;">
+                            <option value="0">All</option>
+                            <option value="10">10</option>
+                            <option value="20">20</option>
+                            <option value="30" selected>30</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+
+                    <button id="btnOpenImportModal" class="btn-primary" type="button" style="font-size:0.8rem; padding:0.4rem 0.75rem; display:inline-flex; align-items:center; gap:0.35rem;" title="Import your repertoire from Chessbook or a PGN file">
+                        <span>📥</span> Import Repertoire
+                    </button>
+                    <button id="btnSeedDefaults" class="btn-secondary" style="font-size:0.8rem; padding:0.4rem 0.75rem;" title="Ask the backend to seed the default study lines. The backend refuses to overwrite an existing repertoire, so this is a no-op while you have prepared lines.">
+                        Reset Defaults
+                    </button>
+                    <button id="btnResetRepertoire" class="btn-secondary btn-danger" style="font-size:0.8rem; padding:0.4rem 0.75rem;" title="Permanently delete all moves from your repertoire database">
+                        🗑️ Reset Repertoire DB
+                    </button>
+                </div>
+            </div>
+
+            <!-- Real-Time Game Scanning Progress Card -->
+            <div id="syncProgressContainer" class="sync-progress-card" style="display:none;" role="region" aria-label="Game scanning and sync progress">
+                <div class="sync-progress-header">
+                    <div class="sync-status-indicator">
+                        <span class="sync-pulse-dot" id="syncPulseDot" aria-hidden="true"></span>
+                        <div class="sync-status-text-wrap">
+                            <div class="sync-status-title" id="syncStatusTitle">Syncing Lichess Games...</div>
+                            <div class="sync-status-desc" id="syncStatusDesc">Connecting to Lichess API</div>
+                        </div>
+                    </div>
+                    <div class="sync-header-actions">
+                        <div class="sync-badge-group">
+                            <span class="sync-pct-badge" id="syncPctBadge">0%</span>
+                            <span class="sync-blunder-pill" id="syncBlunderPill" style="visibility:hidden;" title="Opening blunders detected in your games during this scan">&#128308; <span id="syncBlunderCount">0</span></span>
+                        </div>
+                        <button id="btnCancelSync" class="sync-cancel-btn" title="Cancel or close progress" aria-label="Close progress">&times;</button>
+                    </div>
+                </div>
+
+                <!-- Semantic HTML5 Progress Bar -->
+                <div class="sync-bar-wrapper">
+                    <progress id="syncProgressBar" class="sync-progress-element" value="0" max="100" aria-label="Scanning progress" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></progress>
+                </div>
+
+                <div class="sync-details-grid">
+                    <div class="sync-detail-item">
+                        <span class="sync-detail-label">Processed Games</span>
+                        <span class="sync-detail-value"><span id="syncCountProcessed">0</span> / <span id="syncCountTotal">--</span></span>
+                    </div>
+                    <div class="sync-detail-item">
+                        <span class="sync-detail-label" id="syncDetailLabelSynced">Synced Games</span>
+                        <span class="sync-detail-value" id="syncCountCached">0</span>
+                    </div>
+                    <div class="sync-detail-item sync-detail-opening">
+                        <span class="sync-detail-label">Active Game</span>
+                        <span class="sync-detail-value mono" id="syncActiveOpening">Connecting...</span>
+                    </div>
+                    <div class="sync-detail-item">
+                        <span class="sync-detail-label">New Blunders</span>
+                        <span class="sync-detail-value" id="syncCountNewBlunders">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Game Review Banner (shown when reviewing a game) -->
+            <div id="gameReviewBanner" class="game-review-banner" style="display:none;"></div>
+
+            <!-- Breadcrumbs Move Trail -->
+            <div id="repBreadcrumbs" class="move-breadcrumbs">
+                <span class="breadcrumb-chip start active" data-ply="0">Start</span>
+            </div>
+
+            <!-- Main Workspace: Board on Left, 2000+ Explorer & Gaps on Right -->
+            <div class="repertoire-layout">
+                <!-- Left: Board & Controls -->
+                <div>
+                    <div class="board-eval-container">
+                        <!-- Real-time Evaluation Bar -->
+                        <div class="eval-bar-wrapper" id="repEvalBarWrapper" title="Stockfish Real-time Evaluation">
+                            <div class="eval-bar-fill" id="repEvalBarFill" style="height: 50%;"></div>
+                            <div class="eval-bar-label equal" id="repEvalBarLabel">+0.0</div>
+                        </div>
+                        <div id="repertoireBoard"></div>
+                    </div>
+
+                    <!-- Opening description + engine principal variation (AGENTS.md 4.H).
+                         Both are always-in-flow, fixed-height status strips showing a muted
+                         placeholder when there is nothing to say, so the board never shifts
+                         under the pointer (8.5) and no message is injected into the flow (8.1). -->
+                    <div style="margin-top:0.45rem; display:flex; flex-direction:column; gap:0.15rem;">
+                        <div id="repOpeningLine" class="rep-status-strip is-idle" title="The opening played in this position">
+                            <span class="rep-status-label">Opening</span>
+                            <span class="rep-status-text" id="repOpeningLineText">Starting Position</span>
+                        </div>
+                        <div id="repEngineLine" class="rep-status-strip is-idle" title="Stockfish's best line, recomputed as the search deepens">
+                            <span class="rep-status-label">Engine</span>
+                            <span class="rep-status-text" id="repEngineLineText">Waiting for the first depth…</span>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.75rem; flex-wrap:wrap; gap:0.5rem;">
+                        <div style="display:flex; gap:0.4rem;">
+                            <button id="btnRepStart" class="btn-secondary" title="First Move (Up / k / Home)">⏮ Start</button>
+                            <button id="btnRepPrev" class="btn-secondary" title="Previous Move (Left / h)">◀ Back</button>
+                            <button id="btnRepNext" class="btn-secondary" title="Next Move (Right / l)">Next ▶</button>
+                            <button id="btnRepEnd" class="btn-secondary" title="Latest Move (Down / j / End)">End ⏭</button>
+                        </div>
+                        <div style="display:flex; gap:0.4rem; align-items:center;">
+                            <button id="btnRepEngineLine" class="btn-secondary btn-engine-line active" aria-pressed="true"
+                                    title="Draw Stockfish's best line on the board. Right-click a square to mark it, drag right-click to draw an arrow, left-click an empty square to clear everything.">Engine Line</button>
+                            <button id="btnRepFlip" class="btn-secondary">Flip</button>
+                            <button id="btnRepReset" class="btn-secondary">Reset</button>
+                            <div class="board-size-control-group" style="display:inline-flex; align-items:center; gap:2px; margin-left:0.25rem; background:rgba(30, 41, 59, 0.7); border:1px solid var(--border-color); border-radius:4px; padding:2px 4px;">
+                                <button type="button" class="btn-board-size btn-board-size-dec" title="Decrease board size">−</button>
+                                <span id="repBoardSizeLabel" class="board-size-display-val" style="font-size:0.75rem; color:var(--text-muted); font-family:monospace; min-width:44px; text-align:center;">---</span>
+                                <button type="button" class="btn-board-size btn-board-size-inc" title="Increase board size">+</button>
+                                <button type="button" class="btn-board-size btn-board-size-fit" title="Fit board to available screen space">⛶ Fit</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.4rem; display:flex; gap:0.75rem; flex-wrap:wrap;">
+                        <span><kbd style="background:#1e293b; padding:1px 5px; border-radius:3px; border:1px solid #334155;">&larr;</kbd> / <kbd style="background:#1e293b; padding:1px 5px; border-radius:3px; border:1px solid #334155;">h</kbd> Back</span>
+                        <span><kbd style="background:#1e293b; padding:1px 5px; border-radius:3px; border:1px solid #334155;">&rarr;</kbd> / <kbd style="background:#1e293b; padding:1px 5px; border-radius:3px; border:1px solid #334155;">l</kbd> Next</span>
+                        <span><kbd style="background:#1e293b; padding:1px 5px; border-radius:3px; border:1px solid #334155;">&uarr;</kbd> / <kbd style="background:#1e293b; padding:1px 5px; border-radius:3px; border:1px solid #334155;">k</kbd> Start</span>
+                        <span><kbd style="background:#1e293b; padding:1px 5px; border-radius:3px; border:1px solid #334155;">&darr;</kbd> / <kbd style="background:#1e293b; padding:1px 5px; border-radius:3px; border:1px solid #334155;">j</kbd> End</span>
+                    </div>
+
+                    <!-- Quick Whole-Line Import & Explored Tree Control Bar -->
+                    <div class="rep-line-actions-bar" style="margin-top:0.6rem; padding:0.45rem 0.65rem; background:rgba(15, 23, 42, 0.7); border:1px solid var(--border-color); border-radius:6px; display:flex; flex-direction:column; gap:0.35rem;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.4rem;">
+                            <div style="display:flex; align-items:center; gap:0.4rem; flex-wrap:wrap;">
+                                <button id="btnRepAddWholeLine" class="btn-primary btn-quick-rep" style="font-size:0.78rem; padding:0.3rem 0.65rem;" title="Import the whole line leading to this position into your repertoire">
+                                    📥 Add Line &rarr; <span id="repAddLineColorLabel">White</span> Rep
+                                </button>
+                                <button id="btnRepViewTree" class="btn-secondary btn-quick-rep" style="font-size:0.78rem; padding:0.3rem 0.65rem;" title="View explored lines in session tree">
+                                    🌳 Lines Tree (<span id="repQuickLineCount">0</span>)
+                                </button>
+                                <button id="btnRepClearTree" class="btn-secondary btn-quick-rep" style="font-size:0.78rem; padding:0.3rem 0.55rem; color:var(--text-muted);" title="Clear session explored lines">
+                                    ↺ Clear Tree
+                                </button>
+                            </div>
+                        </div>
+                        <div id="repActiveLineOverlap" class="scout-line-overlap-strip" style="display:flex;"><span style="font-size:0.72rem; color:var(--text-muted); font-weight:500;">Repertoire: Starting Position</span></div>
+                    </div>
+
+                    <!-- Move Notes, Importance & Arrow Tools Panel -->
+                    <div id="repMoveToolsPanel" class="card-panel" style="margin-top:0.75rem; padding:0.75rem; background:rgba(15, 23, 42, 0.65); border:1px solid var(--border-color); border-radius:8px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.4rem; margin-bottom:0.5rem;">
+                            <div style="display:flex; align-items:center; gap:0.4rem;">
+                                <span id="repMoveToolSan" style="font-weight:700; font-size:0.95rem; color:#fff;">Starting Position</span>
+                                <span id="repMoveToolType" style="font-size:0.75rem; color:var(--text-muted);">(Root)</span>
+                            </div>
+                            <div style="display:flex; gap:0.35rem; align-items:center;">
+                                <button id="btnRepToggleImportant" class="btn-secondary" style="font-size:0.75rem; padding:0.25rem 0.55rem;" title="Consider this move important (prioritized in Trainer)">
+                                    ☆ Mark Important
+                                </button>
+                                <button id="btnRepDeleteCurrentMove" class="btn-secondary btn-danger" style="font-size:0.75rem; padding:0.25rem 0.55rem; visibility:hidden;" title="Remove this move and all its continuing variations from repertoire">
+                                    🗑️ Remove Line
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Move Comments / Notes -->
+                        <div style="margin-bottom:0.5rem;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem;">
+                                <label for="repMoveComment" style="font-size:0.76rem; font-weight:600; color:var(--text-secondary);">Move Notes / Ideas (shown in Trainer):</label>
+                                <span id="repCommentSaveStatus" style="font-size:0.72rem; color:#4ade80; opacity:0; transition:opacity 0.2s ease;">Saved ✓</span>
+                            </div>
+                            <textarea id="repMoveComment" placeholder="Write move notes, plans, or key ideas (shown in Trainer)..." rows="2" style="width:100%; box-sizing:border-box; background:rgba(30, 41, 59, 0.7); border:1px solid #334155; border-radius:5px; color:#f8fafc; font-size:0.8rem; padding:0.4rem; resize:vertical; font-family:inherit;"></textarea>
+                        </div>
+
+                        <!-- Board Arrows Bar -->
+                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.4rem; font-size:0.75rem; color:var(--text-muted); background:rgba(30, 41, 59, 0.4); padding:0.35rem 0.6rem; border-radius:5px;">
+                            <span>💡 <strong>Right-click &amp; drag</strong> between squares to draw arrows</span>
+                            <div style="display:flex; align-items:center; gap:0.4rem;">
+                                <span id="repArrowsCount" style="color:var(--text-secondary);">0 arrows</span>
+                                <button id="btnRepClearArrows" class="btn-secondary" style="font-size:0.7rem; padding:0.15rem 0.4rem;" title="Clear all drawn arrows on this move">Clear</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: Database Moves & Gaps -->
+                <div class="repertoire-sidebar-col">
+                    <!-- 2000+ Online Database Table -->
+                    <div class="card-panel repertoire-sidebar-card" style="margin-bottom:0;">
+                        <div class="panel-header" style="padding-bottom:0.5rem;">
+                            <div>
+                                <div class="panel-title" style="font-size:0.95rem;">2000+ Online Database</div>
+                                <div id="repTurnIndicator" style="font-size:0.76rem; color:var(--text-secondary); margin-top:0.15rem;">
+                                    Loading database...
+                                </div>
+                            </div>
+                            <div id="repDbStats" style="font-size:0.78rem; font-weight:600; color:var(--text-muted);">
+                                - games
+                            </div>
+                        </div>
+
+                        <div class="explorer-table-wrap">
+                            <table class="explorer-table">
+                                <thead>
+                                    <tr>
+                                        <th id="thSortMove" class="sortable-th" title="Sort by Move">Move</th>
+                                        <th id="thSortMaster" class="sortable-th" title="Sort by Master 2000+ Popularity">Master (2000+)</th>
+                                        <th>Master Win %</th>
+                                        <th id="thSortMyStats" class="sortable-th active-sort" title="Sort by Personal Game Frequency &amp; Threat Score">My Stats <span class="sort-arrow">▾</span></th>
+                                        <th id="thSortEval" class="sortable-th" title="Stockfish Evaluation (+ White advantage, - Black advantage)">Eval</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="repExplorerTbody">
+                                    <tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:1rem;">Loading 2000+ moves...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Bottom Card: Explored Lines Tree & Address Critical Gaps (Tabbed) -->
+                    <div class="card-panel repertoire-sidebar-card" id="repBottomSidebarCard">
+                        <div class="panel-header" style="padding-bottom:0.4rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.4rem;">
+                            <!-- Tab Switcher -->
+                            <div style="display:flex; align-items:center; gap:0.35rem;">
+                                <button id="btnTabRepLinesTree" class="rep-subcard-tab active" title="View lines and variations explored in this session">
+                                    🌳 Explored Lines (<span id="repTreeTabCount">0</span>)
+                                </button>
+                                <button id="btnTabRepGames" class="rep-subcard-tab" title="Review recent games from Lichess and explore openings">
+                                    🎮 Recent Games (<span id="repGamesCount">0</span>)
+                                </button>
+                                <button id="btnTabRepCoverageGaps" class="rep-subcard-tab" title="Unprepared opponent moves from master games and personal play">
+                                    🛡️ Coverage Gaps (<span id="repCoverageGapsCount">0</span>)
+                                </button>
+                            </div>
+                            <!-- Actions for Explored Lines Tab -->
+                            <div id="repTreeHeaderActions" style="display:flex; align-items:center; gap:0.3rem;">
+                                <button id="btnRepImportAll" class="btn-secondary" style="font-size:0.72rem; padding:0.2rem 0.5rem;" title="Import all explored lines into your repertoire">
+                                    📥 Import All Lines
+                                </button>
+                                <button id="btnRepClearAllTree" class="btn-secondary" style="font-size:0.72rem; padding:0.2rem 0.45rem; color:var(--text-muted);" title="Clear explored lines from this session">
+                                    🗑️ Clear
+                                </button>
+                            </div>
+                            <!-- Actions for Recent Games Tab -->
+                            <div id="repGamesHeaderActions" style="display:none; align-items:center; gap:0.35rem; flex-wrap:wrap;">
+                                <div class="filter-pill-group" style="display:flex; gap:0.2rem; background:rgba(15,23,42,0.8); padding:2px; border-radius:5px; border:1px solid var(--border-color);">
+                                    <button class="filter-pill-btn active" id="btnFilterGamesAll" data-filter="all" style="font-size:0.7rem; padding:0.15rem 0.45rem; border:none; border-radius:3px; background:#0284c7; color:#fff; cursor:pointer;">All</button>
+                                    <button class="filter-pill-btn" id="btnFilterGamesWhite" data-filter="white" style="font-size:0.7rem; padding:0.15rem 0.45rem; border:none; border-radius:3px; background:transparent; color:var(--text-secondary); cursor:pointer;">White</button>
+                                    <button class="filter-pill-btn" id="btnFilterGamesBlack" data-filter="black" style="font-size:0.7rem; padding:0.15rem 0.45rem; border:none; border-radius:3px; background:transparent; color:var(--text-secondary); cursor:pointer;">Black</button>
+                                </div>
+                                <div class="filter-pill-group" style="display:flex; gap:0.2rem; background:rgba(15,23,42,0.8); padding:2px; border-radius:5px; border:1px solid var(--border-color);">
+                                    <button class="filter-pill-btn active" id="btnFilterSpeedAll" data-speed="all" style="font-size:0.7rem; padding:0.15rem 0.45rem; border:none; border-radius:3px; background:#0284c7; color:#fff; cursor:pointer;">All Speeds</button>
+                                    <button class="filter-pill-btn" id="btnFilterSpeedRapid" data-speed="rapid" style="font-size:0.7rem; padding:0.15rem 0.45rem; border:none; border-radius:3px; background:transparent; color:var(--text-secondary); cursor:pointer;">Rapid</button>
+                                    <button class="filter-pill-btn" id="btnFilterSpeedBlitz" data-speed="blitz" style="font-size:0.7rem; padding:0.15rem 0.45rem; border:none; border-radius:3px; background:transparent; color:var(--text-secondary); cursor:pointer;">Blitz</button>
+                                    <button class="filter-pill-btn" id="btnFilterSpeedBullet" data-speed="bullet" style="font-size:0.7rem; padding:0.15rem 0.45rem; border:none; border-radius:3px; background:transparent; color:var(--text-secondary); cursor:pointer;">Bullet</button>
+                                </div>
+                                <button id="btnSyncRecentGames" class="btn-secondary" style="font-size:0.72rem; padding:0.2rem 0.45rem;" title="Fetch latest games from Lichess">
+                                    🔄 Sync Latest
+                                </button>
+                                <button id="btnResyncGames" class="btn-secondary" style="font-size:0.72rem; padding:0.2rem 0.45rem;" title="Re-scan your whole game archive and re-analyse opening theory (slow)">
+                                    🔄 Refresh All Games
+                                </button>
+                            </div>
+                            <!-- Actions for Coverage Gaps Tab -->
+                            <div id="repGapsHeaderActions" style="display:none; align-items:center; gap:0.35rem; flex-wrap:wrap;">
+                            </div>
+                        </div>
+
+                        <!-- Explored Lines View Container -->
+                        <div id="repTreeContainer" style="display:flex; flex-direction:column; flex:1; min-height:0; overflow:hidden;">
+                            <div style="font-size:0.72rem; color:var(--text-muted); margin-bottom:0.3rem; padding:0 0.1rem;">
+                                Variations you explore are tracked here. Click any card to load onto board or import into your repertoire.
+                            </div>
+                            <div id="repVariationsList" class="scout-variations-list" style="flex:1; overflow-y:auto; padding:0.4rem 0.2rem;">
+                                <!-- Explored lines rendered here -->
+                            </div>
+                        </div>
+
+                        <!-- Recent Games View Container -->
+                        <div id="repGamesContainer" style="display:none; flex-direction:column; flex:1; min-height:0; overflow:hidden;">
+                            <div style="display:flex; align-items:center; gap:0.4rem; margin-bottom:0.4rem; padding:0 0.1rem;">
+                                <input type="text" id="repGamesSearchInput" placeholder="Search opponent or opening..." style="flex:1; background:rgba(15,23,42,0.7); border:1px solid var(--border-color); border-radius:4px; color:#f8fafc; font-size:0.75rem; padding:0.25rem 0.5rem;">
+                            </div>
+                            <div id="repGamesList" class="rep-games-list" style="flex:1; overflow-y:auto; padding:0.2rem 0.1rem;">
+                                <div style="text-align:center; color:var(--text-muted); padding:0.75rem;">Loading recent games...</div>
+                            </div>
+                        </div>
+
+                        <!-- Coverage Gaps View Container -->
+                        <div id="repGapsContainer" style="display:none; flex-direction:column; flex:1; min-height:0; overflow:hidden;">
+                            <div class="gaps-section-header" style="margin-bottom:0.35rem;">
+                                <span class="gaps-section-title">🛡️ Unprepared Opponent Moves</span>
+                                <span class="gaps-section-sub" id="repCoverageGapsMeta">--</span>
+                            </div>
+                            <div id="repCoverageGapsList" class="rep-gaps-list" style="flex:1; overflow-y:auto; padding:0.2rem 0.1rem;">
+                                <div style="text-align:center; color:var(--text-muted); padding:0.75rem; font-size:0.8rem;">Loading coverage gaps...</div>
+                            </div>
+                            <div id="repGapsList" class="rep-gaps-list" style="display:none;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- REPERTOIRE TRAINER VIEW -->
+        <section id="viewRepTrainer" class="view-section">
+            <!-- Practice Drills View -->
+            <div id="trainerDrillsSection" style="display:flex; flex-direction:column; gap:0;">
+                <div class="repertoire-top-bar" style="margin-bottom:0.75rem;">
+                    <div style="display:flex; align-items:center; gap:0.65rem; flex-wrap:wrap;">
+                        <!-- Subtab Mode Switcher (Drills vs Deviations) -->
+                        <div class="repertoire-color-toggle trainer-view-mode-toggle" style="display:flex;">
+                            <button id="btnTrainerTabDrills" class="rep-toggle-btn active" style="font-size:0.78rem; padding:0.3rem 0.65rem;" title="Spaced-repetition drills and active recall practice">
+                                🎯 Drills
+                            </button>
+                            <button id="btnTrainerTabDeviations" class="rep-toggle-btn" style="font-size:0.78rem; padding:0.3rem 0.65rem; display:inline-flex; align-items:center; gap:0.35rem;" title="Games where you deviated from your prepared repertoire">
+                                ⚠️ Deviations <span id="trainDeviationsBadge" class="badge-pill" style="background:#ef4444; color:#fff; font-size:0.65rem; padding:0.05rem 0.35rem; border-radius:10px;">0</span>
+                            </button>
+                        </div>
+
+                        <!-- Color Toggle -->
+                        <div class="repertoire-color-toggle">
+                            <button class="rep-toggle-btn active" id="btnTrainMixed" data-color="mixed" style="font-size:0.78rem; padding:0.3rem 0.65rem;">Both</button>
+                            <button class="rep-toggle-btn" id="btnTrainWhite" data-color="white" style="font-size:0.78rem; padding:0.3rem 0.65rem;">White</button>
+                            <button class="rep-toggle-btn" id="btnTrainBlack" data-color="black" style="font-size:0.78rem; padding:0.3rem 0.65rem;">Black</button>
+                        </div>
+
+                        <!-- Opening Focus Selector -->
+                        <div style="display:flex; align-items:center; gap:0.35rem;">
+                            <label for="trainOpeningFilter" style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">Focus:</label>
+                            <select id="trainOpeningFilter" class="trainer-focus-select" style="font-size:0.78rem; padding:0.25rem 0.5rem; background:var(--bg-card); color:#fff; border:1px solid var(--border-color); border-radius:6px; max-width:200px;">
+                                <option value="">All Openings</option>
+                            </select>
+                        </div>
+
+                        <!-- Training Curriculum Mode -->
+                        <div style="display:flex; align-items:center; gap:0.35rem;">
+                            <label for="trainModeSelect" style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">Mode:</label>
+                            <select id="trainModeSelect" class="trainer-focus-select" style="font-size:0.78rem; padding:0.25rem 0.5rem; background:var(--bg-card); color:#fff; border:1px solid var(--border-color); border-radius:6px;">
+                                <option value="adaptive">🧠 Adaptive</option>
+                                <option value="frontier_only">🌱 New Lines</option>
+                                <option value="due_only">⏰ Due Reviews</option>
+                                <option value="deviations">⚠️ Deviations</option>
+                                <option value="full">🎲 Full Tree</option>
+                            </select>
+                        </div>
+
+                        <button id="btnTrainNewDrill" class="btn-primary" style="font-size:0.78rem; padding:0.3rem 0.65rem;">New Line</button>
+                    </div>
+
+                    <div class="trainer-stats-strip" style="padding:0.2rem 0.55rem; gap:0.85rem;">
+                        <div class="trainer-stat">
+                            <div id="trainStatStreak" class="trainer-stat-val" style="color:#4ade80; font-size:0.95rem;">0</div>
+                            <div class="trainer-stat-lbl" style="font-size:0.65rem;">Streak</div>
+                        </div>
+                        <div class="trainer-stat">
+                            <div id="trainStatAccuracy" class="trainer-stat-val" style="color:#38bdf8; font-size:0.95rem;">100%</div>
+                            <div class="trainer-stat-lbl" style="font-size:0.65rem;">Accuracy</div>
+                        </div>
+                        <div class="trainer-stat">
+                            <div id="trainStatPracticed" class="trainer-stat-val" style="font-size:0.95rem;">0</div>
+                            <div class="trainer-stat-lbl" style="font-size:0.65rem;">Practiced</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="repertoire-layout">
+                    <div>
+                        <!-- Opening Move Path & Pedagogical Reason Strip (0px CLS, fixed 34px height) -->
+                        <div id="trainMoveHistoryBreadcrumb" class="trainer-breadcrumb-strip">
+                            <div class="trainer-breadcrumb-left">
+                                <span class="trainer-breadcrumb-icon">🧭</span>
+                                <span id="trainBreadcrumbMoves" class="trainer-breadcrumb-moves" title="Move path leading to this position">Starting position</span>
+                            </div>
+                            <div id="trainDrillReasonBadge" class="trainer-reason-badge badge-frontier">🌱 New Move</div>
+                        </div>
+
+                        <div id="trainerBoard"></div>
+
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.75rem;">
+                            <div style="display:flex; gap:0.4rem;">
+                                <button id="btnTrainHint" class="btn-secondary">Show Hint</button>
+                                <button id="btnTrainToggleArrows" class="btn-secondary" style="visibility:hidden; min-width:96px;" title="Toggle plan arrows on board">🎯 Arrows</button>
+                            </div>
+                            <div style="display:flex; gap:0.5rem; align-items:center;">
+                                <button id="btnTrainFlip" class="btn-secondary">Flip</button>
+                                <button id="btnTrainRetry" class="btn-secondary">Try Again</button>
+                                <div class="board-size-control-group" style="display:inline-flex; align-items:center; gap:2px; margin-left:0.25rem; background:rgba(30, 41, 59, 0.7); border:1px solid var(--border-color); border-radius:4px; padding:2px 4px;">
+                                    <button type="button" class="btn-board-size btn-board-size-dec" title="Decrease board size">−</button>
+                                    <span id="trainBoardSizeLabel" class="board-size-display-val" style="font-size:0.75rem; color:var(--text-muted); font-family:monospace; min-width:44px; text-align:center;">---</span>
+                                    <button type="button" class="btn-board-size btn-board-size-inc" title="Increase board size">+</button>
+                                    <button type="button" class="btn-board-size btn-board-size-fit" title="Fit board to available screen space">⛶ Fit</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="drill-sidebar">
+                        <!-- Session & Deviation Context Cards (Relocated from top) -->
+                        <!-- Chessbook 20-Move Practice Session Strip -->
+                        <div class="trainer-session-strip card-panel" style="margin-bottom:0;">
+                            <div style="display:flex; align-items:center; gap:0.6rem; flex:1; min-width:200px;">
+                                <div style="display:flex; align-items:center; gap:0.35rem; white-space:nowrap;">
+                                    <span style="font-size:0.82rem; font-weight:700; color:#fff;">🎯 Session:</span>
+                                    <span id="trainSessionMoveLabel" style="font-size:0.82rem; font-weight:800; color:#38bdf8;">Move 1 of 20</span>
+                                </div>
+                                <div style="flex:1; max-width:180px; height:7px; border-radius:4px; background:rgba(30, 41, 59, 0.9); border:1px solid rgba(51, 65, 85, 0.6); overflow:hidden;">
+                                    <div id="trainSessionProgressBar" style="width:5%; height:100%; background:linear-gradient(90deg, #38bdf8, #818cf8); transition:width 0.3s ease;"></div>
+                                </div>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:0.85rem;">
+                                <div style="font-size:0.78rem; color:var(--text-secondary);">
+                                    Score: <strong id="trainSessionScore" style="color:#4ade80;">0 / 0</strong> (<span id="trainSessionAccuracy">100%</span>)
+                                </div>
+                                <button id="btnTrainRestartSession" class="btn-secondary" style="font-size:0.7rem; padding:0.2rem 0.5rem;" title="Restart a new 20-move practice session">
+                                    ↺ New Session
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Game Deviation Interactive Context Banner (Visible when practicing real game deviations) -->
+                        <div id="trainDeviationBanner" class="card-panel" style="display:none; margin-bottom:0; padding:0.65rem 0.85rem; background:rgba(15,23,42,0.85); border:1px solid rgba(239,68,68,0.35); border-left:4px solid #ef4444; border-radius:8px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+                                <div style="display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap;">
+                                    <span style="font-size:1.15rem;">⚠️</span>
+                                    <div>
+                                        <div style="font-weight:700; font-size:0.88rem; color:#fff; display:flex; align-items:center; gap:0.4rem; flex-wrap:wrap;">
+                                            <span>vs <span id="devBannerOpponent">Opponent</span></span>
+                                            <span id="devBannerRating" style="color:var(--text-muted); font-size:0.75rem; font-weight:normal;"></span>
+                                            <span id="devBannerSpeed" class="badge-pill" style="font-size:0.65rem; text-transform:uppercase; background:rgba(56,189,248,0.15); color:#38bdf8;">RAPID</span>
+                                            <span id="devBannerResult" class="game-outcome-pill loss" style="font-size:0.65rem;">LOSS</span>
+                                        </div>
+                                        <div style="font-size:0.74rem; color:var(--text-secondary); margin-top:1px;">
+                                            Departed on <strong style="color:#f8fafc;">Move <span id="devBannerMoveNum">1</span></strong> <span id="devBannerDate" style="color:var(--text-muted); font-size:0.72rem;"></span>
+                                        </div>
+                                    </div>
+                                    <div style="display:flex; align-items:center; gap:0.35rem; margin-left:0.25rem;">
+                                        <span class="badge-pill" style="background:rgba(239,68,68,0.18); border:1px solid rgba(239,68,68,0.4); color:#f87171; font-size:0.74rem; padding:0.18rem 0.5rem; font-weight:700;">
+                                            In game: <span id="devBannerPlayedSan">...</span>
+                                        </span>
+                                        <span style="color:var(--text-muted); font-size:0.75rem;">➔</span>
+                                        <span class="badge-pill" style="background:rgba(34,197,94,0.15); border:1px solid rgba(34,197,94,0.35); color:#4ade80; font-size:0.74rem; padding:0.18rem 0.5rem; font-weight:700;">
+                                            Prepared: <span id="devBannerPreparedSan">???</span>
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div style="display:flex; align-items:center; gap:0.4rem;">
+                                    <a id="devBannerGameLink" href="#" target="_blank" rel="noopener noreferrer" class="btn-secondary" style="font-size:0.72rem; padding:0.2rem 0.5rem; text-decoration:none;" title="Open game on Lichess">
+                                        ↗ Lichess
+                                    </a>
+                                    <div style="display:inline-flex; align-items:center; gap:0.25rem; background:rgba(30,41,59,0.85); border:1px solid var(--border-color); border-radius:6px; padding:2px 5px;">
+                                        <button id="btnDevPrev" class="btn-secondary" style="font-size:0.72rem; padding:0.15rem 0.4rem; border:none; cursor:pointer;" title="Previous deviation">◀ Prev</button>
+                                        <span id="devBannerCount" style="font-size:0.75rem; font-weight:700; color:#38bdf8; min-width:70px; text-align:center;">1 of 50</span>
+                                        <button id="btnDevNext" class="btn-secondary" style="font-size:0.72rem; padding:0.15rem 0.4rem; border:none; cursor:pointer;" title="Next deviation">Next ▶</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- AGENTS.md 8.5: constant-height status strip, permanently in flow.
+                             `visibility` (not `display`) so the sidebar below never reflows. -->
+                        <div id="trainFocusBanner" style="visibility:hidden; display:flex; min-height:34px; box-sizing:border-box; background:rgba(56, 189, 248, 0.12); border:1px solid rgba(56, 189, 248, 0.3); border-radius:6px; padding:0.4rem 0.75rem; justify-content:space-between; align-items:center;">
+                            <span style="font-size:0.8rem; color:#38bdf8; font-weight:600;">
+                                🎯 Focus: <span id="trainFocusName">Opening Name</span>
+                            </span>
+                            <button id="btnClearTrainFocus" class="btn-secondary" style="font-size:0.72rem; padding:0.15rem 0.45rem;">
+                                Clear Focus
+                            </button>
+                        </div>
+
+                        <div class="drill-header">
+                            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.5rem; flex-wrap:wrap;">
+                                <div>
+                                    <div id="trainOpeningName" class="drill-title">Italian Game: Giuoco Pianissimo</div>
+                                    <div id="trainOpeningEco" class="drill-subtitle">C50 • Prepared Repertoire Line</div>
+                                </div>
+                                <!-- AGENTS.md 8.4: fixed 132px box + visibility, so the wrapping
+                                     drill header cannot reflow when the badge appears. -->
+                                <span id="trainImportantBadge" style="visibility:hidden; display:inline-flex; min-width:132px; justify-content:center; background:rgba(245, 158, 11, 0.15); border:1px solid rgba(245, 158, 11, 0.4); color:#fbbf24; padding:0.25rem 0.6rem; border-radius:4px; font-weight:700; font-size:0.75rem; align-items:center; gap:0.3rem;">⭐ Key Priority Move</span>
+                            </div>
+                        </div>
+
+                        <div id="trainPrompt" style="background:#0f172a; padding:0.85rem 1rem; border-radius:6px; border-left:4px solid var(--accent-primary);">
+                            <div style="font-weight:600; font-size:1rem; margin-bottom:0.2rem;">
+                                Your turn as <span id="trainColorSpan" style="text-transform:capitalize;">White</span>
+                            </div>
+                            <div style="color:var(--text-secondary); font-size:0.88rem;">
+                                Play your prepared repertoire move on the board.
+                            </div>
+                        </div>
+
+                        <!-- Move Notes & Ideas Callout in Trainer -->
+                        <!-- AGENTS.md 8.5 + 8.2: constant 44px box, text clamped (full note in `title`).
+                             `visibility` not `display`, so the feedback box below never moves. -->
+                        <div id="trainNoteBox" style="visibility:hidden; min-height:44px; max-height:44px; overflow:hidden; background:rgba(30, 41, 59, 0.85); border:1px solid rgba(148, 163, 184, 0.25); border-left:3px solid #38bdf8; padding:0.6rem 0.8rem; border-radius:6px; font-size:0.85rem; color:var(--text-primary);">
+                            <div style="font-size:0.72rem; color:#38bdf8; font-weight:700; text-transform:uppercase; margin-bottom:0.25rem;">📝 Move Note / Idea:</div>
+                            <div id="trainNoteContent" style="display:block; max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.45;"></div>
+                        </div>
+
+                        <div id="trainFeedback" class="feedback-box"></div>
+
+                        <!-- Chessbook-Style Repertoire Mastery Progress Card (Relocated into Sidebar) -->
+                        <div class="trainer-mastery-card card-panel" style="margin-bottom:0; padding:0.75rem 1rem;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem; flex-wrap:wrap; gap:0.4rem;">
+                                <div style="display:flex; align-items:center; gap:0.45rem;">
+                                    <span style="font-weight:700; font-size:0.88rem; color:#fff;">Repertoire Mastery</span>
+                                    <span id="trainScopeBadge" style="font-size:0.72rem; color:#38bdf8; background:rgba(56, 189, 248, 0.12); border:1px solid rgba(56, 189, 248, 0.3); padding:0.1rem 0.45rem; border-radius:4px; font-weight:600;">All Studies</span>
+                                </div>
+                                <div style="display:flex; align-items:center; gap:0.6rem; font-size:0.8rem;">
+                                    <span style="color:var(--text-muted);">Mastered:</span>
+                                    <span id="trainMasteredHeadline" style="font-weight:800; font-size:0.95rem; color:#4ade80;">0%</span>
+                                </div>
+                            </div>
+
+                            <!-- Multi-segment Chessbook progress bar -->
+                            <div class="mastery-progress-track" style="margin-bottom:0.45rem;">
+                                <div id="masterySegMastered" class="mastery-seg-mastered" style="width:0%;" title="Mastered (No errors ever)"></div>
+                                <div id="masterySegLearning" class="mastery-seg-learning" style="width:0%;" title="Partially Mastered (In spaced repetition)"></div>
+                                <div id="masterySegUnlearned" class="mastery-seg-unlearned" style="width:100%;" title="Not Mastered / Untrained"></div>
+                            </div>
+
+                            <!-- Legend & Detailed Counts -->
+                            <div class="mastery-legend-row" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; font-size:0.75rem;">
+                                <div style="display:flex; align-items:center; gap:0.8rem; flex-wrap:wrap;">
+                                    <div style="display:flex; align-items:center; gap:0.3rem;" title="Mastered: Correct on spaced repetition with zero errors">
+                                        <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#22c55e;"></span>
+                                        <span style="color:#f8fafc; font-weight:600;">Mastered:</span>
+                                        <span id="trainMasteredCount" style="color:#4ade80; font-weight:700;">0</span>
+                                        <span id="trainMasteredPct" style="color:var(--text-muted);">(0%)</span>
+                                    </div>
+                                    <div style="display:flex; align-items:center; gap:0.3rem;" title="Learning: Move played correctly but still in spaced repetition process">
+                                        <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#f59e0b;"></span>
+                                        <span style="color:#f8fafc; font-weight:600;">Learning:</span>
+                                        <span id="trainLearningCount" style="color:#fbbf24; font-weight:700;">0</span>
+                                        <span id="trainLearningPct" style="color:var(--text-muted);">(0%)</span>
+                                    </div>
+                                    <div style="display:flex; align-items:center; gap:0.3rem;" title="Unlearned: Not yet trained or not mastered">
+                                        <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#64748b;"></span>
+                                        <span style="color:#f8fafc; font-weight:600;">Unlearned:</span>
+                                        <span id="trainUnlearnedCount" style="color:#94a3b8; font-weight:700;">0</span>
+                                        <span id="trainUnlearnedPct" style="color:var(--text-muted);">(100%)</span>
+                                    </div>
+                                </div>
+                                <div style="color:var(--text-muted); font-size:0.72rem;">
+                                    <span id="trainTotalMovesCount">0</span> total user moves
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="analysis-accordion">
+                            <div class="accordion-title">Repertoire Info</div>
+                            <div style="font-size:0.85rem; color:var(--text-secondary); line-height:1.45;">
+                                The computer automatically plays the opponent's moves from your tree weighted by 2000+ frequency. Play your response to master your opening lines.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Session Complete Modal Overlay -->
+                <div id="trainSessionCompleteModal" class="modal-overlay" style="display:none;">
+                    <div class="card-panel" style="max-width:440px; width:90%; padding:1.75rem; text-align:center; background:#0f172a; border:2px solid #38bdf8; border-radius:12px; box-shadow:0 12px 36px rgba(0,0,0,0.8);">
+                        <div id="modalSessionIcon" style="font-size:2.5rem; margin-bottom:0.5rem;">🎉</div>
+                        <h3 id="modalSessionTitle" style="font-size:1.35rem; color:#fff; margin-bottom:0.35rem;">20-Move Session Complete!</h3>
+                        <p id="modalSessionSubtitle" style="font-size:0.88rem; color:var(--text-secondary); margin-bottom:1.25rem;">
+                            Great work! You've completed your 20-move opening training session.
+                        </p>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:1.5rem; text-align:left;">
+                            <div style="background:rgba(30, 41, 59, 0.6); border:1px solid #334155; border-radius:8px; padding:0.75rem;">
+                                <div style="font-size:0.72rem; color:var(--text-muted); text-transform:uppercase;">Session Accuracy</div>
+                                <div id="modalSessionAccuracy" style="font-size:1.35rem; font-weight:800; color:#38bdf8;">100%</div>
+                            </div>
+                            <div style="background:rgba(30, 41, 59, 0.6); border:1px solid #334155; border-radius:8px; padding:0.75rem;">
+                                <div style="font-size:0.72rem; color:var(--text-muted); text-transform:uppercase;">Correct Moves</div>
+                                <div id="modalSessionScore" style="font-size:1.35rem; font-weight:800; color:#4ade80;">20 / 20</div>
+                            </div>
+                        </div>
+                        <div id="modalSessionReinforceBox" style="display:none; background:rgba(245, 158, 11, 0.12); border:1px solid #f59e0b; border-radius:8px; padding:0.75rem; margin-bottom:1.25rem; text-align:left; font-size:0.82rem; color:#fde68a;">
+                            <span style="font-weight:700;">⚠️ Missed Moves:</span> You missed <strong id="modalSessionMissedCount">0</strong> moves. Reinforce them now to lock them into memory!
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:0.6rem;">
+                            <button id="btnModalReinforceSession" class="btn-primary" style="display:none; padding:0.65rem; font-size:0.95rem; font-weight:700; background:linear-gradient(135deg, #f59e0b, #d97706); border-color:#d97706;">
+                                🎯 Reinforce Missed Moves (<span id="modalBtnReinforceCount">0</span>) &rarr;
+                            </button>
+                            <button id="btnModalNextSession" class="btn-primary" style="padding:0.65rem; font-size:0.95rem; font-weight:700;">
+                                Start Next 20-Move Session &rarr;
+                            </button>
+                            <button id="btnModalCloseSession" class="btn-secondary" style="padding:0.5rem; font-size:0.85rem;">
+                                Continue Free Practice
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div> <!-- /#trainerDrillsSection -->
+
+            <!-- Game Deviations Section -->
+            <div id="trainerDeviationsView" style="display:none; flex-direction:column; gap:1rem;">
+                <!-- Deviations Stats & Controls Bar -->
+                <div class="card-panel" style="padding:1rem; background:rgba(15,23,42,0.8); border:1px solid var(--border-color); border-radius:8px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+                        <div style="display:flex; align-items:center; gap:1.75rem; flex-wrap:wrap;">
+                            <div>
+                                <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Analyzed Games</div>
+                                <div id="devStatTotalGames" style="font-size:1.35rem; font-weight:800; color:#fff;">--</div>
+                            </div>
+                            <div>
+                                <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Repertoire Compliance</div>
+                                <div id="devStatCompliancePct" style="font-size:1.35rem; font-weight:800; color:#4ade80;">--%</div>
+                            </div>
+                            <div>
+                                <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Games with Deviations</div>
+                                <div id="devStatTotalDeviations" style="font-size:1.35rem; font-weight:800; color:#f87171;">--</div>
+                            </div>
+                        </div>
+
+                        <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+                            <!-- Color filter pills -->
+                            <div class="filter-pill-group" style="display:flex; gap:0.2rem; background:rgba(30,41,59,0.8); padding:3px; border-radius:6px; border:1px solid var(--border-color);">
+                                <button class="filter-pill-btn active" id="btnFilterDevAll" data-filter="all" style="font-size:0.75rem; padding:0.25rem 0.6rem; border:none; border-radius:4px; background:#0284c7; color:#fff; cursor:pointer;">All</button>
+                                <button class="filter-pill-btn" id="btnFilterDevWhite" data-filter="white" style="font-size:0.75rem; padding:0.25rem 0.6rem; border:none; border-radius:4px; background:transparent; color:var(--text-secondary); cursor:pointer;">White</button>
+                                <button class="filter-pill-btn" id="btnFilterDevBlack" data-filter="black" style="font-size:0.75rem; padding:0.25rem 0.6rem; border:none; border-radius:4px; background:transparent; color:var(--text-secondary); cursor:pointer;">Black</button>
+                            </div>
+                            <!-- Search -->
+                            <input type="text" id="inputDeviationsSearch" placeholder="Search opponent or opening..." style="background:rgba(15,23,42,0.9); border:1px solid var(--border-color); border-radius:5px; color:#f8fafc; font-size:0.8rem; padding:0.35rem 0.6rem; width:210px;" />
+                            <button id="btnRefreshDeviations" class="btn-secondary" style="font-size:0.78rem; padding:0.35rem 0.65rem;" title="Refresh game deviations">🔄 Refresh</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Deviations List -->
+                <div id="trainerDeviationsList" class="deviations-list" style="display:flex; flex-direction:column; gap:0.75rem;">
+                    <div style="text-align:center; color:var(--text-muted); padding:2rem;">Loading game deviations...</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- OPENING SCOUT VIEW -->
+        <section id="viewScout" class="view-section">
+            <!-- Search & Scout Bar -->
+            <div class="card-panel scout-search-panel">
+                <div class="scout-header-content">
+                    <div class="scout-header-titles">
+                        <div class="scout-main-title">
+                            <span class="scout-icon" aria-hidden="true">🔭</span>
+                            <span>Opening Scout & Video Move Extractor</span>
+                        </div>
+                        <div class="scout-subtitle">
+                            Search online opening guides, video lessons, and courses. Extract moves, positions, and commentary, and play back lines in sync with the interactive board.
+                        </div>
+                    </div>
+                    <div class="scout-header-actions">
+                        <button id="btnScoutDirectInput" class="btn-secondary" title="Paste a direct YouTube URL, Lichess study link, or PGN">
+                            🔗 Paste Link / PGN
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Intent controls: which side I play, and whether I want to play the
+                     opening or face it. Both are fixed-height segmented groups so
+                     switching between them cannot reflow the row (AGENTS.md §8.4), and
+                     both have an "auto" default, which is what tells the server to infer
+                     the intent from the query text. -->
+                <div class="scout-intent-bar-wrap">
+                    <div class="scout-intent-group" role="group" aria-label="Side you play">
+                        <span class="scout-intent-label">I play</span>
+                        <button type="button" class="scout-intent-btn active" data-intent-side="" title="Work out the side from the opening name">Auto</button>
+                        <button type="button" class="scout-intent-btn" data-intent-side="white" title="Show material for playing White">⚪ White</button>
+                        <button type="button" class="scout-intent-btn" data-intent-side="black" title="Show material for playing Black">⚫ Black</button>
+                    </div>
+                    <div class="scout-intent-group" role="group" aria-label="Play it or face it">
+                        <span class="scout-intent-label">I want</span>
+                        <button type="button" class="scout-intent-btn active" data-intent-mode="" title="Work out the intent from the wording">Auto</button>
+                        <button type="button" class="scout-intent-btn" data-intent-mode="play" title="Show material for playing this opening myself">▶ Play it</button>
+                        <button type="button" class="scout-intent-btn" data-intent-mode="against" title="Show material for meeting this opening as my opponent's choice">🛡 Play against it</button>
+                    </div>
+                </div>
+
+                <!-- Search Input Row -->
+                <form id="scoutSearchForm" class="scout-search-form">
+                    <div class="scout-input-wrapper">
+                        <span class="scout-search-icon" aria-hidden="true">🔍</span>
+                        <input type="text" id="scoutSearchInput" class="scout-input" placeholder="Search opening (e.g. Caro-Kann, Italian Game, Sicilian Najdorf, Alapin)..." autocomplete="off" role="combobox" aria-expanded="false" aria-controls="scoutSuggestBox">
+                        <button type="submit" id="btnScoutSubmit" class="btn-primary">Scout Online</button>
+                        <div id="scoutSuggestBox" class="scout-suggest-box is-hidden" role="listbox" aria-label="Opening suggestions"></div>
+                    </div>
+                </form>
+
+                <!-- Always-in-flow status strip: declares what the shelf is answering.
+                     Constant height (§8.5), clamped with a title (§8.2). -->
+                <div id="scoutIntentBar" class="scout-status-strip" title="">Search an opening to see what answers your question.</div>
+
+                <!-- Disambiguation chips. Rendered only when a name is genuinely
+                     ambiguous; the row itself is always present at a fixed height. -->
+                <div class="scout-candidate-row">
+                    <span id="scoutCandidateLabel" class="scout-candidate-label"></span>
+                    <div id="scoutCandidateChips" class="scout-candidate-chips"></div>
+                </div>
+
+                <!-- Quick Suggestion Chips -->
+                <div class="scout-chips-container">
+                    <span class="scout-chips-label">Popular Openings:</span>
+                    <div class="scout-chips-list">
+                        <button type="button" class="scout-chip active" data-query="Caro-Kann Defense">Caro-Kann</button>
+                        <button type="button" class="scout-chip" data-query="Italian Game">Italian Game</button>
+                        <button type="button" class="scout-chip" data-query="Sicilian Defense">Sicilian</button>
+                        <button type="button" class="scout-chip" data-query="King's Indian Defense">King's Indian</button>
+                        <button type="button" class="scout-chip" data-query="London System">London System</button>
+                        <button type="button" class="scout-chip" data-query="French Defense">French</button>
+                        <button type="button" class="scout-chip" data-query="Ruy Lopez">Ruy Lopez</button>
+                        <button type="button" class="scout-chip" data-query="Vienna Game">Vienna Game</button>
+                        <button type="button" class="scout-chip scout-chip-rep" id="chipCurrentRep" title="Scout based on current opening in Repertoire Builder">⚡ Current Repertoire</button>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- Scout Results & Discovered Guides Section -->
+            <div id="scoutResultsSection" class="scout-results-wrap">
+                <div class="scout-shelf-header">
+                    <div class="scout-shelf-title">
+                        <span>Discovered Courses & Video Guides</span>
+                        <span id="scoutResultsCount" class="badge-pill">0</span>
+                    </div>
+                    <div class="scout-shelf-filters">
+                        <div class="scout-intent-group scout-intent-group--sort" role="group" aria-label="Sort results">
+                            <span class="scout-intent-label">Sort</span>
+                            <button type="button" class="scout-intent-btn active" data-intent-sort="match" title="Best answer to your question first">Best match</button>
+                            <button type="button" class="scout-intent-btn" data-intent-sort="shortest" title="Quickest to watch">Shortest</button>
+                            <button type="button" class="scout-intent-btn" data-intent-sort="newest" title="Most recently published">Newest</button>
+                            <button type="button" class="scout-intent-btn" data-intent-sort="extracted" title="Content you already extracted first">Extracted</button>
+                        </div>
+                        <button type="button" class="scout-filter-btn active" data-filter="all">All Content</button>
+                        <button type="button" class="scout-filter-btn" data-filter="youtube">Videos</button>
+                        <button type="button" class="scout-filter-btn" data-filter="eco_guide">Theory & Studies</button>
+                        <button type="button" class="scout-filter-btn" data-filter="recent">Recent History</button>
+                        <button type="button" class="scout-filter-btn" data-filter="favorites" title="Only the guides and videos you bookmarked with the ★ button">★ Bookmarked</button>
+                    </div>
+                </div>
+
+                <div id="scoutLoadingIndicator" class="scout-loading-card" style="display:none;">
+                    <div class="spinner"></div>
+                    <div id="scoutLoadingText">Scouting online for chess guides and videos...</div>
+                </div>
+
+                <div id="scoutResultsGrid" class="scout-cards-grid">
+                    <!-- Discovered cards inserted here -->
+                </div>
+            </div>
+
+            <!-- Active Video & Move Playback Studio -->
+            <div id="scoutStudio" class="scout-studio-container" style="display:none;">
+                <!-- Top Studio Navigation & Title -->
+                <div class="scout-studio-top-bar">
+                    <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+                        <button id="btnBackToScoutSearch" class="btn-secondary" style="font-size:0.8rem; padding:0.35rem 0.65rem;">
+                            ◀ Back to Scout Results
+                        </button>
+                        <div>
+                            <div id="scoutStudioTitle" style="font-weight:700; font-size:1.05rem; color:#fff;">Learn the Caro-Kann Defense</div>
+                            <div style="font-size:0.78rem; color:var(--text-secondary); display:flex; align-items:center; gap:0.5rem;">
+                                <span id="scoutStudioChannel">GothamChess</span> • 
+                                <span id="scoutStudioDuration">09:26</span> • 
+                                <span id="scoutStudioEco" class="badge-eco">B10</span>
+                                <span id="scoutStudioOpeningName" style="color:var(--accent-primary); font-weight:600;">Caro-Kann Defense</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap;">
+                        <div class="study-selector-wrap scout-study-selector-wrap" style="display:flex; align-items:center; gap:0.5rem; background:rgba(30, 41, 59, 0.7); padding:0.3rem 0.6rem; border-radius:8px; border:1px solid #334155;">
+                            <span style="font-size:0.8rem; font-weight:700; color:#38bdf8;">STUDY:</span>
+                            <select id="scoutStudySelect" style="padding:0.25rem 0.5rem; border-radius:5px; background:#0f172a; color:#fff; border:1px solid #475569; font-size:0.85rem; max-width:200px;">
+                                <option value="">(All Studies)</option>
+                            </select>
+                            <button id="btnScoutNewStudy" type="button" class="btn-secondary" style="font-size:0.75rem; padding:0.25rem 0.5rem;" title="Create a new study">+ New</button>
+                        </div>
+                        <button id="btnScoutTrainOpening" class="btn-primary" style="font-size:0.8rem; padding:0.35rem 0.65rem;" title="Train and practice this opening in Repertoire Trainer">
+                            🏋️ Train This Opening
+                        </button>
+                        <button id="btnScoutFav" class="btn-secondary" title="Bookmark / Favorite" style="font-size:0.8rem; padding:0.35rem 0.65rem;">
+                            ★ Favorite
+                        </button>
+                        <a id="btnScoutOpenYoutube" href="#" target="_blank" class="btn-secondary" style="font-size:0.8rem; padding:0.35rem 0.65rem; text-decoration:none;" title="Open in YouTube">
+                            ↗ YouTube
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Studio Workspace Layout: Video (Left), Board (Center), Explored Lines Tree (Right) -->
+                <div class="scout-workspace-layout">
+                    <!-- Left Column: Video Player & Media Controls -->
+                    <div class="scout-video-column">
+                        <div class="card-panel scout-player-card">
+                            <div class="scout-video-embed-wrap">
+                                <div id="scoutYoutubePlayer"></div>
+                                <div id="scoutNonVideoPlaceholder" style="display:none;" class="scout-non-video-panel">
+                                    <div style="font-size:2rem; margin-bottom:0.5rem;">📖</div>
+                                    <div style="font-weight:600;" id="scoutNonVideoTitle">Master Opening Study</div>
+                                    <div style="font-size:0.8rem; color:var(--text-secondary); margin-top:0.3rem;">Interactive chess move playback</div>
+                                </div>
+                            </div>
+
+                            <div class="scout-video-meta-bar">
+                                <div style="display:flex; align-items:center; gap:0.5rem;">
+                                    <span class="scout-live-indicator" id="scoutLiveIndicator"></span>
+                                    <span id="scoutCurrentTimeDisplay" style="font-family:monospace; font-size:0.85rem; font-weight:600; color:#38bdf8;">00:00 / 00:00</span>
+                                </div>
+                                <div style="display:flex; align-items:center; gap:0.4rem;">
+                                    <label for="scoutChapterSelect" style="font-size:0.75rem; color:var(--text-muted);">Chapter:</label>
+                                    <select id="scoutChapterSelect" style="font-size:0.78rem; padding:0.2rem 0.4rem; max-width:180px;">
+                                        <option value="">Jump to Chapter...</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Center Column: Interactive Board & Playback Controls -->
+                    <div class="scout-board-column">
+                        <div class="board-eval-container">
+                            <!-- Real-time Evaluation Bar -->
+                            <div class="eval-bar-wrapper" id="scoutEvalBarWrapper" title="Stockfish Real-time Evaluation">
+                                <div class="eval-bar-fill" id="scoutEvalBarFill" style="height: 50%;"></div>
+                                <div class="eval-bar-label equal" id="scoutEvalBarLabel">+0.0</div>
+                            </div>
+                            <div id="scoutBoard"></div>
+                        </div>
+
+                        <!-- Move Breadcrumbs & Opening Info -->
+                        <div class="scout-board-info-strip">
+                            <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:nowrap; overflow:hidden;">
+                                <span id="scoutCurrentMoveNum" style="font-weight:700; color:var(--accent-primary); font-size:0.9rem; flex-shrink:0;">Start</span>
+                                <span id="scoutCurrentMoveSan" style="font-weight:700; color:#fff; font-size:1rem; flex-shrink:0;">1. ...</span>
+                                <span id="scoutCurrentOpeningTag" style="font-size:0.75rem; color:var(--text-muted);">Starting Position</span>
+                                <span style="font-size:0.74rem; color:var(--text-secondary); font-weight:600; flex-shrink:0;">(<span id="scoutActiveLinePlyCount">0</span> plies)</span>
+                            </div>
+                            <div id="scoutTurnBadge" style="font-size:0.75rem; color:var(--text-secondary); font-weight:600; flex-shrink:0;">White to move</div>
+                        </div>
+
+                        <!-- Quick Add to Repertoire Bar -->
+                        <div class="scout-quick-rep-bar">
+                            <div style="display:flex; align-items:center; gap:0.4rem; flex-wrap:wrap;">
+                                <span style="font-size:0.74rem; color:var(--text-muted); font-weight:600;">Import Line:</span>
+                                <button id="btnScoutAddMoveWhite" class="btn-secondary btn-quick-rep" title="Import the whole line leading up to this position into White Repertoire">
+                                    📥 Line &rarr; White Rep
+                                </button>
+                                <button id="btnScoutAddMoveBlack" class="btn-secondary btn-quick-rep" title="Import the whole line leading up to this position into Black Repertoire">
+                                    📥 Line &rarr; Black Rep
+                                </button>
+                                <button id="btnScoutMarkImportant" class="btn-secondary btn-quick-rep" title="Mark last played move as important (priority in opening trainer)">
+                                    ⭐ Mark Last Move Important
+                                </button>
+                                <!-- AGENTS.md 8.4: fixed 150px box + `visibility` (NOT `display`).
+                                     An inline `display:none` cannot be overridden by
+                                     `style.visibility = 'visible'` — that is exactly what kept
+                                     this button permanently invisible (CODE3-01 class of bug). -->
+                                <button id="btnScoutRemoveFromRep" class="btn-secondary btn-quick-rep" style="visibility:hidden; min-width:150px; color:#ef4444; border-color:rgba(239,68,68,0.35);" title="Remove this move and line from repertoire">
+                                    🗑️ Remove from Rep
+                                </button>
+                                <button id="btnScoutViewTree" class="btn-secondary btn-quick-rep" title="Explored lines in session tree">
+                                    🌳 Lines Tree (<span id="scoutQuickLineCount">0</span>)
+                                </button>
+                                <!-- AGENTS.md 8.4: same reserved-box treatment as above. -->
+                                <button id="btnScoutTrainAfterImport" class="btn-primary btn-quick-rep" style="visibility:hidden; min-width:150px; font-size:0.75rem; padding:0.22rem 0.5rem;" title="Train this opening now">
+                                    🏋️ Train in Trainer
+                                </button>
+                            </div>
+                            <div id="scoutActiveLineOverlap" class="scout-line-overlap-strip" style="display:flex;"><span style="font-size:0.72rem; color:var(--text-muted); font-weight:500;">Repertoire: Starting Position</span></div>
+                        </div>
+
+                        <!-- Move Notes / Master Ideas Input -->
+                        <div id="scoutMoveNoteBar" class="scout-note-bar" style="margin-top:0.35rem; background:rgba(15, 23, 42, 0.7); border:1px solid var(--border-color); border-radius:6px; padding:0.35rem 0.55rem;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem;">
+                                <label for="scoutMoveComment" style="font-size:0.75rem; font-weight:600; color:var(--text-secondary); display:flex; align-items:center; gap:0.3rem;">
+                                    <span>📝</span> <span id="scoutNoteMoveLabel">Move Note</span>:
+                                </label>
+                                <span id="scoutCommentSaveStatus" style="font-size:0.72rem; color:#4ade80; opacity:0; transition:opacity 0.2s ease;">Saved ✓</span>
+                            </div>
+                            <textarea id="scoutMoveComment" placeholder="Write thoughts, master explanations, or video advice for this move..." rows="1" style="width:100%; box-sizing:border-box; background:rgba(30, 41, 59, 0.7); border:1px solid #334155; border-radius:5px; color:#f8fafc; font-size:0.78rem; padding:0.3rem 0.5rem; resize:vertical; font-family:inherit; min-height:28px; line-height:1.3;"></textarea>
+                        </div>
+
+                        <!-- Playback & Board Navigation Controls -->
+                        <div class="scout-controls-row">
+                            <div style="display:flex; gap:0.35rem; align-items:center; flex-wrap:wrap;">
+                                <button id="btnScoutUndoMove" class="btn-primary" title="Undo last played move (↶)">↶ Undo</button>
+                                <button id="btnScoutStart" class="btn-secondary" title="Jump to Start (Home)">⏮ Start</button>
+                                <button id="btnScoutPrev" class="btn-secondary" title="Step Back (Left Arrow)">◀ Back</button>
+                                <button id="btnScoutNext" class="btn-secondary" title="Step Forward (Right Arrow)">Next ▶</button>
+                                <button id="btnScoutEnd" class="btn-secondary" title="Jump to End (End)">End ⏭</button>
+                                <button id="btnScoutResetBoard" class="btn-secondary" title="Reset Board to Starting Position">↺ Reset Board</button>
+                            </div>
+                            <div style="display:flex; gap:0.4rem; align-items:center;">
+                                <button id="btnScoutFlip" class="btn-secondary" title="Flip Board Orientation">Flip Board</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Tree of Explored Lines & Variations -->
+                    <div class="scout-timeline-column">
+                        <div class="card-panel scout-sidebar-card">
+                            <div class="scout-tree-header">
+                                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.4rem;">
+                                    <div style="display:flex; align-items:center; gap:0.4rem;">
+                                        <span style="font-weight:700; color:#fff; font-size:0.88rem;">🌳 Tree of Explored Lines</span>
+                                        <span id="scoutTreeCountBadge" class="badge-pill" style="background:#1e293b; color:#38bdf8; border:1px solid #334155; font-size:0.72rem; padding:0.12rem 0.45rem;">0 Lines</span>
+                                    </div>
+                                    <div style="display:flex; gap:0.3rem; align-items:center;">
+                                        <button id="btnImportAllWhite" class="btn-secondary btn-tree-action" title="Import ALL explored lines into White Repertoire">
+                                            📥 All &rarr; White
+                                        </button>
+                                        <button id="btnImportAllBlack" class="btn-secondary btn-tree-action" title="Import ALL explored lines into Black Repertoire">
+                                            📥 All &rarr; Black
+                                        </button>
+                                        <button id="btnClearTree" class="btn-secondary btn-tree-action" title="Reset and clear session move tree">
+                                            🗑️ Clear Tree
+                                        </button>
+                                    </div>
+                                </div>
+                                <div style="font-size:0.72rem; color:var(--text-muted); margin-top:0.35rem; line-height:1.4;">
+                                    Play moves freely on the board. Every variation and branch you explore is tracked here. Click any card to load that line back onto the board, or import whole lines into your repertoire.
+                                </div>
+                            </div>
+                            <div id="scoutVariationsList" class="scout-variations-list" style="flex:1; overflow-y:auto; padding:0.6rem;">
+                                <!-- Explored lines inserted here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SETTINGS VIEW -->
+        <section id="viewSettings" class="view-section">
+            <div class="card-panel" style="max-width: 600px;">
+                <div class="panel-header">
+                    <div class="panel-title">Settings & Configuration</div>
+                </div>
+                <form id="settingsForm" style="display:flex; flex-direction:column; gap:1.25rem;">
+                    <div>
+                        <label style="display:block; margin-bottom:0.4rem; font-weight:600;">Lichess Personal Access Token (API Key):</label>
+                        <input type="password" id="inputToken" placeholder="lip_..." style="width:100%;">
+                        <div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.35rem;">
+                            Found in `.env` or generate one at <a href="https://lichess.org/account/oauth/token" target="_blank" style="color:var(--accent-primary);">lichess.org/account/oauth/token</a>.
+                        </div>
+                    </div>
+
+                    <div>
+                        <label style="display:block; margin-bottom:0.4rem; font-weight:600;">Lichess Username:</label>
+                        <input type="text" id="inputUsername" placeholder="RobiDeli" style="width:100%;">
+                    </div>
+
+                    <div>
+                        <label style="display:block; margin-bottom:0.4rem; font-weight:600;">Gemini API Key (Optional):</label>
+                        <input type="password" id="inputGeminiKey" placeholder="AIzaSy..." style="width:100%;">
+                        <div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.35rem;">
+                            Enables AI grandmaster strategic commentary and deep opening breakdown. All local video move extraction works without a key.
+                        </div>
+                    </div>
+
+                    <div>
+                        <label style="display:block; margin-bottom:0.4rem; font-weight:600;">Default Opponent Gap Threshold:</label>
+                        <select id="inputDefaultGap" style="width:100%;">
+                            <option value="3">3% Frequency</option>
+                            <option value="5" selected>5% Frequency (Recommended)</option>
+                            <option value="8">8% Frequency</option>
+                            <option value="10">10% Frequency</option>
+                        </select>
+                        <div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.35rem;">
+                            Unprepared opponent moves played with frequency &ge; this value will be flagged as gaps.
+                        </div>
+                    </div>
+
+                    <div>
+                        <label style="display:block; margin-bottom:0.4rem; font-weight:600;">Game Speeds to Sync &amp; Review:</label>
+                        <div style="display:flex; gap:0.85rem; flex-wrap:wrap; font-size:0.85rem; color:#f8fafc; padding:0.25rem 0;">
+                            <label style="display:inline-flex; align-items:center; gap:0.35rem; cursor:pointer;">
+                                <input type="checkbox" id="syncSpeedBullet" value="bullet" checked style="accent-color:var(--accent-primary);"> Bullet
+                            </label>
+                            <label style="display:inline-flex; align-items:center; gap:0.35rem; cursor:pointer;">
+                                <input type="checkbox" id="syncSpeedBlitz" value="blitz" checked style="accent-color:var(--accent-primary);"> Blitz
+                            </label>
+                            <label style="display:inline-flex; align-items:center; gap:0.35rem; cursor:pointer;">
+                                <input type="checkbox" id="syncSpeedRapid" value="rapid" checked style="accent-color:var(--accent-primary);"> Rapid
+                            </label>
+                            <label style="display:inline-flex; align-items:center; gap:0.35rem; cursor:pointer;">
+                                <input type="checkbox" id="syncSpeedClassical" value="classical" checked style="accent-color:var(--accent-primary);"> Classical
+                            </label>
+                        </div>
+                        <div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.35rem;">
+                            Controls which game formats are downloaded from Lichess and analyzed for opening blunders.
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-primary" style="align-self:flex-start;">Save Settings</button>
+                </form>
+
+                <hr style="border:0; border-top:1px solid var(--border-color); margin: 1.5rem 0;">
+                <div style="display:flex; flex-direction:column; gap:0.5rem;">
+                    <div style="font-weight:600; font-size:0.95rem; color:#ef4444; display:flex; align-items:center; gap:0.4rem;">
+                        <span>⚠️</span> Danger Zone
+                    </div>
+                    <div style="font-size:0.82rem; color:var(--text-muted); line-height:1.4;">
+                        Permanently clear all White and Black opening repertoire moves from your database. Your downloaded games and blunder history will remain safe.
+                    </div>
+                    <div style="margin-top:0.35rem;">
+                        <button type="button" id="btnSettingsResetRepertoire" class="btn-secondary btn-danger" style="font-size:0.85rem; padding:0.45rem 0.85rem;" title="Permanently delete all repertoire moves from database">
+                            🗑️ Reset Repertoire Database
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Direct URL / PGN Dialog -->
+        <dialog id="scoutDirectDialog" class="scout-modal">
+            <div class="scout-modal-header">
+                <h3>Analyze Video URL, Study, or PGN</h3>
+                <button id="btnCloseScoutModal" type="button" class="btn-secondary" style="padding:0.2rem 0.5rem;" aria-label="Close">✕</button>
+            </div>
+            <div class="scout-modal-body">
+                <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:0.75rem;">
+                    Enter a YouTube video URL (e.g. <code>https://www.youtube.com/watch?v=...</code>), a Lichess Study link, or paste raw PGN moves:
+                </p>
+                <textarea id="scoutDirectInputText" placeholder="Paste YouTube URL, Lichess study link, or PGN text here..." rows="4" style="width:100%; margin-bottom:1rem; padding:0.5rem;"></textarea>
+                <div style="display:flex; justify-content:flex-end; gap:0.5rem;">
+                    <button id="btnCancelScoutDirect" type="button" class="btn-secondary">Cancel</button>
+                    <button id="btnSubmitScoutDirect" type="button" class="btn-primary">Analyze & Extract</button>
+                </div>
+            </div>
+        </dialog>
+
+        <!-- Study Selection & Naming Dialog (Mandatory for line imports & sessions) -->
+        <dialog id="studySelectModal" class="scout-modal" style="max-width:480px;">
+            <div class="scout-modal-header">
+                <h3 id="studyModalTitle">Save Line to Study</h3>
+                <button id="btnCloseStudyModal" type="button" class="btn-secondary" style="padding:0.2rem 0.5rem;" aria-label="Close">✕</button>
+            </div>
+            <div class="scout-modal-body">
+                <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:1rem;">
+                    Select an existing study or create a new named study for this line. Every repertoire line must belong to a named study.
+                </p>
+
+                <div style="margin-bottom:1rem; display:flex; align-items:center; gap:0.5rem;">
+                    <span style="font-size:0.8rem; color:var(--text-secondary); font-weight:600;">Repertoire:</span>
+                    <span id="studyModalColorBadge" class="badge-pill" style="text-transform:capitalize; font-weight:700;">White</span>
+                </div>
+
+                <div style="display:flex; gap:0.5rem; margin-bottom:1rem;">
+                    <button type="button" id="tabStudyExisting" class="rep-toggle-btn active" style="flex:1; text-align:center;">Existing Study</button>
+                    <button type="button" id="tabStudyNew" class="rep-toggle-btn" style="flex:1; text-align:center;">+ New Study</button>
+                </div>
+
+                <div id="studyExistingSection" style="margin-bottom:1.25rem;">
+                    <label for="studySelectDropdown" style="display:block; font-size:0.85rem; color:var(--text-secondary); margin-bottom:0.4rem; font-weight:600;">
+                        Select Existing Study:
+                    </label>
+                    <select id="studySelectDropdown" style="width:100%; padding:0.5rem 0.75rem; border-radius:6px; background:#0f172a; color:#fff; border:1px solid #334155; font-size:0.9rem;">
+                        <option value="">-- Choose Study --</option>
+                    </select>
+                </div>
+
+                <div id="studyNewSection" style="margin-bottom:1.25rem; display:none;">
+                    <label for="studyNewNameInput" style="display:block; font-size:0.85rem; color:var(--text-secondary); margin-bottom:0.4rem; font-weight:600;">
+                        New Study Name:
+                    </label>
+                    <input type="text" id="studyNewNameInput" placeholder="e.g. Caro-Kann Fantasy Variation" autocomplete="off" style="width:100%; padding:0.5rem 0.75rem; border-radius:6px; background:#0f172a; color:#fff; border:1px solid #334155; font-size:0.9rem;" />
+                </div>
+
+                <div id="studyModalError" style="display:none; color:#ef4444; font-size:0.85rem; margin-bottom:0.75rem; font-weight:600;"></div>
+
+                <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1rem;">
+                    <button id="btnCancelStudyModal" type="button" class="btn-secondary">Cancel</button>
+                    <button id="btnConfirmStudyModal" type="button" class="btn-primary">Save to Study</button>
+                </div>
+            </div>
+        </dialog>
+
+        <!-- Repertoire Import Modal Dialog (Chessbook / PGN) -->
+        <dialog id="importRepertoireModal" class="scout-modal" style="max-width:580px; width:92%;">
+            <div class="scout-modal-header">
+                <div style="display:flex; align-items:center; gap:0.5rem;">
+                    <span style="font-size:1.25rem;">📥</span>
+                    <h3 style="margin:0; font-size:1.15rem; color:#fff;">Import Repertoire (Chessbook / PGN)</h3>
+                </div>
+                <button id="btnCloseImportModal" type="button" class="btn-secondary" style="padding:0.2rem 0.5rem;" aria-label="Close">✕</button>
+            </div>
+            <div class="scout-modal-body">
+                <!-- Instructions for Chessbook -->
+                <div style="background:rgba(56, 189, 248, 0.08); border:1px solid rgba(56, 189, 248, 0.25); border-radius:8px; padding:0.65rem 0.85rem; margin-bottom:1rem; font-size:0.82rem; color:#cbd5e1; line-height:1.45;">
+                    <strong style="color:#38bdf8;">Exporting from Chessbook:</strong>
+                    In <a href="https://chessbook.com" target="_blank" style="color:#38bdf8; text-decoration:underline;">chessbook.com</a>, open your White or Black repertoire &rarr; menu &rarr; click <strong>Export PGN</strong> &rarr; upload or paste the file below.
+                </div>
+
+                <!-- Target Repertoire -->
+                <div style="margin-bottom:0.9rem;">
+                    <label style="display:block; font-size:0.8rem; font-weight:600; color:var(--text-secondary); margin-bottom:0.35rem;">TARGET REPERTOIRE:</label>
+                    <div style="display:flex; gap:0.5rem;">
+                        <button type="button" id="importRepAuto" class="rep-toggle-btn active" style="flex:1; text-align:center;">⚡ Auto-Detect</button>
+                        <button type="button" id="importRepWhite" class="rep-toggle-btn" style="flex:1; text-align:center;">⚪ White</button>
+                        <button type="button" id="importRepBlack" class="rep-toggle-btn" style="flex:1; text-align:center;">⚫ Black</button>
+                    </div>
+                </div>
+
+                <!-- Study Organization -->
+                <div style="margin-bottom:0.9rem; background:rgba(30, 41, 59, 0.5); padding:0.6rem 0.75rem; border-radius:6px; border:1px solid #334155;">
+                    <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.85rem; color:#f1f5f9; cursor:pointer;">
+                        <input type="checkbox" id="importSplitChaptersCheck" checked style="accent-color:#38bdf8; cursor:pointer;" />
+                        <span>Create a named study for each chapter / event in PGN</span>
+                    </label>
+                    <div id="importSingleStudyWrap" style="margin-top:0.5rem; display:none;">
+                        <label for="importStudyNameInput" style="display:block; font-size:0.75rem; color:var(--text-muted); margin-bottom:0.25rem;">Or tag all lines under a single study name:</label>
+                        <input type="text" id="importStudyNameInput" placeholder="e.g. Chessbook Repertoire" style="width:100%; padding:0.35rem 0.5rem; border-radius:5px; background:#0f172a; color:#fff; border:1px solid #475569; font-size:0.85rem;" />
+                    </div>
+                </div>
+
+                <!-- File drop & Textarea -->
+                <div style="margin-bottom:0.9rem;">
+                    <label style="display:block; font-size:0.8rem; font-weight:600; color:var(--text-secondary); margin-bottom:0.35rem;">PGN FILE OR TEXT:</label>
+                    <div id="importPgnDropZone" style="border:2px dashed #475569; border-radius:8px; padding:0.85rem; text-align:center; cursor:pointer; background:rgba(15, 23, 42, 0.6); transition:border-color 0.2s, background 0.2s; margin-bottom:0.5rem;">
+                        <div style="font-size:1.4rem; margin-bottom:0.25rem;">📁</div>
+                        <div style="font-size:0.85rem; color:#cbd5e1;"><span style="color:#38bdf8; font-weight:600;">Click to select .pgn file</span> or drag & drop here</div>
+                        <input type="file" id="importFileInput" accept=".pgn,.txt" style="display:none;" />
+                    </div>
+                    <textarea id="importPgnText" rows="4" placeholder="Or paste PGN text here (e.g. 1. e4 c5 2. Nf3...)" style="width:100%; padding:0.5rem; border-radius:6px; background:#0f172a; color:#fff; border:1px solid #334155; font-size:0.85rem; font-family:monospace; resize:vertical;"></textarea>
+                </div>
+
+                <!-- Conflict Mode & Wipe -->
+                <div style="margin-bottom:0.9rem; font-size:0.82rem; color:var(--text-secondary);">
+                    <label style="display:block; font-weight:600; margin-bottom:0.35rem;">CONFLICT RESOLUTION:</label>
+                    <div style="display:flex; flex-direction:column; gap:0.35rem;">
+                        <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer;">
+                            <input type="radio" name="importConflictMode" value="replace" checked style="accent-color:#38bdf8;" />
+                            <span><strong>Merge &amp; Update</strong> (Chessbook moves replace conflicting prepared moves)</span>
+                        </label>
+                        <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer;">
+                            <input type="radio" name="importConflictMode" value="keep" style="accent-color:#38bdf8;" />
+                            <span><strong>Merge &amp; Keep</strong> (Keep your currently prepared moves on conflict)</span>
+                        </label>
+                        <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer; color:#f87171; margin-top:0.25rem;">
+                            <input type="checkbox" id="importCleanWipeCheck" style="accent-color:#ef4444;" />
+                            <span>Clean import: wipe existing repertoire for this color before importing</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Live Preview Card -->
+                <div id="importPreviewCard" style="display:none; background:rgba(30, 41, 59, 0.7); border:1px solid #38bdf8; border-radius:8px; padding:0.65rem 0.85rem; margin-bottom:1rem; font-size:0.82rem;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem;">
+                        <span style="font-weight:700; color:#38bdf8;">PGN PREVIEW</span>
+                        <span id="previewDetectedBadge" class="badge-pill" style="font-weight:700;">⚪ White</span>
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.5rem; text-align:center;">
+                        <div style="background:#0f172a; padding:0.4rem; border-radius:5px;">
+                            <div style="color:var(--text-muted); font-size:0.7rem;">TOTAL PLIES</div>
+                            <div id="previewTotalPlies" style="font-weight:800; font-size:1.1rem; color:#fff;">--</div>
+                        </div>
+                        <div style="background:#0f172a; padding:0.4rem; border-radius:5px;">
+                            <div style="color:var(--text-muted); font-size:0.7rem;">USER MOVES</div>
+                            <div id="previewUserPlies" style="font-weight:800; font-size:1.1rem; color:#4ade80;">--</div>
+                        </div>
+                        <div style="background:#0f172a; padding:0.4rem; border-radius:5px;">
+                            <div style="color:var(--text-muted); font-size:0.7rem;">OPPONENT MOVES</div>
+                            <div id="previewOppPlies" style="font-weight:800; font-size:1.1rem; color:#38bdf8;">--</div>
+                        </div>
+                    </div>
+                    <div id="previewChaptersList" style="margin-top:0.4rem; color:var(--text-secondary); font-size:0.78rem;"></div>
+                </div>
+
+                <div id="importModalError" style="display:none; color:#ef4444; font-size:0.85rem; margin-bottom:0.75rem; font-weight:600;"></div>
+
+                <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1rem;">
+                    <button id="btnCancelImportModal" type="button" class="btn-secondary">Cancel</button>
+                    <button id="btnSubmitImportModal" type="button" class="btn-primary" disabled>Start Import</button>
+                </div>
+            </div>
+        </dialog>
+
+        <!-- Group Subtree / Sub-block Modal -->
+        <dialog id="groupSubtreeModal" class="scout-modal" style="max-width: 520px; width: 92%; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main); border-radius: 12px; padding: 1.5rem; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);">
+            <div style="display: flex; flex-direction: column; gap: 1rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem;">
+                    <h3 style="margin: 0; font-size: 1.15rem; font-weight: 700; color: #38bdf8; display:flex; align-items:center; gap:0.5rem;">
+                        <span>📁</span> Create Sub-block Study
+                    </h3>
+                    <button id="btnCloseSubtreeModal" type="button" class="btn-icon" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:1.2rem;">&times;</button>
+                </div>
+                
+                <p style="margin: 0; font-size: 0.88rem; color: var(--text-secondary); line-height: 1.45;">
+                    Group all repertoire moves starting from this current board position into a dedicated named study. Any new moves you record in this line will automatically belong to this sub-block.
+                </p>
+
+                <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem 1rem; display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.85rem;">
+                    <div style="display:flex; justify-content:space-between;">
+                        <span style="color:var(--text-muted);">Current Line / Opening:</span>
+                        <span id="subtreeCurrentOpening" style="font-weight: 600; color: #f1f5f9;">--</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between;">
+                        <span style="color:var(--text-muted);">Moves in this Subtree:</span>
+                        <span id="subtreeDescendantCount" style="font-weight: 700; color: #4ade80;">-- moves</span>
+                    </div>
+                </div>
+
+                <div>
+                    <label for="subtreeStudyNameInput" style="display:block; font-size:0.85rem; font-weight:600; color:var(--text-secondary); margin-bottom:0.35rem;">
+                        Sub-block / Study Name:
+                    </label>
+                    <input id="subtreeStudyNameInput" type="text" class="input-text" placeholder="e.g. Caro-Kann, Najdorf Sicilian, London..." style="width: 100%; box-sizing: border-box; padding: 0.55rem 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-dark); color: #fff; font-size: 0.9rem;" />
+                </div>
+
+                <div>
+                    <label style="display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.82rem; color: var(--text-secondary); cursor: pointer;">
+                        <input type="checkbox" id="subtreeIncludePreludeCheck" checked style="margin-top: 0.15rem; accent-color: #38bdf8;" />
+                        <span>Include opening moves leading up to this position (recommended for trainer drilling)</span>
+                    </label>
+                </div>
+
+                <div id="subtreeModalError" style="display:none; color:#ef4444; font-size:0.85rem; font-weight:600;"></div>
+
+                <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:0.5rem;">
+                    <button id="btnCancelSubtreeModal" type="button" class="btn-secondary">Cancel</button>
+                    <button id="btnConfirmGroupSubtree" type="button" class="btn-primary">Create &amp; Group Moves</button>
+                </div>
+            </div>
+        </dialog>
+    </main>
+
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <script src="/repertoire_builder.js?v=20260926_1"></script>
+    <script src="/repertoire_trainer.js?v=20260925_13"></script>
+    <script src="/scout.js?v=20260925_13"></script>
+    <script src="/app.js?v=20260925_13"></script>
+</body>
+</html>

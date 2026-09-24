@@ -1,0 +1,33 @@
+pre-fix snapshot : /home/robin/Projects/ChessImprovement/audit/scripts/api_prefix_snapshot_FIXER-L.py
+patched module  : /home/robin/Projects/ChessImprovement/backend/api.py
+
+CHECK                                                BEFORE (pre-fix api.py)                          AFTER
+----------------------------------------------------------------------------------------------------------------------------------
+check_hostile_origin_cannot_mutate                   AssertionError: {"status":"ok","message":"Enti   PASS
+check_no_cors_reflection_on_any_route                AssertionError: GET /api/dashboard reflected O   PASS
+check_cross_origin_preflight_is_refused              AssertionError: OK                               PASS
+check_fetch_metadata_blocks_cross_site               AssertionError: Sec-Fetch-Site cross-site: {"s   PASS
+check_mutating_request_without_origin_is_allowed     AssertionError: {"status":"success","move":{"i   PASS
+check_hostile_origin_refused_because_of_the_origin   AssertionError: loopback Host: 200 {"status":"   PASS
+check_dns_rebinding_is_blunted                       AssertionError: {"status":"ok","message":"Enti   PASS
+check_local_origin_still_works                       AssertionError: OK                               PASS
+check_malformed_origins_are_not_pattern_matched      AttributeError: module 'api_prefix_snapshot_FI   PASS
+check_security_headers_present                       AssertionError: / is missing content-security-   PASS
+check_blunder_list_is_bounded                        AssertionError: limit=-1 -> 200 [{"id":6,"game   PASS
+check_blunder_id_out_of_int64_is_4xx                 AssertionError: id=9223372036854775808 -> 500    PASS
+check_deeply_nested_json_is_4xx                      AssertionError: depth=1000 -> 500                PASS
+check_recursion_and_overflow_are_4xx                 AssertionError: RecursionError -> 500: Interna   PASS
+check_oversized_body_is_413                          AssertionError: 8MB -> 200                       PASS
+check_persisted_fields_are_capped                    AssertionError: POST /api/settings with a 4 MB   PASS
+check_unbounded_list_is_rejected                     AssertionError: {"detail":"Too many lines (200   PASS
+check_blunder_detail_explorer_is_cached              AssertionError: no in-process explorer memo to   PASS
+check_blunder_detail_reads_explorer_cache            AttributeError: module 'api_prefix_snapshot_FI   PASS
+check_analysis_max_games_is_bounded                  AssertionError: 0                                PASS
+check_dashboard_eco_is_deterministic                 AssertionError: reported eco 'B20' is not the    PASS
+check_chess960_fen_is_rejected                       AssertionError: Shredder-FEN was accepted        PASS
+check_engine_busy_is_503                             AssertionError: backend.api does not import En   PASS
+check_shutdown_closes_the_sync_pool                  AttributeError: module 'api_prefix_snapshot_FI   PASS
+check_game_gaps_rows_carry_best_san_and_cpl_loss     ok                                               PASS
+
+BEFORE: 1 passed / 24 failed
+AFTER : 25 passed / 0 failed

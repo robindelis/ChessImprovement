@@ -1,0 +1,4200 @@
+:root {
+    --bg-main: #0b0f19;
+    --bg-card: #151d30;
+    --bg-card-hover: #1e2942;
+    --border-color: #243049;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --accent-primary: #38bdf8;
+    --accent-emerald: #22c55e;
+    --accent-crimson: #ef4444;
+    --accent-amber: #f59e0b;
+    --board-light: #e2e8f0;
+    --board-dark: #64748b;
+    --board-highlight: rgba(245, 158, 11, 0.45);
+    --board-size: clamp(480px, min(calc(100vh - 180px), calc(100vw - 440px)), 1200px);
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+body {
+    background-color: var(--bg-main);
+    color: var(--text-primary);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Header & Nav */
+header {
+    background-color: var(--bg-card);
+    border-bottom: 1px solid var(--border-color);
+    padding: 0.75rem 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: #fff;
+}
+
+.brand span {
+    color: var(--accent-primary);
+}
+
+.nav-tabs {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.nav-tab {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.nav-tab:hover {
+    color: var(--text-primary);
+    background-color: var(--bg-card-hover);
+}
+
+.nav-tab.active {
+    color: #fff;
+    background-color: #2563eb;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.user-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    background: rgba(30, 41, 59, 0.75);
+    backdrop-filter: blur(8px);
+    padding: 0.35rem 0.85rem;
+    border-radius: 9999px;
+    font-size: 0.875rem;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    transition: all 0.2s ease;
+}
+
+.user-badge:hover {
+    border-color: rgba(56, 189, 248, 0.5);
+    background: rgba(30, 41, 59, 0.9);
+}
+
+.user-badge-online-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #22c55e;
+    box-shadow: 0 0 8px rgba(34, 197, 94, 0.8);
+    flex-shrink: 0;
+}
+
+.user-badge .rating-pill {
+    background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+    color: #fff;
+    padding: 0.15rem 0.5rem;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 0.75rem;
+    letter-spacing: -0.01em;
+}
+
+.btn-primary {
+    background: #0284c7;
+    color: #fff;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: background 0.15s ease;
+}
+
+.btn-primary:hover {
+    background: #0369a1;
+}
+
+.btn-secondary {
+    background: var(--bg-card-hover);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.btn-secondary:hover {
+    background: #334155;
+}
+
+.btn-danger {
+    background: rgba(239, 68, 68, 0.12);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    transition: all 0.15s ease;
+}
+
+.btn-danger:hover {
+    background: rgba(239, 68, 68, 0.22);
+    border-color: #ef4444;
+    color: #fca5a5;
+}
+
+/* Main Container */
+main {
+    flex: 1;
+    padding: 0.75rem 1.5rem 1.25rem 1.5rem;
+    max-width: 100%;
+    margin: 0;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.view-section {
+    display: none !important;
+}
+
+.view-section.active {
+    display: block !important;
+    animation: fadeIn 0.2s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Metric Cards */
+.metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 2rem;
+}
+
+.metric-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.metric-title {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+}
+
+.metric-val {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #fff;
+}
+
+.metric-desc {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+/* Repertoire Table */
+.card-panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.25rem;
+}
+
+.panel-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+}
+
+.data-table th, .data-table td {
+    padding: 0.85rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.data-table th {
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+}
+
+.badge {
+    display: inline-block;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.badge-white { background: #f1f5f9; color: #0f172a; }
+.badge-black { background: #334155; color: #f8fafc; }
+.badge-blunder { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); }
+.badge-mistake { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); }
+.badge-mastered { background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.4); }
+
+/* Board & Real-time Evaluation Bar Layout */
+.board-eval-container {
+    display: flex;
+    align-items: stretch;
+    gap: 10px;
+    width: fit-content;
+    max-width: 100%;
+}
+
+.eval-bar-wrapper {
+    width: 28px;
+    height: var(--board-size);
+    max-height: var(--board-size);
+    background-color: #1e293b; /* Dark slate for Black advantage */
+    border-radius: 6px;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column-reverse; /* Fills from bottom for White */
+    box-shadow: 0 8px 20px -4px rgba(0, 0, 0, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    user-select: none;
+    flex-shrink: 0;
+}
+
+.eval-bar-wrapper.flipped {
+    flex-direction: column; /* Fills from top for Black perspective */
+}
+
+.eval-bar-fill {
+    width: 100%;
+    height: 50%;
+    background-color: #ffffff; /* Pure white for White advantage */
+    transition: height 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.eval-bar-label {
+    position: absolute;
+    width: 100%;
+    text-align: center;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.62rem;
+    font-weight: 800;
+    pointer-events: none;
+    z-index: 5;
+    padding: 2px 0;
+    line-height: 1.1;
+    /* AGENTS.md 8.2: never wrap - a 5-char score such as "+10.0" would spill over the board */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: top 0.35s cubic-bezier(0.25, 1, 0.5, 1), bottom 0.35s cubic-bezier(0.25, 1, 0.5, 1), color 0.2s ease;
+}
+
+.eval-bar-label.white-lead {
+    bottom: 5px;
+    color: #0f172a; /* Dark text on white fill */
+}
+
+.eval-bar-label.black-lead {
+    top: 5px;
+    color: #f8fafc; /* White text on dark slate */
+}
+
+/* AGENTS.md: the fill flips with .flipped (column -> column-reverse), so the label that sits on the
+   white fill must flip to the top and vice versa, otherwise it lands on the wrong background and
+   becomes unreadable (dark-on-dark / light-on-white). */
+.eval-bar-wrapper.flipped .eval-bar-label.white-lead {
+    top: 5px;
+    bottom: auto;
+}
+
+.eval-bar-wrapper.flipped .eval-bar-label.black-lead {
+    bottom: 5px;
+    top: auto;
+}
+
+.eval-bar-label.equal {
+    top: 50%;
+    bottom: auto;
+    transform: translateY(-50%);
+    color: #94a3b8;
+    background: rgba(15, 23, 42, 0.85);
+    font-size: 0.62rem;
+    border-radius: 2px;
+}
+
+/* Chessboard Styles */
+.chess-board-wrapper {
+    width: var(--board-size);
+    height: var(--board-size);
+    max-width: 100%;
+    aspect-ratio: 1;
+    position: relative;
+    user-select: none;
+    box-shadow: 0 12px 28px -4px rgba(0, 0, 0, 0.6);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+/* Interactive Chessboard Corner Resize Handle */
+.board-resize-handle {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    width: 22px;
+    height: 22px;
+    cursor: nwse-resize;
+    z-index: 30;
+    opacity: 0.35;
+    transition: opacity 0.2s ease, transform 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+    touch-action: none;
+}
+
+.chess-board-wrapper:hover .board-resize-handle {
+    opacity: 0.8;
+}
+
+.board-resize-handle:hover,
+.board-resize-handle.active {
+    opacity: 1;
+    transform: scale(1.15);
+}
+
+.board-resize-handle::before,
+.board-resize-handle::after {
+    content: '';
+    position: absolute;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.9);
+    border-right: 2px solid rgba(255, 255, 255, 0.9);
+    border-radius: 1px;
+}
+
+.board-resize-handle::before {
+    width: 13px;
+    height: 13px;
+    bottom: 3px;
+    right: 3px;
+}
+
+.board-resize-handle::after {
+    width: 7px;
+    height: 7px;
+    bottom: 3px;
+    right: 3px;
+}
+
+.btn-board-size {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 1px 5px;
+    border-radius: 3px;
+    cursor: pointer;
+    line-height: 1.2;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.btn-board-size:hover {
+    background: #334155 !important;
+    color: #fff !important;
+}
+
+.btn-board-size-fit:hover {
+    background: rgba(56, 189, 248, 0.3) !important;
+    color: #fff !important;
+}
+
+.chess-board {
+    width: 100%;
+    height: 100%;
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    grid-template-rows: repeat(8, 1fr);
+    position: relative;
+}
+
+.square {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.square.light { background-color: #eedc97; }
+.square.dark { background-color: #769656; }
+
+.square.highlight-last {
+    background-color: #f6f669 !important;
+}
+
+.square.selected {
+    background-color: #bbcb2b !important;
+}
+
+.square.check {
+    background: radial-gradient(circle, #ef4444 30%, transparent 80%) !important;
+}
+
+.piece {
+    width: 90%;
+    height: 90%;
+    cursor: grab;
+    z-index: 2;
+    transition: transform 0.05s ease;
+    user-select: none;
+    -webkit-user-drag: none;
+    touch-action: none;
+}
+
+.piece:active {
+    cursor: grabbing;
+}
+
+.square.drag-hover {
+    box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.7) !important;
+}
+
+/* Right-click square mark (AGENTS.md §4.H).
+   Drawn as an *inset* box-shadow ring rather than a background colour on
+   purpose: `.square.highlight-last` and `.square.selected` both set
+   `background-color ... !important`, so a background here would be either
+   invisible or a fight the mark could not win. An inset ring paints inside the
+   padding box, so it composes with whichever background is active and cannot
+   change a square's border box (AGENTS.md §8, zero layout shift).
+   Violet is used because yellow (last move) and green (selected) are already
+   taken and a third background hue would be unreadable. */
+.square.marked {
+    box-shadow: inset 0 0 0 4px rgba(167, 139, 250, 0.95);
+}
+
+.floating-drag-piece {
+    position: fixed;
+    pointer-events: none;
+    z-index: 9999;
+    transform: translate(-50%, -50%);
+    cursor: grabbing;
+    filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.65));
+    user-select: none;
+    -webkit-user-drag: none;
+    touch-action: none;
+}
+
+.move-hint {
+    width: 24%;
+    height: 24%;
+    background-color: rgba(20, 20, 20, 0.3);
+    border-radius: 50%;
+    position: absolute;
+    pointer-events: none;
+    z-index: 5;
+}
+
+.capture-hint {
+    width: 86%;
+    height: 86%;
+    border: 4px solid rgba(20, 20, 20, 0.3);
+    border-radius: 50%;
+    position: absolute;
+    pointer-events: none;
+    z-index: 5;
+}
+
+.board-svg-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 10;
+}
+
+/* ---------------------------------------------------------------------------
+   The two single-line strips under the Repertoire Builder board: the opening
+   description and the engine's principal variation.
+   §8.5 constant height + §8.2 clamped dynamic text. Both are ALWAYS in flow at
+   exactly 22px, both always render something (a muted placeholder when there is
+   nothing to say), so filling or emptying either one is 0px of layout shift and
+   the board never moves under the pointer. The text cell is the only flexible
+   part and it truncates with an ellipsis; the JS mirrors the full string into
+   `title` so the user can read all of it on hover.
+   --------------------------------------------------------------------------- */
+.rep-status-strip {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: 22px;
+    max-height: 22px;
+    overflow: hidden;
+    font-size: 0.74rem;
+    color: var(--text-secondary);
+}
+
+.rep-status-strip .rep-status-label {
+    flex: 0 0 auto;
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.rep-status-strip .rep-status-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* The height guarantee is ALSO declared by id, because
+   `tests/test_layout_contracts.py::CONSTANT_HEIGHT` resolves the standing §8.5
+   guard by id. An id selector outranks the class, so the effective height of these
+   two strips is the value pinned here -- and that guard fails if it is wrong, so
+   the two rules cannot drift apart silently. */
+#repOpeningLine,
+#repEngineLine {
+    min-height: 22px;
+    max-height: 22px;
+}
+
+.rep-status-strip.is-idle .rep-status-text {
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.rep-status-strip.is-live .rep-status-text {
+    color: #7dd3fc;
+}
+
+/* `#repArrowsCount` is where "these arrows are not saved yet" is reported (it used
+   to be a toast, once per arrow gesture). Same geometry as the bare count — the
+   suffix lands inside the element, so marking it shifts nothing (§8). */
+.arrows-unsaved {
+    color: #f59e0b !important;
+    font-weight: 600;
+}
+
+/* The engine-line toggle (§8.4: it is never removed, only de-emphasised, so the
+   wrapping toolbar cannot re-flow; `min-width` reserves the box either way). */
+.btn-engine-line {
+    min-width: 118px;
+    justify-content: center;
+}
+
+.btn-engine-line.active {
+    background: rgba(56, 189, 248, 0.18);
+    border-color: #38bdf8;
+    color: #7dd3fc;
+}
+
+/* Drill View Layout */
+.drill-container {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 2rem;
+    align-items: start;
+}
+
+@media (max-width: 900px) {
+    .drill-container {
+        grid-template-columns: 1fr;
+    }
+}
+
+.drill-sidebar {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 1.15rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    height: 100%;
+    max-height: calc(var(--board-size) + 88px);
+    overflow-y: auto;
+    min-width: 0;
+}
+
+.drill-header {
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.75rem;
+}
+
+.drill-title {
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+}
+
+.drill-subtitle {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.feedback-box {
+    padding: 1rem;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    display: none;
+}
+
+.feedback-box.correct {
+    display: block;
+    background: rgba(34, 197, 94, 0.15);
+    border: 1px solid rgba(34, 197, 94, 0.4);
+    color: #86efac;
+}
+
+.feedback-box.blunder {
+    display: block;
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    color: #fca5a5;
+}
+
+.feedback-box.good_alternative {
+    display: block;
+    background: rgba(56, 189, 248, 0.15);
+    border: 1px solid rgba(56, 189, 248, 0.4);
+    color: #7dd3fc;
+}
+
+.feedback-box.suboptimal {
+    display: block;
+    background: rgba(245, 158, 11, 0.15);
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    color: #fde68a;
+}
+
+/* Deep Analysis Panel */
+.analysis-accordion {
+    background: #0f172a;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.accordion-title {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--accent-primary);
+    letter-spacing: 0.05em;
+}
+
+.pv-moves-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: center;
+}
+
+.pv-step-btn {
+    background: #1e293b;
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-family: monospace;
+    cursor: pointer;
+}
+
+.pv-step-btn:hover {
+    background: #334155;
+}
+
+.master-stats-bar {
+    display: flex;
+    height: 18px;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 0.4rem;
+    font-size: 0.75rem;
+    line-height: 18px;
+    text-align: center;
+    font-weight: 600;
+}
+
+.stat-white { background: #f1f5f9; color: #0f172a; }
+.stat-draws { background: #64748b; color: #fff; }
+.stat-black { background: #0f172a; color: #fff; }
+
+/* Filter bar */
+.filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    background: var(--bg-card);
+    padding: 1rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.filter-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+}
+
+select, input[type="text"], input[type="password"], input[type="number"] {
+    background: #0f172a;
+    border: 1px solid var(--border-color);
+    color: #fff;
+    padding: 0.45rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+}
+
+/* Modal */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+
+.modal-overlay.active {
+    display: flex;
+}
+
+.modal-content {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    width: 600px;
+    max-width: 90%;
+    padding: 2rem;
+    position: relative;
+}
+
+/* ==========================================================================
+   Repertoire Builder & Explorer Styles (Chessbook Experience)
+   ========================================================================== */
+
+.repertoire-top-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.6rem 1.25rem;
+    margin-bottom: 0.65rem;
+}
+
+.repertoire-color-toggle {
+    display: flex;
+    background: #0f172a;
+    padding: 3px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.rep-toggle-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    padding: 0.5rem 1.2rem;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.rep-toggle-btn.active {
+    background: #0284c7;
+    color: #fff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.25);
+}
+
+.coverage-box {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.coverage-gauge {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-width: 180px;
+}
+
+.coverage-gauge-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.coverage-bar-track {
+    width: 100%;
+    height: 8px;
+    background: #1e293b;
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.coverage-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #38bdf8, #22c55e);
+    border-radius: 999px;
+    transition: width 0.3s ease;
+}
+
+/* ==========================================================================
+   Real-Time Game Scanning & Analysis Progress Card
+   ========================================================================== */
+
+.sync-progress-card {
+    background: linear-gradient(135deg, #131c2e 0%, #0f172a 100%);
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    border-radius: 10px;
+    padding: 1.15rem 1.4rem;
+    margin-bottom: 1.25rem;
+    box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    animation: slideDownFade 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideDownFade {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.sync-progress-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.sync-status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.sync-pulse-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #38bdf8;
+    position: relative;
+    flex-shrink: 0;
+    box-shadow: 0 0 10px rgba(56, 189, 248, 0.8);
+    animation: pulseDot 1.6s ease-in-out infinite;
+}
+
+.sync-pulse-dot.completed {
+    background: #22c55e;
+    box-shadow: 0 0 10px rgba(34, 197, 94, 0.8);
+    animation: none;
+}
+
+.sync-pulse-dot.error {
+    background: #ef4444;
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.8);
+    animation: none;
+}
+
+@keyframes pulseDot {
+    0% {
+        box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.7);
+        transform: scale(0.95);
+    }
+    70% {
+        box-shadow: 0 0 0 8px rgba(56, 189, 248, 0);
+        transform: scale(1.05);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(56, 189, 248, 0);
+        transform: scale(0.95);
+    }
+}
+
+.sync-status-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.01em;
+}
+
+.sync-status-desc {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-top: 0.15rem;
+}
+
+.sync-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.sync-badge-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.sync-blunder-pill {
+    background: rgba(239, 68, 68, 0.2);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    color: #fca5a5;
+    padding: 0.2rem 0.6rem;
+    border-radius: 9999px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.sync-pct-badge {
+    background: #0284c7;
+    color: #fff;
+    padding: 0.2rem 0.65rem;
+    border-radius: 6px;
+    font-family: ui-monospace, SFMono-Regular, monospace;
+    font-size: 0.82rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+}
+
+.sync-pct-badge.completed {
+    background: #15803d;
+}
+
+.sync-cancel-btn {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: var(--text-secondary);
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.sync-cancel-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Native HTML5 <progress> styling with robust browser prefixes */
+.sync-bar-wrapper {
+    width: 100%;
+}
+
+.sync-progress-element {
+    width: 100%;
+    height: 10px;
+    border: none;
+    border-radius: 6px;
+    background-color: #0b0f19;
+    overflow: hidden;
+    appearance: none;
+    -webkit-appearance: none;
+}
+
+.sync-progress-element::-webkit-progress-bar {
+    background-color: #0b0f19;
+    border-radius: 6px;
+}
+
+.sync-progress-element::-webkit-progress-value {
+    background: linear-gradient(90deg, #0284c7 0%, #38bdf8 60%, #22c55e 100%);
+    border-radius: 6px;
+    transition: width 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.sync-progress-element::-moz-progress-bar {
+    background: linear-gradient(90deg, #0284c7 0%, #38bdf8 60%, #22c55e 100%);
+    border-radius: 6px;
+    transition: width 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.sync-details-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 0.75rem;
+    padding-top: 0.25rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.sync-detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.sync-detail-item.sync-detail-opening {
+    grid-column: span 2;
+}
+
+@media (max-width: 768px) {
+    .sync-detail-item.sync-detail-opening {
+        grid-column: span 1;
+    }
+}
+
+.sync-detail-label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    font-weight: 700;
+    letter-spacing: 0.05em;
+}
+
+.sync-detail-value {
+    font-size: 0.85rem;
+    color: #e2e8f0;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sync-detail-value.mono {
+    font-family: ui-monospace, SFMono-Regular, monospace;
+}
+
+.sync-detail-value.accent-crimson {
+    color: #f87171;
+}
+
+/* Breadcrumbs Move Trail */
+.move-breadcrumbs {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    gap: 0.35rem;
+    background: #0f172a;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.45rem 0.75rem;
+    margin-bottom: 0.85rem;
+    min-height: 42px;
+    height: 42px;
+    box-sizing: border-box;
+}
+
+.move-breadcrumbs::-webkit-scrollbar {
+    height: 4px;
+}
+
+.move-breadcrumbs::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 2px;
+}
+
+.breadcrumb-chip {
+    padding: 0.25rem 0.55rem;
+    border-radius: 4px;
+    background: #1e293b;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    font-family: monospace;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.15s ease;
+}
+
+.breadcrumb-chip:hover {
+    background: #334155;
+    color: #fff;
+}
+
+.breadcrumb-chip.active {
+    background: #0284c7;
+    color: #fff;
+    border-color: #38bdf8;
+}
+
+.breadcrumb-chip.start {
+    font-family: inherit;
+    font-weight: 600;
+}
+
+.breadcrumb-chip.blunder-step {
+    border-color: #ef4444 !important;
+    color: #fca5a5 !important;
+    background: rgba(239, 68, 68, 0.18) !important;
+}
+
+.breadcrumb-chip.blunder-step.active {
+    background: #dc2626 !important;
+    color: #fff !important;
+    border-color: #f87171 !important;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+}
+
+/* Repertoire Layout Grid */
+.repertoire-layout {
+    display: grid;
+    grid-template-columns: calc(var(--board-size) + 38px) 1fr;
+    gap: 1.25rem;
+    align-items: stretch;
+    width: 100%;
+}
+
+@media (max-width: 960px) {
+    .repertoire-layout {
+        grid-template-columns: 1fr;
+        justify-items: center;
+    }
+    .repertoire-sidebar-col,
+    .drill-sidebar {
+        max-height: none !important;
+    }
+    :root {
+        --board-size: min(520px, calc(100vw - 2.5rem));
+    }
+}
+
+.repertoire-sidebar-col {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    width: 100%;
+    min-width: 0;
+    height: 100%;
+    max-height: calc(var(--board-size) + 68px);
+}
+
+.repertoire-sidebar-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.75rem 1.15rem !important;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    box-sizing: border-box;
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.repertoire-sidebar-card .panel-header {
+    padding-bottom: 0.4rem;
+    margin-bottom: 0.4rem;
+    flex-shrink: 0;
+}
+
+.repertoire-sidebar-card .panel-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+}
+
+.explorer-table-wrap {
+    flex: 1 1 0;
+    min-height: 120px;
+    overflow-y: auto;
+    overflow-x: auto;
+}
+
+#repGapsList {
+    flex: 1 1 0;
+    min-height: 120px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+/* Custom sleek scrollbar for sidebar scroll areas */
+.explorer-table-wrap::-webkit-scrollbar,
+#repGapsList::-webkit-scrollbar,
+.drill-sidebar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+.explorer-table-wrap::-webkit-scrollbar-track,
+#repGapsList::-webkit-scrollbar-track,
+.drill-sidebar::-webkit-scrollbar-track {
+    background: #0b0f19;
+    border-radius: 3px;
+}
+.explorer-table-wrap::-webkit-scrollbar-thumb,
+#repGapsList::-webkit-scrollbar-thumb,
+.drill-sidebar::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 3px;
+}
+.explorer-table-wrap::-webkit-scrollbar-thumb:hover,
+#repGapsList::-webkit-scrollbar-thumb:hover,
+.drill-sidebar::-webkit-scrollbar-thumb:hover {
+    background: #475569;
+}
+
+.repertoire-sidebar-card .explorer-table th {
+    padding: 0.45rem 0.6rem;
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: #0f172a;
+}
+
+.repertoire-sidebar-card .explorer-table td {
+    padding: 0.45rem 0.6rem;
+    font-size: 0.84rem;
+}
+
+.repertoire-sidebar-card .explorer-move-san {
+    font-size: 1rem;
+}
+
+.repertoire-sidebar-card .pop-bar-wrap {
+    min-width: 90px;
+    gap: 0.35rem;
+}
+
+.repertoire-sidebar-card .btn-primary,
+.repertoire-sidebar-card .btn-secondary {
+    font-size: 0.76rem;
+    padding: 0.25rem 0.55rem;
+}
+
+.repertoire-sidebar-card .gap-item {
+    padding: 0.55rem 0.8rem;
+    margin-bottom: 0.25rem;
+    font-size: 0.82rem;
+}
+
+.repertoire-sidebar-card .gap-san {
+    font-size: 0.98rem;
+}
+
+.repertoire-sidebar-card .gap-meta {
+    font-size: 0.76rem;
+}
+
+.repertoire-sidebar-card .badge-critical,
+.repertoire-sidebar-card .badge-patched {
+    font-size: 0.7rem;
+    padding: 0.14rem 0.44rem;
+}
+
+/* 2000+ Explorer Move Table */
+.explorer-table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+}
+
+.explorer-table th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: #0f172a;
+    padding: 0.65rem 0.6rem;
+    text-align: left;
+    color: var(--text-secondary);
+    font-weight: 700;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.explorer-table th:nth-child(1), .explorer-table td:nth-child(1) { width: 62px; max-width: 62px; }
+.explorer-table th:nth-child(2), .explorer-table td:nth-child(2) { width: 115px; }
+.explorer-table th:nth-child(3), .explorer-table td:nth-child(3) { width: 125px; }
+.explorer-table th:nth-child(4), .explorer-table td:nth-child(4) { width: 130px; }
+.explorer-table th:nth-child(5), .explorer-table td:nth-child(5) { width: 65px; max-width: 65px; }
+.explorer-table th:nth-child(6), .explorer-table td:nth-child(6) { width: 110px; }
+
+.sortable-th {
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.15s ease;
+}
+
+.sortable-th:hover {
+    color: #fff;
+}
+
+.sortable-th.active-sort {
+    color: #38bdf8;
+}
+
+.sort-arrow {
+    display: inline-block;
+    font-size: 0.8rem;
+    margin-left: 2px;
+}
+
+/* AGENTS.md 8.3: `text-overflow: ellipsis` is inert without `white-space: nowrap`, so a
+   long opening name used to wrap onto a second line and change the row height — exactly
+   the column twitch the rule forbids. nowrap + ellipsis + the fixed column widths above
+   keep every row the same height whatever move/opening is on screen. */
+.explorer-table td {
+    padding: 0.6rem 0.6rem;
+    border-bottom: 1px solid var(--border-color);
+    vertical-align: middle;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.explorer-row {
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.explorer-row:hover {
+    background: rgba(30, 41, 59, 0.5);
+}
+
+.explorer-move-san {
+    font-size: 1.05rem;
+    font-weight: 700;
+    font-family: monospace;
+    color: #fff;
+}
+
+.pop-bar-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 110px;
+}
+
+.pop-bar-track {
+    flex: 1;
+    height: 6px;
+    background: #1e293b;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.pop-bar-fill {
+    height: 100%;
+    background: #38bdf8;
+    border-radius: 3px;
+}
+
+.winrate-bar-wrap {
+    display: flex;
+    height: 14px;
+    width: 130px;
+    border-radius: 3px;
+    overflow: hidden;
+    font-size: 0.7rem;
+    font-weight: 600;
+    line-height: 14px;
+    text-align: center;
+}
+
+.wr-white { background: #e2e8f0; color: #0f172a; }
+.wr-draw { background: #64748b; color: #fff; }
+.wr-black { background: #0f172a; color: #fff; border: 1px solid #334155; }
+
+.eval-badge {
+    padding: 0.15rem 0.45rem;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.eval-badge.plus {
+    background: rgba(34, 197, 94, 0.15);
+    color: #4ade80;
+    border: 1px solid rgba(34, 197, 94, 0.35);
+}
+
+.eval-badge.minus {
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.eval-badge.zero {
+    background: rgba(148, 163, 184, 0.15);
+    color: #cbd5e1;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.badge-in-tree {
+    background: rgba(34, 197, 94, 0.2);
+    border: 1px solid #22c55e;
+    color: #4ade80;
+    padding: 0.25rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.badge-opp-tree {
+    background: rgba(56, 189, 248, 0.2);
+    border: 1px solid #38bdf8;
+    color: #7dd3fc;
+    padding: 0.25rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+/* Personal Stats Badges in Explorer */
+.my-stat-badge {
+    padding: 0.15rem 0.45rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    line-height: 1.2;
+}
+
+.my-stat-badge.threat {
+    background: rgba(239, 68, 68, 0.18);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.my-stat-badge.neutral {
+    background: rgba(245, 158, 11, 0.18);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.my-stat-badge.win {
+    background: rgba(34, 197, 94, 0.18);
+    color: #4ade80;
+    border: 1px solid rgba(34, 197, 94, 0.4);
+}
+
+.btn-add-move {
+    background: #0284c7;
+    color: #fff;
+    border: none;
+    padding: 0.3rem 0.65rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.btn-add-move:hover {
+    background: #0369a1;
+}
+
+.btn-del-branch {
+    background: transparent;
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    padding: 0.2rem 0.45rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    margin-left: 0.4rem;
+}
+
+.btn-del-branch:hover {
+    background: rgba(239, 68, 68, 0.2);
+}
+
+/* Gap List Styles */
+.gap-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    background: #0f172a;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+    transition: border-color 0.15s ease;
+}
+
+.gap-item:hover {
+    border-color: #f59e0b;
+}
+
+/* Coverage-gap kinds (AGENTS.md 4.G). `repertoire_builder.js::_coverageGapCardHtml()` tags
+   every row of `#repCoverageGapsList` with exactly one of these, so the two honest cases are
+   distinguishable at a glance and not only by their wording:
+     - `--unanswered` : the repertoire HOLDS the opponent move and has no prepared reply, so
+                        the line would stop on the opponent's move (amber, the neutral slot —
+                        the same colour the Trainer uses for the same state).
+     - `--missing`    : the repertoire does not hold the move at all.
+   Drawn with an **inset** `box-shadow`, not a thicker `border-left`: an inset shadow paints
+   inside the padding box, so the row's border box and content box are byte-identical to the
+   unstyled rule and the accent cannot move a sibling (AGENTS.md 8). */
+.gap-item--unanswered {
+    box-shadow: inset 3px 0 0 rgba(245, 158, 11, 0.85);
+}
+
+.gap-item--missing {
+    box-shadow: inset 3px 0 0 rgba(239, 68, 68, 0.7);
+}
+
+.gap-left {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.gap-san {
+    font-size: 1.05rem;
+    font-weight: 700;
+    font-family: monospace;
+    color: #fbbf24;
+}
+
+.gap-meta {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+/* Trainer View Specifics */
+.trainer-stats-strip {
+    display: flex;
+    gap: 1.5rem;
+    background: #0f172a;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.85rem 1.25rem;
+    margin-bottom: 1.25rem;
+}
+
+.trainer-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.trainer-stat-val {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+}
+
+.trainer-stat-lbl {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+}
+
+/* Critical Blunder Card Styles (from actual games) */
+.critical-blunder-card {
+    border: 1px solid #ef4444 !important;
+    background: linear-gradient(180deg, rgba(239, 68, 68, 0.16) 0%, #0f172a 100%) !important;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
+}
+
+.badge-critical {
+    background: #dc2626;
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 800;
+    padding: 0.2rem 0.55rem;
+    border-radius: 4px;
+    letter-spacing: 0.04em;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.badge-patched {
+    background: rgba(34, 197, 94, 0.15);
+    border: 1px solid rgba(34, 197, 94, 0.4);
+    color: #4ade80;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+}
+
+.blunder-banner {
+    background: #0f172a;
+    border: 1px solid var(--border-color);
+    border-left: 4px solid #ef4444;
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
+    margin-top: 0.75rem;
+    line-height: 1.4;
+}
+
+/* --- Root-Cause Blunder Banner (AGENTS.md 4.B / 4.D, zero-CLS per 8.5) ---
+   The container is permanently in flow at a constant height. When there is nothing to
+   report it renders a muted placeholder instead of collapsing, so navigating between a
+   blunder position and a clean position never shifts the layout. */
+.blunder-banner-alert {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    height: 46px;
+    min-height: 46px;
+    margin-bottom: 0.5rem;
+    padding: 0 0.75rem;
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid var(--border-color);
+    border-left: 4px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.82rem;
+    line-height: 1.25;
+    overflow: hidden;
+}
+
+.blunder-banner-alert.has-blunder {
+    border-left-color: #ef4444;
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.blunder-banner-alert.has-solution {
+    border-left-color: #22c55e;
+    background: rgba(34, 197, 94, 0.1);
+}
+
+.blunder-banner-alert.has-info {
+    border-left-color: #38bdf8;
+    background: rgba(56, 189, 248, 0.1);
+}
+
+.blunder-banner-placeholder {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.blunder-banner-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text-primary);
+}
+
+.blunder-banner-text strong {
+    color: #fca5a5;
+}
+
+.blunder-banner-alert.has-solution .blunder-banner-text strong {
+    color: #4ade80;
+}
+
+.blunder-banner-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-shrink: 0;
+}
+
+.blunder-banner-actions .btn-primary {
+    font-size: 0.75rem;
+    padding: 0.3rem 0.65rem;
+    min-width: 130px;
+    justify-content: center;
+}
+
+/* --- Blunder / Coverage Gap List (AGENTS.md 4.B) --- */
+.gaps-section-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+    height: 22px;
+    min-height: 22px;
+    overflow: hidden;
+    font-size: 0.72rem;
+}
+
+.gaps-section-title {
+    font-weight: 700;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.gaps-section-sub {
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.rep-gaps-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.badge-critical {
+    display: inline-flex;
+    align-items: center;
+    background: rgba(239, 68, 68, 0.18);
+    color: #fca5a5;
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    border-radius: 4px;
+    padding: 0.1rem 0.4rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.badge-patched {
+    display: inline-flex;
+    align-items: center;
+    background: rgba(34, 197, 94, 0.18);
+    color: #4ade80;
+    border: 1px solid rgba(34, 197, 94, 0.4);
+    border-radius: 4px;
+    padding: 0.1rem 0.4rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+/* Recent Games List & Cards */
+.rep-games-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.game-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.55rem 0.75rem;
+    background: #0f172a;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    transition: all 0.15s ease;
+    gap: 0.5rem;
+}
+
+.game-card:hover {
+    border-color: #38bdf8;
+    background: rgba(15, 23, 42, 0.95);
+}
+
+.game-card.active-review {
+    border-color: #38bdf8;
+    background: rgba(56, 189, 248, 0.08);
+}
+
+.game-outcome-pill {
+    font-size: 0.68rem;
+    font-weight: 800;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.game-outcome-pill.win {
+    background: rgba(34, 197, 94, 0.18);
+    color: #4ade80;
+    border: 1px solid rgba(34, 197, 94, 0.4);
+}
+
+.game-outcome-pill.loss {
+    background: rgba(239, 68, 68, 0.18);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.game-outcome-pill.draw {
+    background: rgba(148, 163, 184, 0.18);
+    color: #94a3b8;
+    border: 1px solid rgba(148, 163, 184, 0.4);
+}
+
+.game-review-banner {
+    background: #0f172a;
+    border: 1px solid var(--border-color);
+    border-left: 4px solid #38bdf8;
+    border-radius: 6px;
+    padding: 0.65rem 0.9rem;
+    font-size: 0.85rem;
+    margin-bottom: 0.5rem;
+    line-height: 1.4;
+}
+
+.breadcrumb-chip.theory-step {
+    border-bottom: 2px solid #38bdf8;
+    color: #e0f2fe;
+}
+
+.filter-pill-btn {
+    border: none;
+    border-radius: 3px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+    padding: 0.15rem 0.45rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.filter-pill-btn.active {
+    background: #0284c7;
+    color: #fff;
+    font-weight: 600;
+}
+
+/* ==========================================================================
+   OPENING SCOUT & VIDEO MOVE EXTRACTOR STYLES
+   ========================================================================== */
+
+.scout-search-panel {
+    margin-bottom: 1.25rem;
+    background: linear-gradient(180deg, #151d30 0%, #111827 100%);
+    border: 1px solid var(--border-color);
+}
+
+.scout-header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.scout-main-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.scout-icon {
+    font-size: 1.35rem;
+}
+
+.scout-subtitle {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+    line-height: 1.4;
+    max-width: 800px;
+}
+
+.scout-search-form {
+    margin-bottom: 0.85rem;
+}
+
+.scout-input-wrapper {
+    display: flex;
+    align-items: center;
+    position: relative;
+    background: #0b1120;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 0.25rem;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.scout-input-wrapper:focus-within {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
+}
+
+.scout-search-icon {
+    padding-left: 0.85rem;
+    padding-right: 0.4rem;
+    font-size: 1rem;
+    color: var(--text-muted);
+}
+
+.scout-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 0.95rem;
+    padding: 0.6rem 0.5rem;
+    outline: none;
+}
+
+.scout-chips-container {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    font-size: 0.82rem;
+}
+
+.scout-chips-label {
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.scout-chips-list {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+.scout-chip {
+    background: #1e293b;
+    border: 1px solid #334155;
+    color: var(--text-secondary);
+    padding: 0.25rem 0.65rem;
+    border-radius: 9999px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.scout-chip:hover {
+    background: #334155;
+    color: #fff;
+    border-color: var(--accent-primary);
+}
+
+.scout-chip.active {
+    background: rgba(56, 189, 248, 0.15);
+    border-color: var(--accent-primary);
+    color: #38bdf8;
+    font-weight: 600;
+}
+
+.scout-chip-rep {
+    border-color: rgba(245, 158, 11, 0.5);
+    color: #fbbf24;
+}
+
+.scout-chip-rep:hover {
+    background: rgba(245, 158, 11, 0.2);
+    border-color: #f59e0b;
+}
+
+/* Scout Modal Dialog */
+.scout-modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    margin: 0;
+    background: #151d30;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 1.5rem;
+    color: #fff;
+    max-width: 540px;
+    width: 90%;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+}
+
+.scout-modal:not([open]) {
+    display: none;
+}
+
+.scout-modal::backdrop {
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(4px);
+}
+
+.scout-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+/* Scout Results Section */
+.scout-results-wrap {
+    margin-top: 1rem;
+}
+
+.scout-shelf-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.scout-shelf-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.scout-shelf-filters {
+    display: flex;
+    gap: 0.35rem;
+}
+
+.scout-filter-btn {
+    background: #1e293b;
+    border: 1px solid #334155;
+    color: var(--text-secondary);
+    padding: 0.3rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.scout-filter-btn:hover {
+    color: #fff;
+    background: #334155;
+}
+
+.scout-filter-btn.active {
+    background: #2563eb;
+    border-color: #3b82f6;
+    color: #fff;
+    font-weight: 600;
+}
+
+.scout-loading-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 2.5rem;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+}
+
+.scout-loading-card .spinner {
+    width: 36px;
+    height: 36px;
+    border: 3px solid #334155;
+    border-top-color: var(--accent-primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Scout Cards Grid */
+.scout-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(255px, 1fr));
+    gap: 0.8rem;
+    align-items: start;
+}
+
+.scout-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.scout-card:hover {
+    transform: translateY(-2px);
+    border-color: #38bdf8;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+}
+
+.scout-card-thumb-wrap {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: #0f172a;
+    overflow: hidden;
+}
+
+.scout-card-thumb {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.scout-card-thumb-icon {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3rem;
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+}
+
+.scout-card-duration {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    background: rgba(0, 0, 0, 0.82);
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0.15rem 0.45rem;
+    border-radius: 4px;
+    font-family: monospace;
+}
+
+.scout-card-body {
+    padding: 0.6rem 0.65rem 0.65rem;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    gap: 0.15rem;
+}
+
+.scout-card-title {
+    font-weight: 600;
+    font-size: 0.92rem;
+    color: #fff;
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin-bottom: 0.4rem;
+}
+
+.scout-card-channel {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.6rem;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.scout-card-footer {
+    margin-top: auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 0.6rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Scout Studio Mode & Container */
+body.scout-studio-active {
+    overflow-y: hidden;
+}
+
+body.scout-studio-active main {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+    overflow: hidden;
+}
+
+#viewScout.active.studio-mode {
+    height: calc(100vh - 86px);
+    max-height: calc(100vh - 86px);
+    overflow: hidden;
+    display: flex !important;
+    flex-direction: column;
+}
+
+#viewScout.studio-mode .scout-search-panel,
+#viewScout.studio-mode .scout-results-wrap {
+    display: none !important;
+}
+
+.scout-studio-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    flex: 1;
+    min-height: 0;
+    height: 100%;
+    max-height: 100%;
+    overflow: hidden;
+}
+
+.scout-studio-top-bar {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.45rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    flex-shrink: 0;
+}
+
+.sync-switch-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: #0f172a;
+    padding: 0.35rem 0.75rem;
+    border-radius: 6px;
+    border: 1px solid #334155;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #38bdf8;
+    cursor: pointer;
+}
+
+.sync-switch-wrap input {
+    cursor: pointer;
+}
+
+.scout-workspace-layout {
+    display: grid;
+    grid-template-columns: 1fr auto minmax(340px, 380px);
+    gap: 1rem;
+    align-items: start;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+@media (max-width: 1440px) {
+    .scout-workspace-layout {
+        grid-template-columns: 1fr auto minmax(300px, 340px);
+        gap: 0.85rem;
+    }
+}
+
+@media (max-width: 1200px) {
+    .scout-workspace-layout {
+        grid-template-columns: 1fr auto 280px;
+        gap: 0.75rem;
+    }
+}
+
+@media (max-width: 1060px) {
+    .scout-workspace-layout {
+        grid-template-columns: 1fr;
+        overflow-y: auto;
+    }
+}
+
+/* Video Column */
+.scout-video-column {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    align-self: start;
+    min-width: 0;
+    width: 100%;
+}
+
+.scout-player-card {
+    padding: 0.6rem;
+    margin-bottom: 0;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    width: 100%;
+}
+
+.scout-video-embed-wrap {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    max-height: calc(100vh - 200px);
+    background: #000;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.scout-video-embed-wrap iframe,
+.scout-video-embed-wrap #scoutYoutubePlayer {
+    width: 100%;
+    height: 100%;
+    border: none;
+}
+
+.scout-non-video-panel {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    text-align: center;
+    padding: 1rem;
+}
+
+.scout-video-meta-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0.25rem 0.25rem;
+}
+
+/* AGENTS.md (CODE-11): `scout.js::_onYtStateChange()` puts `#scoutLiveIndicator` into
+   `.live` / `.idle` according to the player state. Without an `.idle` rule the dot stayed
+   green and pulsing while nothing was playing. */
+.scout-live-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #22c55e;
+    box-shadow: 0 0 6px #22c55e;
+    display: inline-block;
+    animation: livePulse 1.8s infinite;
+}
+
+.scout-live-indicator.live {
+    background: #22c55e;
+    box-shadow: 0 0 6px #22c55e;
+    animation: livePulse 1.8s infinite;
+}
+
+.scout-live-indicator.idle {
+    background: #475569;
+    box-shadow: none;
+    animation: none;
+}
+
+@keyframes livePulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+/* Center Board Column */
+.scout-board-column {
+    display: flex;
+    flex-direction: column;
+    width: fit-content;
+    align-self: start;
+}
+
+.scout-board-info-strip {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #0f172a;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 0.4rem 0.65rem;
+    margin-top: 0.4rem;
+    min-height: 40px;
+    height: 40px;
+    box-sizing: border-box;
+    flex-wrap: nowrap;
+    overflow: hidden;
+}
+
+/* AGENTS.md 8.2: opening name / ECO / turn text all change length with the position.
+   nowrap + ellipsis + explicit bounds + a `title` set by the JS
+   (`scout.js::_clampInline()`) keeps the fixed-height info strip from ever re-wrapping.
+   `min-width: 0` lets the flex item shrink below its content width, which is what makes
+   the ellipsis engage instead of pushing its siblings out of the strip. */
+#scoutCurrentOpeningTag {
+    display: inline-block;
+    min-width: 0;
+    max-width: 240px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle;
+}
+
+#scoutNoteMoveLabel {
+    display: inline-block;
+    min-width: 0;
+    max-width: 160px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: bottom;
+}
+
+#scoutTurnBadge {
+    display: inline-block;
+    min-width: 0;
+    max-width: 110px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: bottom;
+}
+
+.scout-controls-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 0.4rem;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+/* Right Timeline & Variations Column */
+.scout-timeline-column {
+    display: flex;
+    flex-direction: column;
+    align-self: stretch;
+    height: 100%;
+    min-height: 0;
+}
+
+.scout-sidebar-card {
+    padding: 0;
+    overflow: hidden;
+    margin-bottom: 0;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    max-height: calc(100vh - 165px);
+    min-height: 0;
+}
+
+.scout-side-tabs {
+    display: flex;
+    background: #0f172a;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.scout-side-tab {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    padding: 0.65rem 0.4rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s ease;
+    border-bottom: 2px solid transparent;
+}
+
+.scout-side-tab:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.scout-side-tab.active {
+    color: var(--accent-primary);
+    border-bottom-color: var(--accent-primary);
+    background: rgba(56, 189, 248, 0.08);
+}
+
+.scout-side-pane {
+    display: none;
+    flex: 1;
+    overflow-y: auto;
+    flex-direction: column;
+}
+
+.scout-side-pane.active {
+    display: flex;
+}
+
+.scout-timeline-header {
+    padding: 0.5rem 0.75rem;
+    background: #111827;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.scout-timeline-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.25rem 0;
+}
+
+.scout-timeline-item {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    cursor: pointer;
+    transition: background 0.12s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.scout-timeline-item:hover {
+    background: #1e293b;
+}
+
+.scout-timeline-item.active {
+    background: rgba(56, 189, 248, 0.14);
+    border-left: 3px solid var(--accent-primary);
+}
+
+.scout-timeline-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.scout-time-badge {
+    background: #0f172a;
+    border: 1px solid #334155;
+    color: #38bdf8;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    font-family: monospace;
+}
+
+.scout-move-san {
+    font-weight: 700;
+    font-size: 0.88rem;
+    color: #fff;
+}
+
+.scout-move-eco {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
+.scout-timeline-text {
+    font-size: 0.76rem;
+    color: var(--text-secondary);
+    line-height: 1.35;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+/* Variations List */
+.scout-variations-list {
+    padding: 0.6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+}
+
+.scout-var-card {
+    background: #0f172a;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 0.65rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.scout-var-card:hover {
+    border-color: var(--accent-primary);
+    background: #172033;
+}
+
+.scout-var-card.active {
+    border-color: #38bdf8;
+    background: rgba(56, 189, 248, 0.1);
+}
+
+.scout-var-title {
+    font-weight: 600;
+    font-size: 0.84rem;
+    color: #fff;
+    margin-bottom: 0.35rem;
+}
+
+.scout-var-pgn {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-family: monospace;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Transcript List */
+.scout-transcript-list {
+    padding: 0.5rem;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.scout-transcript-item {
+    padding: 0.4rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    cursor: pointer;
+    transition: background 0.12s ease;
+}
+
+.scout-transcript-item:hover {
+    background: #1e293b;
+}
+
+.scout-transcript-time {
+    color: var(--accent-primary);
+    font-weight: 700;
+    font-family: monospace;
+    margin-right: 0.4rem;
+}
+
+/* Scout Free Play & Catch-Up Bars */
+.scout-catchup-bar {
+    background: rgba(30, 41, 59, 0.85);
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    border-radius: 6px;
+    padding: 0.35rem 0.65rem;
+    margin-top: 0.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    animation: fadeIn 0.15s ease-out;
+}
+
+.scout-badge-play {
+    background: rgba(245, 158, 11, 0.18);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0.12rem 0.45rem;
+    border-radius: 4px;
+}
+
+.scout-quick-rep-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.4rem;
+    padding: 0.3rem 0.6rem;
+    background: rgba(15, 23, 42, 0.55);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+}
+
+/* AGENTS.md 8.4: the quick-rep bar is a `flex-wrap: wrap` row, so every button in it
+   must reserve its box from the first paint. The JS mirrors these numbers in
+   `scout.js::_primeQuickRepToolbar()` — keep the two in sync. */
+.btn-quick-rep {
+    font-size: 0.75rem;
+    padding: 0.22rem 0.5rem;
+    background: #1e293b;
+    border-color: #334155;
+    transition: all 0.15s ease;
+    min-width: 150px;
+    justify-content: center;
+    white-space: nowrap;
+}
+
+.btn-quick-rep:hover {
+    background: #0284c7;
+    border-color: #38bdf8;
+    color: #fff;
+}
+
+/* AGENTS.md 8.4 (CODE-14): "⭐ Mark Last Move Important" swaps between two labels of
+   different intrinsic widths, and the two conditional actions below only exist for
+   some positions. Fixed box + `visibility` + `disabled` = zero reflow, and the
+   reserved box means the first paint already has the final geometry (the inline
+   `display:none` bootstrap that used to be in index.html is gone). */
+#btnScoutMarkImportant {
+    min-width: 212px;
+    justify-content: center;
+}
+
+#btnScoutRemoveFromRep,
+#btnScoutTrainAfterImport {
+    min-width: 150px;
+    justify-content: center;
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity 0.18s ease;
+}
+
+#btnScoutRemoveFromRep:not([disabled]),
+#btnScoutTrainAfterImport:not([disabled]) {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* Repertoire Trainer Focus Selector & Banner */
+.trainer-focus-select {
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.15s ease;
+}
+
+.trainer-focus-select:focus {
+    border-color: var(--accent-primary);
+}
+
+.trainer-focus-banner {
+    animation: fadeIn 0.15s ease-out;
+}
+
+/* --- AGENTS.md 8.4 / 8.5: conditional Trainer controls reserve their box ------------
+   Mirrored from `repertoire_trainer.js::_setConditional()` / `_updateNoteBox()` /
+   `_updateFocusBanner()` / `_updateImportantBadge()` so the very first paint already has
+   the final geometry. Inline `display:none` is never used for these: the surrounding
+   header uses `flex-wrap: wrap`, so a collapsing conditional child re-wraps the
+   neighbouring buttons. */
+
+/* 8.5 — the focus banner is a status strip: constant height, always in flow. */
+#trainFocusBanner {
+    display: flex;
+    min-height: 34px;
+    box-sizing: border-box;
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity 0.18s ease;
+}
+
+/* 8.4 — the priority badge keeps a 132px box so the wrapping header cannot reflow. */
+#trainImportantBadge {
+    display: inline-flex;
+    min-width: 132px;
+    justify-content: center;
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity 0.18s ease;
+}
+
+/* 8.4 — the arrow toggle sits between "Show Hint" and "Flip" in a fixed toolbar row. */
+#btnTrainToggleArrows {
+    min-width: 96px;
+    justify-content: center;
+    white-space: nowrap;
+    visibility: hidden;
+}
+
+/* 8.5 + 8.2 — the move-note callout keeps a constant 44px box and clamps its text
+   (the full note is always available through the element's `title`).
+
+   KNOWN GAP (not fixable here): 44px is `repertoire_trainer.js::_updateNoteBox()`'s
+   runtime constant, and it is ~13px short of what the box needs
+   (0.6rem padding x2 = 19.2 + the "Move Note / Idea" label ~17.8 + one 1.45-line note
+   ~19.7 = 56.7px), so the note line is clipped by `overflow:hidden`. Changing the number
+   *here* would have no effect — the JS writes `min/maxHeight` inline and wins. Fixing it
+   means either raising the constant to ~58px in
+   `repertoire_trainer.js::_updateNoteBox()`, or moving the label into the same line as
+   the note. Left as-is to keep the first paint identical to the post-JS paint. */
+#trainNoteBox {
+    min-height: 44px;
+    max-height: 44px;
+    overflow: hidden;
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity 0.18s ease;
+}
+
+#trainNoteContent {
+    display: block;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Scout Explored Lines Tree */
+.scout-tree-header {
+    padding: 0.6rem 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+    background: rgba(15, 23, 42, 0.55);
+}
+
+.btn-tree-action {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.45rem;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 4px;
+    font-weight: 600;
+    cursor: pointer;
+    color: var(--text-primary);
+    transition: all 0.12s ease;
+}
+
+.btn-tree-action:hover {
+    background: #0284c7;
+    border-color: #38bdf8;
+    color: #fff;
+}
+
+.scout-var-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.35rem;
+}
+
+.scout-var-badge {
+    background: rgba(56, 189, 248, 0.18);
+    color: #38bdf8;
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.1rem 0.35rem;
+    border-radius: 4px;
+}
+
+.scout-var-plies {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
+.scout-var-status {
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #4ade80;
+    background: rgba(34, 197, 94, 0.12);
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.scout-var-actions {
+    display: flex;
+    gap: 0.35rem;
+    margin-top: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.btn-var-action {
+    font-size: 0.72rem;
+    padding: 0.2rem 0.5rem;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--text-primary);
+    transition: all 0.12s ease;
+}
+
+.btn-var-action:hover {
+    background: #0284c7;
+    border-color: #38bdf8;
+    color: #fff;
+}
+
+/* Scout Repertoire Overlap Detection Badges */
+.scout-overlap-badge {
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 0.1rem 0.38rem;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    letter-spacing: 0.02em;
+    /* AGENTS.md 8.2: status-strip children must never wrap */
+    white-space: nowrap;
+    max-width: 48%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 0 1 auto;
+}
+
+.scout-overlap-badge.rep-present {
+    background: rgba(34, 197, 94, 0.16);
+    color: #4ade80;
+    border: 1px solid rgba(34, 197, 94, 0.38);
+}
+
+.scout-overlap-badge.rep-partial {
+    background: rgba(245, 158, 11, 0.16);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.38);
+}
+
+.scout-overlap-badge.rep-new {
+    background: rgba(56, 189, 248, 0.16);
+    color: #38bdf8;
+    border: 1px solid rgba(56, 189, 248, 0.38);
+}
+
+/* AGENTS.md 8.5: constant height, never wraps - a wrapping strip pushes everything below it
+   by 20-35px on every transition between ply 0 and ply >= 1. */
+.scout-line-overlap-strip {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: nowrap;
+    font-size: 0.73rem;
+    height: 28px;
+    min-height: 28px;
+    max-height: 28px;
+    overflow: hidden;
+    white-space: nowrap;
+    box-sizing: border-box;
+}
+
+/* `.scout-overlap-banner` + its three state variants (`.banner-present`,
+   `.banner-partial`, `.banner-new`) were deleted here: after CODE-15 removed
+   `#scoutActiveLineOverlapBanner` from index.html there is no element and no JS
+   reference left that ever applies the class (verified: zero hits across
+   `frontend/*.js` and `index.html`). The overlap UI is now rendered by
+   `.scout-line-overlap-strip` (the strip under the board) and
+   `.scout-overlap-badge` / `.scout-card-overlap-badges` (the per-line badges),
+   which are all 8.5-compliant. Re-adding a `display:none` tombstone instead of
+   deleting would only leave a trap for the next author. */
+
+/* Repertoire Sidebar Subcard Tabs */
+.rep-subcard-tab {
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 0.22rem 0.55rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.rep-subcard-tab:hover {
+    color: #fff;
+    border-color: #475569;
+    background: #1e293b;
+}
+
+.rep-subcard-tab.active {
+    background: #1e293b;
+    color: #38bdf8;
+    border-color: #38bdf8;
+    font-weight: 700;
+}
+
+/* Study Selector in Top Bar */
+.study-selector-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(30, 41, 59, 0.7);
+    padding: 0.25rem 0.6rem;
+    border-radius: 8px;
+    border: 1px solid #334155;
+}
+
+.study-selector-wrap select {
+    background: #0f172a;
+    color: #f8fafc;
+    border: 1px solid #475569;
+    border-radius: 6px;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.15s ease;
+}
+
+.study-selector-wrap select:hover,
+.study-selector-wrap select:focus {
+    border-color: #38bdf8;
+}
+
+/* Study Modal Dialog */
+#studySelectModal {
+    background: #151d30;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+}
+
+#studySelectModal select,
+#studySelectModal input[type="text"] {
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+#studySelectModal select:focus,
+#studySelectModal input[type="text"]:focus {
+    border-color: #38bdf8 !important;
+    box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25);
+    outline: none;
+}
+
+.active-important {
+    color: #fbbf24 !important;
+    border-color: #fbbf24 !important;
+    background: rgba(251, 191, 36, 0.15) !important;
+}
+
+.btn-assign-line-study:hover {
+    border-color: #38bdf8 !important;
+    color: #38bdf8 !important;
+}
+
+/* =====================================================================
+   ZERO CUMULATIVE LAYOUT SHIFT (CLS) & LAYOUT STABILITY UTILITIES
+   ===================================================================== */
+
+/* Floating App Toast System (Zero Layout Shift) */
+.app-toast-container {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 99999;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 8px;
+    max-width: 400px;
+}
+
+.app-toast {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #0f172a;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.65rem 0.95rem;
+    color: #f8fafc;
+    font-size: 0.82rem;
+    font-weight: 500;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.06);
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+    transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1), transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    pointer-events: auto;
+}
+
+.app-toast.visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+.app-toast.leaving {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.96);
+}
+
+.app-toast-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.app-toast-text {
+    flex: 1;
+    line-height: 1.35;
+    word-break: break-word;
+}
+
+/* Repertoire Top Bar Title Group: fixed boundaries prevent pushing right-hand buttons */
+.rep-header-title-box {
+    display: flex;
+    flex-direction: column;
+    min-width: 170px;
+    max-width: 240px;
+    overflow: hidden;
+}
+
+#repOpeningTitle {
+    font-weight: 700;
+    font-size: 1.05rem;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+}
+
+#repOpeningEco {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+}
+
+/* Move Tools Panel: constant dimensions prevent panel header twitching */
+#repMoveToolSan {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: #fff;
+    min-width: 130px;
+    display: inline-block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#btnRepToggleImportant {
+    min-width: 125px;
+    justify-content: center;
+}
+
+#btnRepDeleteCurrentMove {
+    min-width: 110px;
+    justify-content: center;
+}
+
+/* AGENTS.md 8.4: the Recent Games card action group sits in a space-between row, so both action
+   buttons need a fixed width - otherwise relabelling one ("Adding..." / "✓ Added!") reflows its
+   neighbours by ~50px twice per click. */
+.btn-review-game {
+    min-width: 132px;
+    justify-content: center;
+    white-space: nowrap;
+}
+
+.btn-quick-add-opening {
+    min-width: 118px;
+    justify-content: center;
+    white-space: nowrap;
+    transition: color 0.2s ease;
+}
+
+.btn-quick-add-opening.added {
+    color: #4ade80;
+}
+
+/* AGENTS.md 8.4: conditionally-available action revealed with visibility + disabled, never display */
+#btnRepTogglePatchedGaps {
+    min-width: 130px;
+    justify-content: center;
+}
+
+#btnRepTogglePatchedGaps[aria-pressed="true"] {
+    background: rgba(34, 197, 94, 0.16);
+    border-color: rgba(34, 197, 94, 0.45);
+    color: #4ade80;
+}
+
+.sync-blunder-pill {
+    min-width: 74px;
+    justify-content: center;
+}
+
+/* Explored Variations Cards: min-height preserves space for async badges (AGENTS.md 8.5).
+   `flex-wrap: nowrap` + `overflow: hidden` — the badge text changes with the overlap
+   result, so a wrapping strip would make the whole card grow every time a check lands. */
+.scout-card-overlap-badges {
+    min-height: 20px;
+    flex-wrap: nowrap;
+    overflow: hidden;
+}
+
+/* Result-card source badges. `scout.js::scoutCardMarkup()` emits `.scout-badge-youtube`,
+   `.scout-badge-guide` and `.badge-eco`; before these rules existed they rendered as
+   bare unstyled text, and the unstyled text was a different height than the reserved
+   20px badge row (DEAD-01(j)). */
+.scout-badge-youtube,
+.scout-badge-guide {
+    display: inline-block;
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    padding: 0.1rem 0.4rem;
+    border-radius: 999px;
+    text-transform: uppercase;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.scout-badge-youtube {
+    background: rgba(239, 68, 68, 0.18);
+    color: #fca5a5;
+    border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.scout-badge-guide {
+    background: rgba(56, 189, 248, 0.15);
+    color: #7dd3fc;
+    border: 1px solid rgba(56, 189, 248, 0.35);
+}
+
+.badge-eco {
+    display: inline-block;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--accent-primary);
+    background: rgba(56, 189, 248, 0.12);
+    border-radius: 4px;
+    padding: 0.05rem 0.3rem;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+/* FIXER-W item 5 — emitted but previously unstyled, and VISIBLE in a normal flow.
+   `index.html:658` is `<span id="scoutResultsCount" class="badge-pill">0</span>` with **no
+   inline style at all**, so the Scout result count rendered as bare unstyled text sitting
+   next to a bold section title. The other two `.badge-pill` users (`#scoutTreeCountBadge`
+   at index.html:834 and `#studyModalColorBadge` at :953) carry full inline styles; this base
+   rule is additive for them (inline wins) and gives the class a real definition. A fixed
+   line-height + `nowrap` keeps the pill one line tall, so the count changing never resizes
+   the shelf header (AGENTS.md 8.2/8.5). */
+.badge-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.5rem;
+    height: 1.15rem;
+    padding: 0 0.4rem;
+    margin-left: 0.45rem;
+    border-radius: 999px;
+    background: rgba(56, 189, 248, 0.16);
+    border: 1px solid rgba(56, 189, 248, 0.38);
+    color: #7dd3fc;
+    font-size: 0.68rem;
+    font-weight: 700;
+    line-height: 1.15rem;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+/* FIXER-W item 5 — the same gap, one level up. `scout.js::scoutCardMarkup()` emits
+   `<div class="scout-card-meta">` around the `.scout-badge-youtube` / `.scout-badge-guide` /
+   `.badge-eco` badges FIXER-H styled above, and it was the ONE child of `.scout-card-body`
+   with no inline style, so the three badges sat flush against the title with no gap and no
+   reserved height. `min-height` is the 20px row `.scout-card-overlap-badges` already
+   reserves, so a card that gains or loses an ECO badge does not change height (8.5). */
+.scout-card-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    flex-wrap: nowrap;
+    min-height: 20px;
+    margin-bottom: 0.35rem;
+    overflow: hidden;
+}
+
+/* --- Chessbook-Style Repertoire Trainer Enhancements --- */
+.trainer-mastery-card {
+    background: rgba(15, 23, 42, 0.75);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0;
+}
+
+.mastery-progress-track {
+    height: 10px;
+    border-radius: 5px;
+    background: rgba(30, 41, 59, 0.9);
+    border: 1px solid rgba(51, 65, 85, 0.6);
+    overflow: hidden;
+    display: flex;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.mastery-seg-mastered {
+    height: 100%;
+    background: #22c55e;
+    transition: width 0.4s ease;
+}
+
+.mastery-seg-learning {
+    height: 100%;
+    background: #f59e0b;
+    transition: width 0.4s ease;
+}
+
+.mastery-seg-unlearned {
+    height: 100%;
+    background: #334155;
+    transition: width 0.4s ease;
+}
+
+.trainer-session-strip {
+    background: rgba(15, 23, 42, 0.65);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.6rem 0.85rem;
+    margin-bottom: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+}
+
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(4px);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Pedagogical Trainer Move Path Breadcrumb Strip (0px CLS) */
+.trainer-breadcrumb-strip {
+    height: 34px;
+    min-height: 34px;
+    background: rgba(15, 23, 42, 0.75);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 0 0.75rem;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.trainer-breadcrumb-left {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+}
+
+.trainer-breadcrumb-icon {
+    font-size: 0.85rem;
+    flex-shrink: 0;
+}
+
+.trainer-breadcrumb-moves {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #e2e8f0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    letter-spacing: -0.01em;
+}
+
+.trainer-reason-badge {
+    flex-shrink: 0;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0.18rem 0.5rem;
+    border-radius: 4px;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.trainer-reason-badge.badge-frontier {
+    background: rgba(34, 197, 94, 0.15);
+    border: 1px solid rgba(34, 197, 94, 0.35);
+    color: #4ade80;
+}
+
+.trainer-reason-badge.badge-due {
+    background: rgba(245, 158, 11, 0.15);
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    color: #fbbf24;
+}
+
+.trainer-reason-badge.badge-lapse {
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    color: #f87171;
+}
+
+.trainer-reason-badge.badge-maintenance {
+    background: rgba(56, 189, 248, 0.15);
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    color: #38bdf8;
+}
+
+
+/* ==========================================================================
+   Scout discovery: intent controls, disambiguation chips, rich result cards.
+
+   Layout-stability notes (AGENTS.md §8), because several of these exist only to
+   keep the shelf from moving:
+   - every segmented button carries a fixed `min-width`, so switching between
+     "White" and "Black" cannot reflow the row (§8.4);
+   - `.scout-status-strip` declares `min-height` AND `max-height`: its text
+     changes on every search, and a min-height alone still lets a long string
+     grow the row (§8.5, per the §4.H rule);
+   - the result card reserves its description / reasons / footer slots at a fixed
+     height even when they are empty, because the second (enrichment) paint only
+     fills text into slots that already exist. That is what makes filling them
+     0px of layout shift.
+   ========================================================================== */
+
+.scout-intent-bar-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.25rem;
+    align-items: center;
+    margin: 0.5rem 0 0.6rem;
+}
+
+.scout-intent-group {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    flex-wrap: nowrap;
+    min-height: 30px;
+}
+
+.scout-intent-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+/* §8.4: fixed width + always in flow. Never `display:none`. */
+.scout-intent-btn {
+    min-width: 92px;
+    min-height: 28px;
+    padding: 0.25rem 0.55rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    background: rgba(148, 163, 184, 0.08);
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 6px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.scout-intent-btn:hover { background: rgba(148, 163, 184, 0.16); }
+
+.scout-intent-btn.active {
+    background: rgba(56, 189, 248, 0.18);
+    border-color: rgba(56, 189, 248, 0.5);
+    color: #7dd3fc;
+}
+
+.scout-intent-group--sort .scout-intent-btn { min-width: 104px; font-size: 0.74rem; }
+
+/* The intent statement. min-height AND max-height: the text changes on every
+   search, so a min-height alone would still let a long one grow the row. */
+.scout-status-strip {
+    display: flex;
+    align-items: center;
+    min-height: 24px;
+    max-height: 24px;
+    padding: 0 0.55rem;
+    margin: 0.5rem 0 0.4rem;
+    font-size: 0.78rem;
+    color: #7dd3fc;
+    background: rgba(56, 189, 248, 0.09);
+    border-left: 3px solid rgba(56, 189, 248, 0.55);
+    border-radius: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* The same guarantee again, by id. An id selector outranks a class, so this is
+   the rule that is actually painted, and `test_layout_contracts.py::CONSTANT_HEIGHT`
+   resolves the guard by id -- so the two must be kept in sync or they drift
+   apart silently. Same rule as `.rep-status-strip` / `.rep-engine-line` (§4.H). */
+#scoutIntentBar {
+    min-height: 24px;
+    max-height: 24px;
+}
+
+/* §8.5: the row is always present at a fixed height, so chips appearing is not
+   a layout shift either. */
+.scout-candidate-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 34px;
+    margin-bottom: 0.5rem;
+}
+
+.scout-candidate-label {
+    font-size: 0.74rem;
+    color: #fbbf24;
+    white-space: nowrap;
+    flex: 0 0 auto;
+    max-width: 320px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.scout-candidate-chips {
+    display: flex;
+    gap: 0.35rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex: 1 1 auto;
+    padding-bottom: 2px;
+}
+
+.scout-candidate-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex: 0 0 auto;
+    max-width: 260px;
+    padding: 0.22rem 0.5rem;
+    font-size: 0.74rem;
+    color: var(--text-secondary);
+    background: rgba(251, 191, 36, 0.08);
+    border: 1px solid rgba(251, 191, 36, 0.28);
+    border-radius: 999px;
+    cursor: pointer;
+}
+
+.scout-candidate-chip:hover { background: rgba(251, 191, 36, 0.18); }
+
+.scout-candidate-eco {
+    font-weight: 700;
+    font-size: 0.7rem;
+    color: #fbbf24;
+    flex: 0 0 auto;
+}
+
+.scout-candidate-side { flex: 0 0 auto; }
+
+.scout-candidate-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Autocomplete */
+.scout-input-wrapper { position: relative; }
+
+.scout-suggest-box {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    z-index: 40;
+    max-height: 300px;
+    overflow-y: auto;
+    background: #111c33;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    border-radius: 8px;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+}
+
+.scout-suggest-box.is-hidden { display: none; }
+
+.scout-suggest-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.6rem;
+    font-size: 0.8rem;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+    cursor: pointer;
+}
+
+.scout-suggest-item:hover { background: rgba(56, 189, 248, 0.12); }
+
+.scout-suggest-eco { font-weight: 700; font-size: 0.72rem; color: #fbbf24; flex: 0 0 30px; }
+.scout-suggest-side { flex: 0 0 auto; }
+.scout-suggest-name { flex: 1 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.scout-suggest-moves {
+    flex: 0 0 auto;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    font-family: monospace;
+    max-width: 190px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Grouped results */
+.scout-group-title {
+    grid-column: 1 / -1;
+    font-size: 0.76rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin: 0.6rem 0 0.2rem;
+}
+
+.scout-cards-grid--nested { margin-bottom: 0.4rem; }
+
+/*
+ * The results grid is itself a grid, and `renderResults()` puts *grouped*
+ * sections inside it (the plan panel, the theory row, the coverage strip, then
+ * one grid per bucket). Without this rule those sections become ordinary grid
+ * items and are laid out **side by side**, each squeezed into one auto-filled
+ * column of the outer grid -- so each nested grid came out ~285px wide and
+ * rendered its cards one per row down a single column, with 90% of the viewport
+ * empty. Spanning every column is the standard stack-inside-a-grid idiom, and
+ * writing it as a child selector means the *next* section added to
+ * `renderResults()` is laid out correctly without anyone remembering to opt in.
+ */
+#scoutResultsGrid > * { grid-column: 1 / -1; }
+
+/* The critical-reply strip: "which replies must I prepare", from the
+   encyclopedia rather than from a video title. */
+.scout-replies { grid-column: 1 / -1; }
+
+.scout-reply-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    margin-top: 0.2rem;
+}
+
+.scout-reply-chip {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.35rem;
+    padding: 0.18rem 0.42rem;
+    font-size: 0.74rem;
+    background: rgba(74, 222, 128, 0.08);
+    border: 1px solid rgba(74, 222, 128, 0.26);
+    border-radius: 5px;
+}
+
+.scout-reply-san { font-family: monospace; font-weight: 700; color: #4ade80; }
+.scout-reply-eco { font-size: 0.68rem; color: var(--text-muted); }
+
+/* The rich card. Fixed slots: the enrichment paint only fills text in. */
+.scout-card[data-card="rich"] .scout-card-desc {
+    font-size: 0.72rem;
+    line-height: 1.3;
+    color: var(--text-secondary);
+    min-height: 2.6em;
+    max-height: 2.6em;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    margin-top: 0.25rem;
+}
+
+.scout-card[data-card="rich"] .scout-card-why {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.2rem;
+    min-height: 18px;
+    margin-top: 0.15rem;
+}
+
+.scout-why-chip {
+    font-size: 0.68rem;
+    padding: 0.1rem 0.35rem;
+    border-radius: 4px;
+    color: #93c5fd;
+    background: rgba(59, 130, 246, 0.12);
+    border: 1px solid rgba(59, 130, 246, 0.24);
+}
+
+.scout-card[data-card="rich"] .scout-card-foot {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: 18px;
+    margin-top: 0.2rem;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+.scout-card-stat { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.scout-length-tag { font-weight: 600; }
+.scout-length-tag--quick { color: #4ade80; }
+.scout-length-tag--single { color: #38bdf8; }
+.scout-length-tag--course { color: #a78bfa; }
+.scout-length-tag--long { color: #fbbf24; }
+.scout-length-tag--theory { color: var(--text-muted); }
+
+/* The perspective badge: which side does this teach. `unknown` is a real
+   answer, styled as "we don't know" rather than as a missing field. */
+.scout-perspective {
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 0.1rem 0.36rem;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+.scout-perspective--white { color: #f1f5f9; background: rgba(226, 232, 240, 0.16); }
+.scout-perspective--black { color: #cbd5e1; background: rgba(100, 116, 139, 0.28); }
+.scout-perspective--white--against { color: #7dd3fc; background: rgba(56, 189, 248, 0.18); }
+.scout-perspective--black--against { color: #fbbf24; background: rgba(251, 191, 36, 0.16); }
+.scout-perspective--unknown { color: #94a3b8; background: rgba(148, 163, 184, 0.12); }
+.scout-perspective--theory { color: #a78bfa; background: rgba(167, 139, 250, 0.16); }
+
+.scout-flag {
+    font-size: 0.66rem;
+    font-weight: 700;
+    padding: 0.1rem 0.34rem;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+.scout-flag--done { color: #4ade80; background: rgba(74, 222, 128, 0.14); }
+
+.scout-fav-toggle {
+    margin-left: auto;
+    font-size: 0.9rem;
+    line-height: 1;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0 0.15rem;
+}
+
+.scout-fav-toggle.is-on { color: #fbbf24; }
+.scout-fav-toggle:hover { color: #fbbf24; }
+
+.scout-card[data-card="guide"] .scout-card-thumb-wrap--guide {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(167, 139, 250, 0.1);
+}
+
+/* ==========================================================================
+   Scout coverage (Phase 2): which critical replies the user still lacks.
+
+   The three states are the Repertoire Builder's own vocabulary (`gap_kind`), and
+   they are *distinguished by an inset box-shadow ring*, not by a background
+   colour, so that switching one row between states cannot resize it and cannot
+   make it invisible against a selected square. The row is also `inline-grid`
+   with a fixed `min-width` on the SAN column so a 5-character SAN and a 7-character
+   one cannot shift the labels beside it.
+   ========================================================================== */
+
+.scout-coverage-summary {
+    font-size: 0.76rem;
+    color: var(--text-secondary);
+    margin: 0.1rem 0 0.35rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.scout-coverage-rows {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+}
+
+.scout-coverage-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-height: 24px;
+    padding: 0.1rem 0.45rem;
+    font-size: 0.75rem;
+    border-radius: 5px;
+    background: rgba(148, 163, 184, 0.08);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.scout-coverage-row.is-prepared {
+    background: rgba(74, 222, 128, 0.09);
+    border-color: rgba(74, 222, 128, 0.3);
+    box-shadow: inset 2px 0 0 #4ade80;
+}
+
+.scout-coverage-row.is-unanswered {
+    background: rgba(245, 158, 11, 0.1);
+    border-color: rgba(245, 158, 11, 0.34);
+    box-shadow: inset 2px 0 0 #f59e0b;
+}
+
+.scout-coverage-row.is-missing {
+    background: rgba(239, 68, 68, 0.09);
+    border-color: rgba(239, 68, 68, 0.32);
+    box-shadow: inset 2px 0 0 #ef4444;
+}
+
+.scout-coverage-mark { font-weight: 700; flex: 0 0 auto; }
+.scout-coverage-row.is-prepared .scout-coverage-mark { color: #4ade80; }
+.scout-coverage-row.is-unanswered .scout-coverage-mark { color: #f59e0b; }
+.scout-coverage-row.is-missing .scout-coverage-mark { color: #ef4444; }
+
+.scout-coverage-san {
+    font-family: monospace;
+    font-weight: 700;
+    min-width: 3.2em;
+    flex: 0 0 auto;
+}
+
+.scout-coverage-eco { font-size: 0.68rem; color: var(--text-muted); flex: 0 0 auto; }
+
+.scout-coverage-state {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    flex: 0 0 auto;
+}
+
+.scout-coverage-action {
+    font-size: 0.68rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    color: #7dd3fc;
+    background: rgba(56, 189, 248, 0.12);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    cursor: pointer;
+    white-space: nowrap;
+    flex: 0 0 auto;
+}
+
+.scout-coverage-action:hover { background: rgba(56, 189, 248, 0.24); }
+
+/* The whole strip is tinted by the verdict, by inset shadow only. */
+.scout-replies[data-state="covered"] { box-shadow: inset 3px 0 0 #4ade80; padding-left: 0.5rem; }
+.scout-replies[data-state="gaps"] { box-shadow: inset 3px 0 0 #f59e0b; padding-left: 0.5rem; }
+.scout-replies[data-state="empty"],
+.scout-replies[data-state="unknown"] { box-shadow: inset 3px 0 0 rgba(148, 163, 184, 0.5); padding-left: 0.5rem; }
+
+/* ==========================================================================
+   The plan panel. A <details>, so it costs nothing while collapsed, and its
+   three rows are keyed by `data-field` rather than by per-field ids.
+   ========================================================================== */
+
+.scout-plan-panel {
+    grid-column: 1 / -1;
+    border: 1px solid rgba(167, 139, 250, 0.28);
+    border-radius: 8px;
+    background: rgba(167, 139, 250, 0.07);
+    margin-bottom: 0.3rem;
+}
+
+.scout-plan-summary {
+    cursor: pointer;
+    padding: 0.45rem 0.6rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #c4b5fd;
+    min-height: 30px;
+    display: flex;
+    align-items: center;
+}
+
+.scout-plan-body { padding: 0 0.6rem 0.55rem; }
+
+.scout-plan-note {
+    font-size: 0.72rem;
+    color: #fbbf24;
+    margin-bottom: 0.35rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.scout-plan-row {
+    display: grid;
+    grid-template-columns: 130px 1fr;
+    gap: 0.5rem;
+    padding: 0.22rem 0;
+    border-top: 1px solid rgba(148, 163, 184, 0.12);
+    font-size: 0.78rem;
+    line-height: 1.45;
+}
+
+.scout-plan-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.scout-plan-text { color: var(--text-secondary); }
+
+/* ==========================================================================
+   Repertoire Trainer: Game Deviations Section
+   ========================================================================== */
+
+.deviation-card {
+    background: rgba(15, 23, 42, 0.85);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.85rem 1.1rem;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.deviation-card:hover {
+    border-color: #38bdf8;
+    background: rgba(15, 23, 42, 0.95);
+}
+
+.deviation-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.65rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.deviation-game-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.deviation-opponent {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: #f8fafc;
+}
+
+.deviation-opening-tag {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+}
+
+.deviation-comparison-grid {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 0.75rem;
+    align-items: center;
+    background: rgba(30, 41, 59, 0.5);
+    padding: 0.65rem 0.9rem;
+    border-radius: 6px;
+    border: 1px solid rgba(51, 65, 85, 0.6);
+    margin-bottom: 0.65rem;
+}
+
+.deviation-box {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.deviation-box.played {
+    border-left: 3px solid #ef4444;
+    padding-left: 0.6rem;
+}
+
+.deviation-box.prepared {
+    border-left: 3px solid #4ade80;
+    padding-left: 0.6rem;
+}
+
+.deviation-box-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+}
+
+.deviation-box.played .deviation-box-label {
+    color: #f87171;
+}
+
+.deviation-box.prepared .deviation-box-label {
+    color: #4ade80;
+}
+
+.deviation-move-val {
+    font-family: monospace;
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: #fff;
+}
+
+.deviation-arrow-icon {
+    font-size: 1.25rem;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+.deviation-note-callout {
+    font-size: 0.78rem;
+    color: #cbd5e1;
+    background: rgba(15, 23, 42, 0.6);
+    padding: 0.35rem 0.6rem;
+    border-radius: 4px;
+    border-left: 2px solid #38bdf8;
+    margin-bottom: 0.65rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.deviation-actions {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+#trainDeviationBanner {
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    margin-bottom: 0;
+}
+
+#trainDeviationBanner .game-outcome-pill.loss {
+    background: rgba(239, 68, 68, 0.2);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    color: #f87171;
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 0.15rem 0.45rem;
+    border-radius: 4px;
+}
+
+#trainDeviationBanner .game-outcome-pill.win {
+    background: rgba(34, 197, 94, 0.2);
+    border: 1px solid rgba(34, 197, 94, 0.4);
+    color: #4ade80;
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 0.15rem 0.45rem;
+    border-radius: 4px;
+}
+
+#trainDeviationBanner .game-outcome-pill.draw {
+    background: rgba(148, 163, 184, 0.2);
+    border: 1px solid rgba(148, 163, 184, 0.4);
+    color: #cbd5e1;
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 0.15rem 0.45rem;
+    border-radius: 4px;
+}
+

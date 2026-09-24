@@ -1,0 +1,26 @@
+{
+  "name": "chess-opening-improvement",
+  "version": "1.0.0",
+  "description": "Personalized Chess Opening Improvement Platform & Repertoire Trainer",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "desktop": "electron .",
+    "server": "/home/robin/miniconda3/bin/python3 start.py",
+    "test": "/home/robin/miniconda3/bin/python3 -m unittest discover tests",
+    "install-shortcut": "./install-desktop.sh"
+  },
+  "keywords": [
+    "chess",
+    "repertoire",
+    "opening",
+    "trainer",
+    "desktop"
+  ],
+  "author": "Robin",
+  "license": "ISC",
+  "private": true,
+  "devDependencies": {
+    "electron": "^44.4.5"
+  }
+}
