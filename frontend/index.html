@@ -12,10 +12,10 @@
 <body>
     <header>
         <div class="brand">
-            <svg width="28" height="28" viewBox="0 0 45 45" fill="none">
-                <path d="M22.5 4L28 13H17L22.5 4Z" fill="#38bdf8"/>
-                <path d="M12 15H33L31 32H14L12 15Z" fill="#0284c7"/>
-                <path d="M9 34H36V40H9V34Z" fill="#0369a1"/>
+            <svg width="26" height="26" viewBox="0 0 45 45" fill="none">
+                <path d="M22.5 4L28 13H17L22.5 4Z" fill="#e2b968"/>
+                <path d="M12 15H33L31 32H14L12 15Z" fill="#d4a853"/>
+                <path d="M9 34H36V40H9V34Z" fill="#9a7229"/>
             </svg>
             <div>Chess<span>Repertoire</span>Studio</div>
         </div>
@@ -171,7 +171,7 @@
             <!-- Main Workspace: Board on Left, 2000+ Explorer & Gaps on Right -->
             <div class="repertoire-layout">
                 <!-- Left: Board & Controls -->
-                <div>
+                <div class="repertoire-board-col">
                     <div class="board-eval-container">
                         <!-- Real-time Evaluation Bar -->
                         <div class="eval-bar-wrapper" id="repEvalBarWrapper" title="Stockfish Real-time Evaluation">
@@ -185,7 +185,7 @@
                          Both are always-in-flow, fixed-height status strips showing a muted
                          placeholder when there is nothing to say, so the board never shifts
                          under the pointer (8.5) and no message is injected into the flow (8.1). -->
-                    <div style="margin-top:0.45rem; display:flex; flex-direction:column; gap:0.15rem;">
+                    <div style="margin-top:0.35rem; display:flex; flex-direction:column; gap:0.15rem;">
                         <div id="repOpeningLine" class="rep-status-strip is-idle" title="The opening played in this position">
                             <span class="rep-status-label">Opening</span>
                             <span class="rep-status-text" id="repOpeningLineText">Starting Position</span>
@@ -196,19 +196,19 @@
                         </div>
                     </div>
 
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.75rem; flex-wrap:wrap; gap:0.5rem;">
-                        <div style="display:flex; gap:0.4rem;">
+                    <div class="board-transport-row" style="display:flex; justify-content:space-between; align-items:center; margin-top:0.45rem; flex-wrap:wrap; gap:0.35rem;">
+                        <div style="display:flex; gap:0.3rem;">
                             <button id="btnRepStart" class="btn-secondary" title="First Move (Up / k / Home)">⏮ Start</button>
                             <button id="btnRepPrev" class="btn-secondary" title="Previous Move (Left / h)">◀ Back</button>
                             <button id="btnRepNext" class="btn-secondary" title="Next Move (Right / l)">Next ▶</button>
                             <button id="btnRepEnd" class="btn-secondary" title="Latest Move (Down / j / End)">End ⏭</button>
                         </div>
-                        <div style="display:flex; gap:0.4rem; align-items:center;">
+                        <div style="display:flex; gap:0.35rem; align-items:center;">
                             <button id="btnRepEngineLine" class="btn-secondary btn-engine-line active" aria-pressed="true"
                                     title="Draw Stockfish's best line on the board. Right-click a square to mark it, drag right-click to draw an arrow, left-click an empty square to clear everything.">Engine Line</button>
                             <button id="btnRepFlip" class="btn-secondary">Flip</button>
                             <button id="btnRepReset" class="btn-secondary">Reset</button>
-                            <div class="board-size-control-group" style="display:inline-flex; align-items:center; gap:2px; margin-left:0.25rem; background:rgba(30, 41, 59, 0.7); border:1px solid var(--border-color); border-radius:4px; padding:2px 4px;">
+                            <div class="board-size-control-group" style="display:inline-flex; align-items:center; gap:2px; margin-left:0.15rem; background:rgba(19, 22, 31, 0.85); border:1px solid var(--border-color); border-radius:4px; padding:2px 4px;">
                                 <button type="button" class="btn-board-size btn-board-size-dec" title="Decrease board size">−</button>
                                 <span id="repBoardSizeLabel" class="board-size-display-val" style="font-size:0.75rem; color:var(--text-muted); font-family:monospace; min-width:44px; text-align:center;">---</span>
                                 <button type="button" class="btn-board-size btn-board-size-inc" title="Increase board size">+</button>
@@ -216,80 +216,27 @@
                             </div>
                         </div>
                     </div>
-                    <div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.4rem; display:flex; gap:0.75rem; flex-wrap:wrap;">
-                        <span><kbd style="background:#1e293b; padding:1px 5px; border-radius:3px; border:1px solid #334155;">&larr;</kbd> / <kbd style="background:#1e293b; padding:1px 5px; border-radius:3px; border:1px solid #334155;">h</kbd> Back</span>
-                        <span><kbd style="background:#1e293b; padding:1px 5px; border-radius:3px; border:1px solid #334155;">&rarr;</kbd> / <kbd style="background:#1e293b; padding:1px 5px; border-radius:3px; border:1px solid #334155;">l</kbd> Next</span>
-                        <span><kbd style="background:#1e293b; padding:1px 5px; border-radius:3px; border:1px solid #334155;">&uarr;</kbd> / <kbd style="background:#1e293b; padding:1px 5px; border-radius:3px; border:1px solid #334155;">k</kbd> Start</span>
-                        <span><kbd style="background:#1e293b; padding:1px 5px; border-radius:3px; border:1px solid #334155;">&darr;</kbd> / <kbd style="background:#1e293b; padding:1px 5px; border-radius:3px; border:1px solid #334155;">j</kbd> End</span>
-                    </div>
-
-                    <!-- Quick Whole-Line Import & Explored Tree Control Bar -->
-                    <div class="rep-line-actions-bar" style="margin-top:0.6rem; padding:0.45rem 0.65rem; background:rgba(15, 23, 42, 0.7); border:1px solid var(--border-color); border-radius:6px; display:flex; flex-direction:column; gap:0.35rem;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.4rem;">
-                            <div style="display:flex; align-items:center; gap:0.4rem; flex-wrap:wrap;">
-                                <button id="btnRepAddWholeLine" class="btn-primary btn-quick-rep" style="font-size:0.78rem; padding:0.3rem 0.65rem;" title="Import the whole line leading to this position into your repertoire">
-                                    📥 Add Line &rarr; <span id="repAddLineColorLabel">White</span> Rep
-                                </button>
-                                <button id="btnRepViewTree" class="btn-secondary btn-quick-rep" style="font-size:0.78rem; padding:0.3rem 0.65rem;" title="View explored lines in session tree">
-                                    🌳 Lines Tree (<span id="repQuickLineCount">0</span>)
-                                </button>
-                                <button id="btnRepClearTree" class="btn-secondary btn-quick-rep" style="font-size:0.78rem; padding:0.3rem 0.55rem; color:var(--text-muted);" title="Clear session explored lines">
-                                    ↺ Clear Tree
-                                </button>
-                            </div>
-                        </div>
-                        <div id="repActiveLineOverlap" class="scout-line-overlap-strip" style="display:flex;"><span style="font-size:0.72rem; color:var(--text-muted); font-weight:500;">Repertoire: Starting Position</span></div>
-                    </div>
-
-                    <!-- Move Notes, Importance & Arrow Tools Panel -->
-                    <div id="repMoveToolsPanel" class="card-panel" style="margin-top:0.75rem; padding:0.75rem; background:rgba(15, 23, 42, 0.65); border:1px solid var(--border-color); border-radius:8px;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.4rem; margin-bottom:0.5rem;">
-                            <div style="display:flex; align-items:center; gap:0.4rem;">
-                                <span id="repMoveToolSan" style="font-weight:700; font-size:0.95rem; color:#fff;">Starting Position</span>
-                                <span id="repMoveToolType" style="font-size:0.75rem; color:var(--text-muted);">(Root)</span>
-                            </div>
-                            <div style="display:flex; gap:0.35rem; align-items:center;">
-                                <button id="btnRepToggleImportant" class="btn-secondary" style="font-size:0.75rem; padding:0.25rem 0.55rem;" title="Consider this move important (prioritized in Trainer)">
-                                    ☆ Mark Important
-                                </button>
-                                <button id="btnRepDeleteCurrentMove" class="btn-secondary btn-danger" style="font-size:0.75rem; padding:0.25rem 0.55rem; visibility:hidden;" title="Remove this move and all its continuing variations from repertoire">
-                                    🗑️ Remove Line
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Move Comments / Notes -->
-                        <div style="margin-bottom:0.5rem;">
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem;">
-                                <label for="repMoveComment" style="font-size:0.76rem; font-weight:600; color:var(--text-secondary);">Move Notes / Ideas (shown in Trainer):</label>
-                                <span id="repCommentSaveStatus" style="font-size:0.72rem; color:#4ade80; opacity:0; transition:opacity 0.2s ease;">Saved ✓</span>
-                            </div>
-                            <textarea id="repMoveComment" placeholder="Write move notes, plans, or key ideas (shown in Trainer)..." rows="2" style="width:100%; box-sizing:border-box; background:rgba(30, 41, 59, 0.7); border:1px solid #334155; border-radius:5px; color:#f8fafc; font-size:0.8rem; padding:0.4rem; resize:vertical; font-family:inherit;"></textarea>
-                        </div>
-
-                        <!-- Board Arrows Bar -->
-                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.4rem; font-size:0.75rem; color:var(--text-muted); background:rgba(30, 41, 59, 0.4); padding:0.35rem 0.6rem; border-radius:5px;">
-                            <span>💡 <strong>Right-click &amp; drag</strong> between squares to draw arrows</span>
-                            <div style="display:flex; align-items:center; gap:0.4rem;">
-                                <span id="repArrowsCount" style="color:var(--text-secondary);">0 arrows</span>
-                                <button id="btnRepClearArrows" class="btn-secondary" style="font-size:0.7rem; padding:0.15rem 0.4rem;" title="Clear all drawn arrows on this move">Clear</button>
-                            </div>
-                        </div>
+                    <div class="board-kbd-hint-row" style="font-size:0.7rem; color:var(--text-muted); margin-top:0.25rem; display:flex; gap:0.65rem; flex-wrap:wrap;">
+                        <span><kbd>&larr;</kbd>/<kbd>h</kbd> Back</span>
+                        <span><kbd>&rarr;</kbd>/<kbd>l</kbd> Next</span>
+                        <span><kbd>&uarr;</kbd>/<kbd>k</kbd> Start</span>
+                        <span><kbd>&darr;</kbd>/<kbd>j</kbd> End</span>
+                        <span>💡 Right-click drag for arrows</span>
                     </div>
                 </div>
 
-                <!-- Right: Database Moves & Gaps -->
+                <!-- Right: Database Moves, Line/Move Inspector & Gaps -->
                 <div class="repertoire-sidebar-col">
                     <!-- 2000+ Online Database Table -->
-                    <div class="card-panel repertoire-sidebar-card" style="margin-bottom:0;">
-                        <div class="panel-header" style="padding-bottom:0.5rem;">
-                            <div>
-                                <div class="panel-title" style="font-size:0.95rem;">2000+ Online Database</div>
-                                <div id="repTurnIndicator" style="font-size:0.76rem; color:var(--text-secondary); margin-top:0.15rem;">
+                    <div class="card-panel repertoire-sidebar-card" id="repExplorerCard" style="margin-bottom:0;">
+                        <div class="panel-header" style="padding-bottom:0.35rem; margin-bottom:0.35rem;">
+                            <div style="display:flex; align-items:baseline; gap:0.6rem; flex-wrap:wrap;">
+                                <div class="panel-title" style="font-size:0.9rem;">2000+ Online Database</div>
+                                <div id="repTurnIndicator" style="font-size:0.74rem; color:var(--text-secondary);">
                                     Loading database...
                                 </div>
                             </div>
-                            <div id="repDbStats" style="font-size:0.78rem; font-weight:600; color:var(--text-muted);">
+                            <div id="repDbStats" style="font-size:0.75rem; font-weight:600; color:var(--text-muted);">
                                 - games
                             </div>
                         </div>
@@ -307,17 +254,60 @@
                                     </tr>
                                 </thead>
                                 <tbody id="repExplorerTbody">
-                                    <tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:1rem;">Loading 2000+ moves...</td></tr>
+                                    <tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:0.75rem;">Loading 2000+ moves...</td></tr>
                                 </tbody>
                             </table>
                         </div>
                     </div>
 
+                    <!-- Compact Move & Line Inspector Dock (Relocated from under board to eliminate vertical scroll) -->
+                    <div class="rep-inspector-dock">
+                        <!-- Quick Whole-Line Import & Explored Tree Control Bar -->
+                        <div class="rep-line-actions-bar">
+                            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.35rem;">
+                                <div style="display:flex; align-items:center; gap:0.35rem; flex-wrap:wrap;">
+                                    <button id="btnRepAddWholeLine" class="btn-primary btn-quick-rep" style="font-size:0.74rem; padding:0.22rem 0.55rem;" title="Import the whole line leading to this position into your repertoire">
+                                        📥 Add Line &rarr; <span id="repAddLineColorLabel">White</span> Rep
+                                    </button>
+                                    <button id="btnRepViewTree" class="btn-secondary btn-quick-rep" style="font-size:0.74rem; padding:0.22rem 0.5rem;" title="View explored lines in session tree">
+                                        🌳 Lines Tree (<span id="repQuickLineCount">0</span>)
+                                    </button>
+                                    <button id="btnRepClearTree" class="btn-secondary btn-quick-rep" style="font-size:0.74rem; padding:0.22rem 0.45rem; color:var(--text-muted);" title="Clear session explored lines">
+                                        ↺ Clear Tree
+                                    </button>
+                                </div>
+                                <div id="repActiveLineOverlap" class="scout-line-overlap-strip" style="display:flex;"><span style="font-size:0.72rem; color:var(--text-muted); font-weight:500;">Repertoire: Starting Position</span></div>
+                            </div>
+                        </div>
+
+                        <!-- Move Notes, Importance & Arrow Tools Panel -->
+                        <div id="repMoveToolsPanel" class="card-panel rep-move-tools-compact">
+                            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.35rem; margin-bottom:0.3rem;">
+                                <div style="display:flex; align-items:center; gap:0.4rem;">
+                                    <span id="repMoveToolSan" style="font-weight:700; font-size:0.88rem; color:#fff;">Starting Position</span>
+                                    <span id="repMoveToolType" style="font-size:0.72rem; color:var(--text-muted);">(Root)</span>
+                                    <span id="repCommentSaveStatus" style="font-size:0.7rem; color:#4ade80; opacity:0; transition:opacity 0.2s ease;">Saved ✓</span>
+                                </div>
+                                <div style="display:flex; gap:0.3rem; align-items:center;">
+                                    <span id="repArrowsCount" style="font-size:0.72rem; color:var(--text-secondary);">0 arrows</span>
+                                    <button id="btnRepClearArrows" class="btn-secondary" style="font-size:0.68rem; padding:0.12rem 0.35rem;" title="Clear all drawn arrows on this move">Clear</button>
+                                    <button id="btnRepToggleImportant" class="btn-secondary" style="font-size:0.72rem; padding:0.18rem 0.45rem;" title="Consider this move important (prioritized in Trainer)">
+                                        ☆ Mark Important
+                                    </button>
+                                    <button id="btnRepDeleteCurrentMove" class="btn-secondary btn-danger" style="font-size:0.72rem; padding:0.18rem 0.45rem; visibility:hidden;" title="Remove this move and all its continuing variations from repertoire">
+                                        🗑️ Remove Line
+                                    </button>
+                                </div>
+                            </div>
+                            <textarea id="repMoveComment" placeholder="Write move notes, plans, or key ideas (shown in Trainer)..." rows="1" class="rep-move-comment-input"></textarea>
+                        </div>
+                    </div>
+
                     <!-- Bottom Card: Explored Lines Tree & Address Critical Gaps (Tabbed) -->
                     <div class="card-panel repertoire-sidebar-card" id="repBottomSidebarCard">
-                        <div class="panel-header" style="padding-bottom:0.4rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.4rem;">
+                        <div class="panel-header" style="padding-bottom:0.35rem; margin-bottom:0.35rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.35rem;">
                             <!-- Tab Switcher -->
-                            <div style="display:flex; align-items:center; gap:0.35rem;">
+                            <div style="display:flex; align-items:center; gap:0.3rem;">
                                 <button id="btnTabRepLinesTree" class="rep-subcard-tab active" title="View lines and variations explored in this session">
                                     🌳 Explored Lines (<span id="repTreeTabCount">0</span>)
                                 </button>
@@ -330,52 +320,58 @@
                             </div>
                             <!-- Actions for Explored Lines Tab -->
                             <div id="repTreeHeaderActions" style="display:flex; align-items:center; gap:0.3rem;">
-                                <button id="btnRepImportAll" class="btn-secondary" style="font-size:0.72rem; padding:0.2rem 0.5rem;" title="Import all explored lines into your repertoire">
+                                <button id="btnRepImportAll" class="btn-secondary" style="font-size:0.72rem; padding:0.18rem 0.45rem;" title="Import all explored lines into your repertoire">
                                     📥 Import All Lines
                                 </button>
-                                <button id="btnRepClearAllTree" class="btn-secondary" style="font-size:0.72rem; padding:0.2rem 0.45rem; color:var(--text-muted);" title="Clear explored lines from this session">
+                                <button id="btnRepClearAllTree" class="btn-secondary" style="font-size:0.72rem; padding:0.18rem 0.4rem; color:var(--text-muted);" title="Clear explored lines from this session">
                                     🗑️ Clear
                                 </button>
                             </div>
                             <!-- Actions for Recent Games Tab -->
-                            <div id="repGamesHeaderActions" style="display:none; align-items:center; gap:0.35rem; flex-wrap:wrap;">
-                                <div class="filter-pill-group" style="display:flex; gap:0.2rem; background:rgba(15,23,42,0.8); padding:2px; border-radius:5px; border:1px solid var(--border-color);">
-                                    <button class="filter-pill-btn active" id="btnFilterGamesAll" data-filter="all" style="font-size:0.7rem; padding:0.15rem 0.45rem; border:none; border-radius:3px; background:#0284c7; color:#fff; cursor:pointer;">All</button>
-                                    <button class="filter-pill-btn" id="btnFilterGamesWhite" data-filter="white" style="font-size:0.7rem; padding:0.15rem 0.45rem; border:none; border-radius:3px; background:transparent; color:var(--text-secondary); cursor:pointer;">White</button>
-                                    <button class="filter-pill-btn" id="btnFilterGamesBlack" data-filter="black" style="font-size:0.7rem; padding:0.15rem 0.45rem; border:none; border-radius:3px; background:transparent; color:var(--text-secondary); cursor:pointer;">Black</button>
+                            <div id="repGamesHeaderActions" style="display:none; align-items:center; gap:0.3rem; flex-wrap:wrap;">
+                                <div class="filter-pill-group">
+                                    <button class="filter-pill-btn active" id="btnFilterGamesAll" data-filter="all">All</button>
+                                    <button class="filter-pill-btn" id="btnFilterGamesWhite" data-filter="white">White</button>
+                                    <button class="filter-pill-btn" id="btnFilterGamesBlack" data-filter="black">Black</button>
                                 </div>
-                                <div class="filter-pill-group" style="display:flex; gap:0.2rem; background:rgba(15,23,42,0.8); padding:2px; border-radius:5px; border:1px solid var(--border-color);">
-                                    <button class="filter-pill-btn active" id="btnFilterSpeedAll" data-speed="all" style="font-size:0.7rem; padding:0.15rem 0.45rem; border:none; border-radius:3px; background:#0284c7; color:#fff; cursor:pointer;">All Speeds</button>
-                                    <button class="filter-pill-btn" id="btnFilterSpeedRapid" data-speed="rapid" style="font-size:0.7rem; padding:0.15rem 0.45rem; border:none; border-radius:3px; background:transparent; color:var(--text-secondary); cursor:pointer;">Rapid</button>
-                                    <button class="filter-pill-btn" id="btnFilterSpeedBlitz" data-speed="blitz" style="font-size:0.7rem; padding:0.15rem 0.45rem; border:none; border-radius:3px; background:transparent; color:var(--text-secondary); cursor:pointer;">Blitz</button>
-                                    <button class="filter-pill-btn" id="btnFilterSpeedBullet" data-speed="bullet" style="font-size:0.7rem; padding:0.15rem 0.45rem; border:none; border-radius:3px; background:transparent; color:var(--text-secondary); cursor:pointer;">Bullet</button>
+                                <div class="filter-pill-group">
+                                    <button class="filter-pill-btn active" id="btnFilterSpeedAll" data-speed="all">All Speeds</button>
+                                    <button class="filter-pill-btn" id="btnFilterSpeedRapid" data-speed="rapid">Rapid</button>
+                                    <button class="filter-pill-btn" id="btnFilterSpeedBlitz" data-speed="blitz">Blitz</button>
+                                    <button class="filter-pill-btn" id="btnFilterSpeedBullet" data-speed="bullet">Bullet</button>
                                 </div>
-                                <button id="btnSyncRecentGames" class="btn-secondary" style="font-size:0.72rem; padding:0.2rem 0.45rem;" title="Fetch latest games from Lichess">
+                                <button id="btnSyncRecentGames" class="btn-secondary" style="font-size:0.7rem; padding:0.18rem 0.4rem;" title="Fetch latest games from Lichess">
                                     🔄 Sync Latest
                                 </button>
-                                <button id="btnResyncGames" class="btn-secondary" style="font-size:0.72rem; padding:0.2rem 0.45rem;" title="Re-scan your whole game archive and re-analyse opening theory (slow)">
+                                <button id="btnResyncGames" class="btn-secondary" style="font-size:0.7rem; padding:0.18rem 0.4rem;" title="Re-scan your whole game archive and re-analyse opening theory (slow)">
                                     🔄 Refresh All Games
                                 </button>
                             </div>
                             <!-- Actions for Coverage Gaps Tab -->
                             <div id="repGapsHeaderActions" style="display:none; align-items:center; gap:0.35rem; flex-wrap:wrap;">
+                                <button id="btnRepAddressTopBlunder" class="btn-secondary" style="font-size:0.7rem; padding:0.18rem 0.45rem;" title="Jump directly to the #1 unpatched opening blunder">
+                                    🎯 Fix #1 Blunder
+                                </button>
+                                <button id="btnRepTogglePatchedGaps" class="btn-secondary" style="font-size:0.7rem; padding:0.18rem 0.45rem;" title="Show or hide already-patched opening blunders">
+                                    Show Patched (0)
+                                </button>
                             </div>
                         </div>
 
                         <!-- Explored Lines View Container -->
                         <div id="repTreeContainer" style="display:flex; flex-direction:column; flex:1; min-height:0; overflow:hidden;">
-                            <div style="font-size:0.72rem; color:var(--text-muted); margin-bottom:0.3rem; padding:0 0.1rem;">
+                            <div style="font-size:0.7rem; color:var(--text-muted); margin-bottom:0.25rem; padding:0 0.1rem;">
                                 Variations you explore are tracked here. Click any card to load onto board or import into your repertoire.
                             </div>
-                            <div id="repVariationsList" class="scout-variations-list" style="flex:1; overflow-y:auto; padding:0.4rem 0.2rem;">
+                            <div id="repVariationsList" class="scout-variations-list" style="flex:1; overflow-y:auto; padding:0.3rem 0.2rem;">
                                 <!-- Explored lines rendered here -->
                             </div>
                         </div>
 
                         <!-- Recent Games View Container -->
                         <div id="repGamesContainer" style="display:none; flex-direction:column; flex:1; min-height:0; overflow:hidden;">
-                            <div style="display:flex; align-items:center; gap:0.4rem; margin-bottom:0.4rem; padding:0 0.1rem;">
-                                <input type="text" id="repGamesSearchInput" placeholder="Search opponent or opening..." style="flex:1; background:rgba(15,23,42,0.7); border:1px solid var(--border-color); border-radius:4px; color:#f8fafc; font-size:0.75rem; padding:0.25rem 0.5rem;">
+                            <div style="display:flex; align-items:center; gap:0.4rem; margin-bottom:0.35rem; padding:0 0.1rem;">
+                                <input type="text" id="repGamesSearchInput" placeholder="Search opponent or opening..." style="flex:1; background:rgba(12,14,19,0.75); border:1px solid var(--border-color); border-radius:4px; color:var(--text-primary); font-size:0.75rem; padding:0.25rem 0.5rem;">
                             </div>
                             <div id="repGamesList" class="rep-games-list" style="flex:1; overflow-y:auto; padding:0.2rem 0.1rem;">
                                 <div style="text-align:center; color:var(--text-muted); padding:0.75rem;">Loading recent games...</div>
@@ -383,15 +379,18 @@
                         </div>
 
                         <!-- Coverage Gaps View Container -->
-                        <div id="repGapsContainer" style="display:none; flex-direction:column; flex:1; min-height:0; overflow:hidden;">
-                            <div class="gaps-section-header" style="margin-bottom:0.35rem;">
+                        <div id="repGapsContainer" style="display:none; flex-direction:column; flex:1; min-height:0; overflow-y:auto; gap:0.5rem; padding-right:0.15rem;">
+                            <div class="gaps-section-header" style="margin-bottom:0.15rem;">
                                 <span class="gaps-section-title">🛡️ Unprepared Opponent Moves</span>
                                 <span class="gaps-section-sub" id="repCoverageGapsMeta">--</span>
                             </div>
-                            <div id="repCoverageGapsList" class="rep-gaps-list" style="flex:1; overflow-y:auto; padding:0.2rem 0.1rem;">
+                            <div id="repCoverageGapsList" class="rep-gaps-list" style="padding:0.15rem 0.1rem;">
                                 <div style="text-align:center; color:var(--text-muted); padding:0.75rem; font-size:0.8rem;">Loading coverage gaps...</div>
                             </div>
-                            <div id="repGapsList" class="rep-gaps-list" style="display:none;"></div>
+                            <div class="gaps-section-header" style="margin-top:0.25rem; margin-bottom:0.15rem;">
+                                <span class="gaps-section-title">🚨 Opening Blunders in Recent Games</span>
+                            </div>
+                            <div id="repGapsList" class="rep-gaps-list" style="padding:0.15rem 0.1rem;"></div>
                         </div>
                     </div>
                 </div>
@@ -400,68 +399,68 @@
 
         <!-- REPERTOIRE TRAINER VIEW -->
         <section id="viewRepTrainer" class="view-section">
-            <!-- Practice Drills View -->
-            <div id="trainerDrillsSection" style="display:flex; flex-direction:column; gap:0;">
-                <div class="repertoire-top-bar" style="margin-bottom:0.75rem;">
-                    <div style="display:flex; align-items:center; gap:0.65rem; flex-wrap:wrap;">
-                        <!-- Subtab Mode Switcher (Drills vs Deviations) -->
-                        <div class="repertoire-color-toggle trainer-view-mode-toggle" style="display:flex;">
-                            <button id="btnTrainerTabDrills" class="rep-toggle-btn active" style="font-size:0.78rem; padding:0.3rem 0.65rem;" title="Spaced-repetition drills and active recall practice">
-                                🎯 Drills
-                            </button>
-                            <button id="btnTrainerTabDeviations" class="rep-toggle-btn" style="font-size:0.78rem; padding:0.3rem 0.65rem; display:inline-flex; align-items:center; gap:0.35rem;" title="Games where you deviated from your prepared repertoire">
-                                ⚠️ Deviations <span id="trainDeviationsBadge" class="badge-pill" style="background:#ef4444; color:#fff; font-size:0.65rem; padding:0.05rem 0.35rem; border-radius:10px;">0</span>
-                            </button>
-                        </div>
-
-                        <!-- Color Toggle -->
-                        <div class="repertoire-color-toggle">
-                            <button class="rep-toggle-btn active" id="btnTrainMixed" data-color="mixed" style="font-size:0.78rem; padding:0.3rem 0.65rem;">Both</button>
-                            <button class="rep-toggle-btn" id="btnTrainWhite" data-color="white" style="font-size:0.78rem; padding:0.3rem 0.65rem;">White</button>
-                            <button class="rep-toggle-btn" id="btnTrainBlack" data-color="black" style="font-size:0.78rem; padding:0.3rem 0.65rem;">Black</button>
-                        </div>
-
-                        <!-- Opening Focus Selector -->
-                        <div style="display:flex; align-items:center; gap:0.35rem;">
-                            <label for="trainOpeningFilter" style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">Focus:</label>
-                            <select id="trainOpeningFilter" class="trainer-focus-select" style="font-size:0.78rem; padding:0.25rem 0.5rem; background:var(--bg-card); color:#fff; border:1px solid var(--border-color); border-radius:6px; max-width:200px;">
-                                <option value="">All Openings</option>
-                            </select>
-                        </div>
-
-                        <!-- Training Curriculum Mode -->
-                        <div style="display:flex; align-items:center; gap:0.35rem;">
-                            <label for="trainModeSelect" style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">Mode:</label>
-                            <select id="trainModeSelect" class="trainer-focus-select" style="font-size:0.78rem; padding:0.25rem 0.5rem; background:var(--bg-card); color:#fff; border:1px solid var(--border-color); border-radius:6px;">
-                                <option value="adaptive">🧠 Adaptive</option>
-                                <option value="frontier_only">🌱 New Lines</option>
-                                <option value="due_only">⏰ Due Reviews</option>
-                                <option value="deviations">⚠️ Deviations</option>
-                                <option value="full">🎲 Full Tree</option>
-                            </select>
-                        </div>
-
-                        <button id="btnTrainNewDrill" class="btn-primary" style="font-size:0.78rem; padding:0.3rem 0.65rem;">New Line</button>
+            <div class="repertoire-top-bar" style="margin-bottom:0.5rem;">
+                <div style="display:flex; align-items:center; gap:0.65rem; flex-wrap:wrap;">
+                    <!-- Subtab Mode Switcher (Drills vs Deviations) -->
+                    <div class="repertoire-color-toggle trainer-view-mode-toggle" style="display:flex;">
+                        <button id="btnTrainerTabDrills" class="rep-toggle-btn active" style="font-size:0.78rem; padding:0.3rem 0.65rem;" title="Spaced-repetition drills and active recall practice">
+                            🎯 Drills
+                        </button>
+                        <button id="btnTrainerTabDeviations" class="rep-toggle-btn" style="font-size:0.78rem; padding:0.3rem 0.65rem; display:inline-flex; align-items:center; gap:0.35rem;" title="Games where you deviated from your prepared repertoire">
+                            ⚠️ Deviations <span id="trainDeviationsBadge" class="badge-pill" style="background:#ef4444; color:#fff; font-size:0.65rem; padding:0.05rem 0.35rem; border-radius:10px;">0</span>
+                        </button>
                     </div>
 
-                    <div class="trainer-stats-strip" style="padding:0.2rem 0.55rem; gap:0.85rem;">
-                        <div class="trainer-stat">
-                            <div id="trainStatStreak" class="trainer-stat-val" style="color:#4ade80; font-size:0.95rem;">0</div>
-                            <div class="trainer-stat-lbl" style="font-size:0.65rem;">Streak</div>
-                        </div>
-                        <div class="trainer-stat">
-                            <div id="trainStatAccuracy" class="trainer-stat-val" style="color:#38bdf8; font-size:0.95rem;">100%</div>
-                            <div class="trainer-stat-lbl" style="font-size:0.65rem;">Accuracy</div>
-                        </div>
-                        <div class="trainer-stat">
-                            <div id="trainStatPracticed" class="trainer-stat-val" style="font-size:0.95rem;">0</div>
-                            <div class="trainer-stat-lbl" style="font-size:0.65rem;">Practiced</div>
-                        </div>
+                    <!-- Color Toggle -->
+                    <div class="repertoire-color-toggle">
+                        <button class="rep-toggle-btn active" id="btnTrainMixed" data-color="mixed" style="font-size:0.78rem; padding:0.3rem 0.65rem;">Both</button>
+                        <button class="rep-toggle-btn" id="btnTrainWhite" data-color="white" style="font-size:0.78rem; padding:0.3rem 0.65rem;">White</button>
+                        <button class="rep-toggle-btn" id="btnTrainBlack" data-color="black" style="font-size:0.78rem; padding:0.3rem 0.65rem;">Black</button>
                     </div>
+
+                    <!-- Opening Focus Selector -->
+                    <div style="display:flex; align-items:center; gap:0.35rem;">
+                        <label for="trainOpeningFilter" style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">Focus:</label>
+                        <select id="trainOpeningFilter" class="trainer-focus-select" style="font-size:0.78rem; padding:0.25rem 0.5rem; background:var(--bg-card); color:#fff; border:1px solid var(--border-color); border-radius:6px; max-width:200px;">
+                            <option value="">All Openings</option>
+                        </select>
+                    </div>
+
+                    <!-- Training Curriculum Mode -->
+                    <div style="display:flex; align-items:center; gap:0.35rem;">
+                        <label for="trainModeSelect" style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">Mode:</label>
+                        <select id="trainModeSelect" class="trainer-focus-select" style="font-size:0.78rem; padding:0.25rem 0.5rem; background:var(--bg-card); color:#fff; border:1px solid var(--border-color); border-radius:6px;">
+                            <option value="adaptive">🧠 Adaptive</option>
+                            <option value="frontier_only">🌱 New Lines</option>
+                            <option value="due_only">⏰ Due Reviews</option>
+                            <option value="deviations">⚠️ Deviations</option>
+                            <option value="full">🎲 Full Tree</option>
+                        </select>
+                    </div>
+
+                    <button id="btnTrainNewDrill" class="btn-primary" style="font-size:0.78rem; padding:0.3rem 0.65rem;">New Line</button>
                 </div>
 
+                <div class="trainer-stats-strip" style="padding:0.2rem 0.55rem; gap:0.85rem;">
+                    <div class="trainer-stat">
+                        <div id="trainStatStreak" class="trainer-stat-val" style="color:#4ade80; font-size:0.95rem;">0</div>
+                        <div class="trainer-stat-lbl" style="font-size:0.65rem;">Streak</div>
+                    </div>
+                    <div class="trainer-stat">
+                        <div id="trainStatAccuracy" class="trainer-stat-val" style="color:#38bdf8; font-size:0.95rem;">100%</div>
+                        <div class="trainer-stat-lbl" style="font-size:0.65rem;">Accuracy</div>
+                    </div>
+                    <div class="trainer-stat">
+                        <div id="trainStatPracticed" class="trainer-stat-val" style="font-size:0.95rem;">0</div>
+                        <div class="trainer-stat-lbl" style="font-size:0.65rem;">Practiced</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Practice Drills View -->
+            <div id="trainerDrillsSection" style="display:flex; flex-direction:column; flex:1; min-height:0; gap:0;">
                 <div class="repertoire-layout">
-                    <div>
+                    <div class="repertoire-board-col">
                         <!-- Opening Move Path & Pedagogical Reason Strip (0px CLS, fixed 34px height) -->
                         <div id="trainMoveHistoryBreadcrumb" class="trainer-breadcrumb-strip">
                             <div class="trainer-breadcrumb-left">
@@ -473,7 +472,7 @@
 
                         <div id="trainerBoard"></div>
 
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.75rem;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.5rem;">
                             <div style="display:flex; gap:0.4rem;">
                                 <button id="btnTrainHint" class="btn-secondary">Show Hint</button>
                                 <button id="btnTrainToggleArrows" class="btn-secondary" style="visibility:hidden; min-width:96px;" title="Toggle plan arrows on board">🎯 Arrows</button>
@@ -481,7 +480,7 @@
                             <div style="display:flex; gap:0.5rem; align-items:center;">
                                 <button id="btnTrainFlip" class="btn-secondary">Flip</button>
                                 <button id="btnTrainRetry" class="btn-secondary">Try Again</button>
-                                <div class="board-size-control-group" style="display:inline-flex; align-items:center; gap:2px; margin-left:0.25rem; background:rgba(30, 41, 59, 0.7); border:1px solid var(--border-color); border-radius:4px; padding:2px 4px;">
+                                <div class="board-size-control-group" style="display:inline-flex; align-items:center; gap:2px; margin-left:0.25rem; background:rgba(19, 22, 31, 0.85); border:1px solid var(--border-color); border-radius:4px; padding:2px 4px;">
                                     <button type="button" class="btn-board-size btn-board-size-dec" title="Decrease board size">−</button>
                                     <span id="trainBoardSizeLabel" class="board-size-display-val" style="font-size:0.75rem; color:var(--text-muted); font-family:monospace; min-width:44px; text-align:center;">---</span>
                                     <button type="button" class="btn-board-size btn-board-size-inc" title="Increase board size">+</button>
@@ -577,21 +576,21 @@
                             </div>
                         </div>
 
-                        <div id="trainPrompt" style="background:#0f172a; padding:0.85rem 1rem; border-radius:6px; border-left:4px solid var(--accent-primary);">
-                            <div style="font-weight:600; font-size:1rem; margin-bottom:0.2rem;">
+                        <div id="trainPrompt" style="background:rgba(12, 14, 19, 0.75); padding:0.7rem 0.9rem; border-radius:6px; border-left:4px solid var(--accent-primary);">
+                            <div style="font-weight:600; font-size:0.95rem; margin-bottom:0.15rem;">
                                 Your turn as <span id="trainColorSpan" style="text-transform:capitalize;">White</span>
                             </div>
-                            <div style="color:var(--text-secondary); font-size:0.88rem;">
+                            <div style="color:var(--text-secondary); font-size:0.84rem;">
                                 Play your prepared repertoire move on the board.
                             </div>
                         </div>
 
                         <!-- Move Notes & Ideas Callout in Trainer -->
-                        <!-- AGENTS.md 8.5 + 8.2: constant 44px box, text clamped (full note in `title`).
+                        <!-- AGENTS.md 8.5 + 8.2: constant height box, text clamped (full note in `title`).
                              `visibility` not `display`, so the feedback box below never moves. -->
-                        <div id="trainNoteBox" style="visibility:hidden; min-height:44px; max-height:44px; overflow:hidden; background:rgba(30, 41, 59, 0.85); border:1px solid rgba(148, 163, 184, 0.25); border-left:3px solid #38bdf8; padding:0.6rem 0.8rem; border-radius:6px; font-size:0.85rem; color:var(--text-primary);">
-                            <div style="font-size:0.72rem; color:#38bdf8; font-weight:700; text-transform:uppercase; margin-bottom:0.25rem;">📝 Move Note / Idea:</div>
-                            <div id="trainNoteContent" style="display:block; max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.45;"></div>
+                        <div id="trainNoteBox" style="visibility:hidden; min-height:54px; max-height:54px; overflow:hidden; background:rgba(24, 28, 38, 0.85); border:1px solid rgba(212, 168, 83, 0.25); border-left:3px solid var(--accent-primary); padding:0.45rem 0.75rem; border-radius:6px; font-size:0.82rem; color:var(--text-primary);">
+                            <div style="font-size:0.68rem; color:var(--accent-primary); font-weight:700; text-transform:uppercase; margin-bottom:0.15rem;">📝 Move Note / Idea:</div>
+                            <div id="trainNoteContent" style="display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; max-width:100%; white-space:normal; overflow:hidden; text-overflow:ellipsis; line-height:1.3;"></div>
                         </div>
 
                         <div id="trainFeedback" class="feedback-box"></div>
@@ -933,60 +932,24 @@
                             <div id="scoutTurnBadge" style="font-size:0.75rem; color:var(--text-secondary); font-weight:600; flex-shrink:0;">White to move</div>
                         </div>
 
-                        <!-- Quick Add to Repertoire Bar -->
-                        <div class="scout-quick-rep-bar">
-                            <div style="display:flex; align-items:center; gap:0.4rem; flex-wrap:wrap;">
-                                <span style="font-size:0.74rem; color:var(--text-muted); font-weight:600;">Import Line:</span>
-                                <button id="btnScoutAddMoveWhite" class="btn-secondary btn-quick-rep" title="Import the whole line leading up to this position into White Repertoire">
-                                    📥 Line &rarr; White Rep
-                                </button>
-                                <button id="btnScoutAddMoveBlack" class="btn-secondary btn-quick-rep" title="Import the whole line leading up to this position into Black Repertoire">
-                                    📥 Line &rarr; Black Rep
-                                </button>
-                                <button id="btnScoutMarkImportant" class="btn-secondary btn-quick-rep" title="Mark last played move as important (priority in opening trainer)">
-                                    ⭐ Mark Last Move Important
-                                </button>
-                                <!-- AGENTS.md 8.4: fixed 150px box + `visibility` (NOT `display`).
-                                     An inline `display:none` cannot be overridden by
-                                     `style.visibility = 'visible'` — that is exactly what kept
-                                     this button permanently invisible (CODE3-01 class of bug). -->
-                                <button id="btnScoutRemoveFromRep" class="btn-secondary btn-quick-rep" style="visibility:hidden; min-width:150px; color:#ef4444; border-color:rgba(239,68,68,0.35);" title="Remove this move and line from repertoire">
-                                    🗑️ Remove from Rep
-                                </button>
-                                <button id="btnScoutViewTree" class="btn-secondary btn-quick-rep" title="Explored lines in session tree">
-                                    🌳 Lines Tree (<span id="scoutQuickLineCount">0</span>)
-                                </button>
-                                <!-- AGENTS.md 8.4: same reserved-box treatment as above. -->
-                                <button id="btnScoutTrainAfterImport" class="btn-primary btn-quick-rep" style="visibility:hidden; min-width:150px; font-size:0.75rem; padding:0.22rem 0.5rem;" title="Train this opening now">
-                                    🏋️ Train in Trainer
-                                </button>
-                            </div>
-                            <div id="scoutActiveLineOverlap" class="scout-line-overlap-strip" style="display:flex;"><span style="font-size:0.72rem; color:var(--text-muted); font-weight:500;">Repertoire: Starting Position</span></div>
-                        </div>
-
-                        <!-- Move Notes / Master Ideas Input -->
-                        <div id="scoutMoveNoteBar" class="scout-note-bar" style="margin-top:0.35rem; background:rgba(15, 23, 42, 0.7); border:1px solid var(--border-color); border-radius:6px; padding:0.35rem 0.55rem;">
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem;">
-                                <label for="scoutMoveComment" style="font-size:0.75rem; font-weight:600; color:var(--text-secondary); display:flex; align-items:center; gap:0.3rem;">
-                                    <span>📝</span> <span id="scoutNoteMoveLabel">Move Note</span>:
-                                </label>
-                                <span id="scoutCommentSaveStatus" style="font-size:0.72rem; color:#4ade80; opacity:0; transition:opacity 0.2s ease;">Saved ✓</span>
-                            </div>
-                            <textarea id="scoutMoveComment" placeholder="Write thoughts, master explanations, or video advice for this move..." rows="1" style="width:100%; box-sizing:border-box; background:rgba(30, 41, 59, 0.7); border:1px solid #334155; border-radius:5px; color:#f8fafc; font-size:0.78rem; padding:0.3rem 0.5rem; resize:vertical; font-family:inherit; min-height:28px; line-height:1.3;"></textarea>
-                        </div>
-
                         <!-- Playback & Board Navigation Controls -->
                         <div class="scout-controls-row">
-                            <div style="display:flex; gap:0.35rem; align-items:center; flex-wrap:wrap;">
+                            <div style="display:flex; gap:0.3rem; align-items:center; flex-wrap:wrap;">
                                 <button id="btnScoutUndoMove" class="btn-primary" title="Undo last played move (↶)">↶ Undo</button>
                                 <button id="btnScoutStart" class="btn-secondary" title="Jump to Start (Home)">⏮ Start</button>
                                 <button id="btnScoutPrev" class="btn-secondary" title="Step Back (Left Arrow)">◀ Back</button>
                                 <button id="btnScoutNext" class="btn-secondary" title="Step Forward (Right Arrow)">Next ▶</button>
                                 <button id="btnScoutEnd" class="btn-secondary" title="Jump to End (End)">End ⏭</button>
-                                <button id="btnScoutResetBoard" class="btn-secondary" title="Reset Board to Starting Position">↺ Reset Board</button>
+                                <button id="btnScoutResetBoard" class="btn-secondary" title="Reset Board to Starting Position">↺ Reset</button>
                             </div>
-                            <div style="display:flex; gap:0.4rem; align-items:center;">
-                                <button id="btnScoutFlip" class="btn-secondary" title="Flip Board Orientation">Flip Board</button>
+                            <div style="display:flex; gap:0.35rem; align-items:center;">
+                                <button id="btnScoutFlip" class="btn-secondary" title="Flip Board Orientation">Flip</button>
+                                <div class="board-size-control-group" style="display:inline-flex; align-items:center; gap:2px; background:rgba(19, 22, 31, 0.85); border:1px solid var(--border-color); border-radius:4px; padding:2px 4px;">
+                                    <button type="button" class="btn-board-size btn-board-size-dec" title="Decrease board size">−</button>
+                                    <span id="scoutBoardSizeLabel" class="board-size-display-val" style="font-size:0.75rem; color:var(--text-muted); font-family:monospace; min-width:44px; text-align:center;">---</span>
+                                    <button type="button" class="btn-board-size btn-board-size-inc" title="Increase board size">+</button>
+                                    <button type="button" class="btn-board-size btn-board-size-fit" title="Fit board to available screen space">⛶ Fit</button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -994,11 +957,50 @@
                     <!-- Right Column: Tree of Explored Lines & Variations -->
                     <div class="scout-timeline-column">
                         <div class="card-panel scout-sidebar-card">
+                            <!-- Quick Add to Repertoire Bar (Relocated from under board) -->
+                            <div class="scout-quick-rep-bar" style="margin-bottom:0.35rem;">
+                                <div style="display:flex; align-items:center; gap:0.35rem; flex-wrap:wrap;">
+                                    <span style="font-size:0.72rem; color:var(--text-muted); font-weight:600;">Import Line:</span>
+                                    <button id="btnScoutAddMoveWhite" class="btn-secondary btn-quick-rep" title="Import the whole line leading up to this position into White Repertoire">
+                                        📥 Line &rarr; White Rep
+                                    </button>
+                                    <button id="btnScoutAddMoveBlack" class="btn-secondary btn-quick-rep" title="Import the whole line leading up to this position into Black Repertoire">
+                                        📥 Line &rarr; Black Rep
+                                    </button>
+                                    <button id="btnScoutMarkImportant" class="btn-secondary btn-quick-rep" title="Mark last played move as important (priority in opening trainer)">
+                                        ⭐ Mark Important
+                                    </button>
+                                    <!-- AGENTS.md 8.4: fixed 150px box + `visibility` (NOT `display`). -->
+                                    <button id="btnScoutRemoveFromRep" class="btn-secondary btn-quick-rep" style="visibility:hidden; min-width:150px; color:#ef4444; border-color:rgba(239,68,68,0.35);" title="Remove this move and line from repertoire">
+                                        🗑️ Remove from Rep
+                                    </button>
+                                    <button id="btnScoutViewTree" class="btn-secondary btn-quick-rep" title="Explored lines in session tree">
+                                        🌳 Lines Tree (<span id="scoutQuickLineCount">0</span>)
+                                    </button>
+                                    <!-- AGENTS.md 8.4: same reserved-box treatment as above. -->
+                                    <button id="btnScoutTrainAfterImport" class="btn-primary btn-quick-rep" style="visibility:hidden; min-width:150px; font-size:0.75rem; padding:0.22rem 0.5rem;" title="Train this opening now">
+                                        🏋️ Train in Trainer
+                                    </button>
+                                </div>
+                                <div id="scoutActiveLineOverlap" class="scout-line-overlap-strip" style="display:flex;"><span style="font-size:0.72rem; color:var(--text-muted); font-weight:500;">Repertoire: Starting Position</span></div>
+                            </div>
+
+                            <!-- Move Notes / Master Ideas Input -->
+                            <div id="scoutMoveNoteBar" class="scout-note-bar" style="margin-bottom:0.45rem; background:rgba(12, 14, 19, 0.7); border:1px solid var(--border-color); border-radius:6px; padding:0.35rem 0.55rem;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.2rem;">
+                                    <label for="scoutMoveComment" style="font-size:0.74rem; font-weight:600; color:var(--text-secondary); display:flex; align-items:center; gap:0.3rem;">
+                                        <span>📝</span> <span id="scoutNoteMoveLabel">Move Note</span>:
+                                    </label>
+                                    <span id="scoutCommentSaveStatus" style="font-size:0.7rem; color:#4ade80; opacity:0; transition:opacity 0.2s ease;">Saved ✓</span>
+                                </div>
+                                <textarea id="scoutMoveComment" placeholder="Write thoughts, master explanations, or video advice for this move..." rows="1" style="width:100%; box-sizing:border-box; background:rgba(24, 28, 38, 0.75); border:1px solid var(--border-color); border-radius:5px; color:var(--text-primary); font-size:0.78rem; padding:0.25rem 0.5rem; resize:vertical; font-family:inherit; min-height:26px; line-height:1.3;"></textarea>
+                            </div>
+
                             <div class="scout-tree-header">
                                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.4rem;">
                                     <div style="display:flex; align-items:center; gap:0.4rem;">
-                                        <span style="font-weight:700; color:#fff; font-size:0.88rem;">🌳 Tree of Explored Lines</span>
-                                        <span id="scoutTreeCountBadge" class="badge-pill" style="background:#1e293b; color:#38bdf8; border:1px solid #334155; font-size:0.72rem; padding:0.12rem 0.45rem;">0 Lines</span>
+                                        <span style="font-weight:700; color:#fff; font-size:0.86rem;">🌳 Tree of Explored Lines</span>
+                                        <span id="scoutTreeCountBadge" class="badge-pill" style="background:var(--bg-panel); color:var(--accent-primary); border:1px solid var(--border-color); font-size:0.7rem; padding:0.1rem 0.4rem;">0 Lines</span>
                                     </div>
                                     <div style="display:flex; gap:0.3rem; align-items:center;">
                                         <button id="btnImportAllWhite" class="btn-secondary btn-tree-action" title="Import ALL explored lines into White Repertoire">
@@ -1012,11 +1014,8 @@
                                         </button>
                                     </div>
                                 </div>
-                                <div style="font-size:0.72rem; color:var(--text-muted); margin-top:0.35rem; line-height:1.4;">
-                                    Play moves freely on the board. Every variation and branch you explore is tracked here. Click any card to load that line back onto the board, or import whole lines into your repertoire.
-                                </div>
                             </div>
-                            <div id="scoutVariationsList" class="scout-variations-list" style="flex:1; overflow-y:auto; padding:0.6rem;">
+                            <div id="scoutVariationsList" class="scout-variations-list" style="flex:1; overflow-y:auto; padding:0.4rem 0.5rem;">
                                 <!-- Explored lines inserted here -->
                             </div>
                         </div>

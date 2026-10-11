@@ -281,34 +281,18 @@ class RepertoireTrainer {
 
         const devBanner = document.getElementById('trainDeviationBanner');
         if (devBanner) {
-            devBanner.style.display = 'block';
-            devBanner.innerHTML = `
-                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem;">
-                    <div style="display:flex; align-items:center; gap:0.75rem;">
-                        <span style="font-size:1.6rem;">🎉</span>
-                        <div>
-                            <div style="font-weight:700; font-size:1rem; color:#4ade80;">All Game Deviations Resolved!</div>
-                            <div style="font-size:0.82rem; color:var(--text-secondary); margin-top:2px;">
-                                You have successfully corrected every departure from your prepared repertoire.
-                            </div>
-                        </div>
-                    </div>
-                    <button id="btnDevSwitchDrills" class="btn-primary" style="font-size:0.78rem; padding:0.35rem 0.85rem;">
-                        Back to Repertoire Drills ➔
-                    </button>
-                </div>
-            `;
-            const btnSwitch = document.getElementById('btnDevSwitchDrills');
-            if (btnSwitch) {
-                btnSwitch.addEventListener('click', () => this.switchTrainerTab('drills'));
-            }
+            devBanner.style.display = 'none';
+        }
+        const sessionStrip = document.querySelector('.trainer-session-strip');
+        if (sessionStrip) {
+            sessionStrip.style.display = 'flex';
         }
 
         const promptEl = document.getElementById('trainPrompt');
         if (promptEl) {
             promptEl.innerHTML = `
                 <div style="font-weight:600; font-size:1.05rem; color:#4ade80; margin-bottom:0.25rem;">
-                    🎉 Repertoire 100% Up to Date!
+                    🎉 All Game Deviations Resolved!
                 </div>
                 <div style="color:var(--text-secondary); font-size:0.9rem;">
                     No pending real game deviations remaining for ${this.activeColor === 'mixed' ? 'White & Black' : this.activeColor}.
@@ -322,6 +306,17 @@ class RepertoireTrainer {
             feedback.className = 'feedback-box correct';
             feedback.textContent = '🎉 All game deviations have been corrected and cleared from your list!';
         }
+    }
+
+    _normalizeGameOutcome(rawResult, userColor) {
+        const r = String(rawResult || '').toLowerCase().trim();
+        const u = String(userColor || 'white').toLowerCase().trim();
+        if (r === 'win') return 'win';
+        if (r === 'loss') return 'loss';
+        if (r === 'draw' || r === '1/2-1/2') return 'draw';
+        if (r === 'white' || r === '1-0') return u === 'white' ? 'win' : 'loss';
+        if (r === 'black' || r === '0-1') return u === 'black' ? 'win' : 'loss';
+        return 'loss';
     }
 
     getDrillColor(drill = this.currentDrill) {
@@ -442,32 +437,17 @@ class RepertoireTrainer {
         const text = (comment && String(comment).trim()) ? String(comment).trim() : '';
         noteContent.textContent = text;
         noteContent.title = text;
-        noteContent.style.whiteSpace = 'nowrap';
+        noteContent.style.whiteSpace = 'normal';
         noteContent.style.overflow = 'hidden';
         noteContent.style.textOverflow = 'ellipsis';
-        noteContent.style.verticalAlign = 'top';
-        noteContent.style.display = 'inline-block';
-
-        // The label is the first element child of the same box. Float it left so the
-        // note's inline-block starts after it instead of on the next line.
-        const label = noteBox.firstElementChild;
-        const labelWidth = (label && typeof label.offsetWidth === 'number' && label.offsetWidth > 0)
-            ? label.offsetWidth
-            : 0;
-        if (label && label !== noteContent) {
-            label.style.float = 'left';
-            label.style.marginBottom = '0';
-            label.style.marginRight = '0.4rem';
-        }
-        // `max-width: 100%` alone would let the note slide under the float and wrap,
-        // which is exactly the second line the 44px box cannot show.
-        noteContent.style.maxWidth = labelWidth
-            ? `calc(100% - ${labelWidth + 7}px)`
-            : 'calc(100% - 170px)';
+        noteContent.style.display = '-webkit-box';
+        noteContent.style.webkitLineClamp = '2';
+        noteContent.style.webkitBoxOrient = 'vertical';
+        noteContent.style.maxWidth = '100%';
 
         if (noteBox.style.display !== 'block') noteBox.style.display = 'block';
-        noteBox.style.minHeight = '44px';
-        noteBox.style.maxHeight = '44px';
+        noteBox.style.minHeight = '54px';
+        noteBox.style.maxHeight = '54px';
         noteBox.style.overflow = 'hidden';
         noteBox.style.visibility = text ? 'visible' : 'hidden';
         noteBox.style.opacity = text ? '1' : '0';
@@ -770,10 +750,12 @@ class RepertoireTrainer {
 
     setOpeningFocus(openingName, color = null) {
         this.init();
-        if (color && (color === 'white' || color === 'black') && this.activeColor !== color) {
+        if (color && (color === 'white' || color === 'black' || color === 'mixed') && this.activeColor !== color) {
             this.activeColor = color;
+            const btnMixed = document.getElementById('btnTrainMixed');
             const btnWhite = document.getElementById('btnTrainWhite');
             const btnBlack = document.getElementById('btnTrainBlack');
+            if (btnMixed) btnMixed.classList.toggle('active', color === 'mixed');
             if (btnWhite) btnWhite.classList.toggle('active', color === 'white');
             if (btnBlack) btnBlack.classList.toggle('active', color === 'black');
             const colorSpan = document.getElementById('trainColorSpan');
@@ -975,12 +957,7 @@ class RepertoireTrainer {
                 if (ratingEl) ratingEl.textContent = data.opponent_rating ? `(${data.opponent_rating})` : '';
                 if (speedEl) speedEl.textContent = (data.speed || 'game').toUpperCase();
                 if (resultEl) {
-                    const res = (data.result || 'loss').toLowerCase();
-                    const resClass = (res === 'win' || (res === '1-0' && drillColor === 'white') || (res === '0-1' && drillColor === 'black'))
-                        ? 'win'
-                        : (res === 'draw' || res === '1/2-1/2')
-                            ? 'draw'
-                            : 'loss';
+                    const resClass = this._normalizeGameOutcome(data.game_result || data.result, drillColor);
                     resultEl.className = `game-outcome-pill ${resClass}`;
                     resultEl.textContent = resClass.toUpperCase();
                 }
@@ -1671,17 +1648,14 @@ class RepertoireTrainer {
         const drillsSection = document.getElementById('trainerDrillsSection');
         const deviationsView = document.getElementById('trainerDeviationsView');
         const modeSelect = document.getElementById('trainModeSelect');
+        const isDeviations = (tab === 'deviations');
 
-        if (btnDrills) btnDrills.classList.toggle('active', tab === 'drills');
-        if (btnDeviations) btnDeviations.classList.toggle('active', tab === 'deviations');
-        if (drillsSection) drillsSection.style.display = 'flex';
-        if (deviationsView) deviationsView.style.display = 'none';
+        if (btnDrills) btnDrills.classList.toggle('active', !isDeviations);
+        if (btnDeviations) btnDeviations.classList.toggle('active', isDeviations);
+        if (drillsSection) drillsSection.style.display = isDeviations ? 'none' : 'flex';
+        if (deviationsView) deviationsView.style.display = isDeviations ? 'flex' : 'none';
 
-        if (tab === 'deviations') {
-            this.sessionMode = 'deviations';
-            if (modeSelect) modeSelect.value = 'deviations';
-            this.currentDeviationIndex = 0;
-            this.startNewDrill({ index: 0 });
+        if (isDeviations) {
             this.loadGameDeviations();
         } else {
             if (this.sessionMode === 'deviations') {
@@ -1764,11 +1738,7 @@ class RepertoireTrainer {
         }
 
         list.innerHTML = devs.map((d, idx) => {
-            const resultCls = (d.result === 'win' || d.result === '1-0' && d.user_color === 'white' || d.result === '0-1' && d.user_color === 'black')
-                ? 'win'
-                : (d.result === 'draw' || d.result === '1/2-1/2')
-                    ? 'draw'
-                    : 'loss';
+            const resultCls = this._normalizeGameOutcome(d.game_result || d.result, d.user_color);
             const resultLabel = resultCls.toUpperCase();
             const colorSymbol = d.user_color === 'white' ? '⚪' : '⚫';
             const speed = d.speed ? d.speed.toUpperCase() : 'GAME';

@@ -257,18 +257,6 @@ SIDE_THEMES = {
             "key_plans": "The Staunton with ...g5, ...g6, ...Bg7, ...O-O and ...f5-f4; the Leningrad with ...Bb4 and ...Ne4, or the Stonewall with ...d5; the Classical with ...Nh6, ...f6 and the e6-pawn as a target; counterplay with ...c5 and ...c4.",
         },
     },
-    "sicilian defense": {
-        "white": {
-            "core_idea": "You have traded a centre pawn for the half-open c-file and a queenside majority; the aim is to trade pieces, open the c-file and attack before Black organises.",
-            "typical_mistakes": "The Open: not knowing when to play d4 and c3; the Closed: playing cxd4 without a plan; the Semi-Closed: attacking before d5/e5; the Kalashnikov: playing a slow English and being outprepared.",
-            "key_plans": "The Open with d4, cxd4 and a queenside attack; the Closed with d5, Be3, O-O and a slow centre; the Semi-Closed with d5 and f4; the Kalashnikov with c3, d4, Nc3 and a quick d5.",
-        },
-        "black": {
-            "core_idea": "Choose a Sicilian that suits the player: a Najdorf for maximum flexibility, a Poisoned Pawn for immediate activity, a Kalashnikov for a pawn centre, or an Open for dynamic balance.",
-            "typical_mistakes": "Automatic responses with no plan; the Poisoned Pawn played without knowing the main lines; dragging out the Open with passive play; answering 5.d4 with the Dragon but then having no plan.",
-            "key_plans": "Najdorf: ask White a question and answer the next one; Poisoned Pawn: d6, Nf6, Qe7, Nc3 and a fast ...d5/...b5; Kalashnikov: c5, Nc6, Nge7 and ...d5; Dragon: g6, Bg7, d6 and ...d5, keeping the Yugoslav/Classical options.",
-        },
-    },
     "french defense, classical": {
         "white": {
             "core_idea": "You have a space advantage and good piece coordination against a passive defence; the plan is to keep the e4-pawn, improve your worst piece, and open a line into Black's camp.",

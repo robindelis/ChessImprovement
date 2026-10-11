@@ -1646,8 +1646,18 @@ class OpeningScout {
         const builder = window.repertoireBuilder;
         if (builder) {
             try {
-                if (this.intent && this.intent.side && typeof builder.loadRepertoire === 'function') {
-                    builder.loadRepertoire(this.intent.side);
+                const targetSide = (this.intent && (this.intent.side === 'white' || this.intent.side === 'black'))
+                    ? this.intent.side
+                    : builder.activeColor;
+                const jumpToGap = () => {
+                    if (fen && uci && typeof builder.addressGap === 'function') {
+                        builder.addressGap({ parent_fen: fen, opponent_uci: uci });
+                    }
+                };
+                if (targetSide && typeof builder.loadRepertoire === 'function' && builder.activeColor !== targetSide) {
+                    Promise.resolve(builder.loadRepertoire(targetSide)).then(jumpToGap).catch(() => jumpToGap());
+                } else {
+                    jumpToGap();
                 }
             } catch (e) {
                 console.warn('Could not load the repertoire in the Builder:', e);
@@ -1688,29 +1698,56 @@ class OpeningScout {
     }
 
     /**
-     * Bookmark from the shelf. The server's answer is applied to the cached
-     * result rather than trusted blindly, so the star can never drift from the
-     * stored state (the same honesty rule `saveMoveNote` follows).
+     * Bookmark from the shelf or from the Studio header. The server's answer is
+     * applied to both the active study and the cached shelf results so the ★
+     * state can never drift from what is stored.
      */
-    async toggleFavorite(sourceId) {
-        if (!sourceId) return;
+    async toggleFavorite(sourceId = null) {
+        const targetId = sourceId
+            || (this.activeStudy && (this.activeStudy.source_id || this.activeStudy.video_id || this.activeStudy.id))
+            || null;
+        if (!targetId) return;
+        const cardItem = (this.cachedResults || []).find(r => r && r.id === targetId)
+            || (this.ecoGuides || []).find(r => r && r.id === targetId)
+            || (this.activeStudy && (this.activeStudy.source_id === targetId || this.activeStudy.video_id === targetId) ? this.activeStudy : null);
+        const payload = { source_id: targetId };
+        if (cardItem) {
+            if (cardItem.source_type) payload.source_type = cardItem.source_type;
+            if (cardItem.title) payload.title = cardItem.title;
+            if (cardItem.channel) payload.channel = cardItem.channel;
+            if (cardItem.opening_name) payload.opening_name = cardItem.opening_name;
+            if (cardItem.eco) payload.eco = cardItem.eco;
+            if (cardItem.thumbnail_url || cardItem.thumbnail) payload.thumbnail_url = cardItem.thumbnail_url || cardItem.thumbnail;
+            if (cardItem.duration || cardItem.duration_seconds) payload.duration = cardItem.duration || cardItem.duration_seconds;
+        }
         try {
             const res = await fetch('/api/scout/favorite', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ source_id: sourceId })
+                body: JSON.stringify(payload)
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data && data.detail ? data.detail : `HTTP ${res.status}`);
             const on = !!data.is_favorite;
-            this.cachedResults.forEach(r => { if (r.id === sourceId) r.is_favorite = on; });
-            this.ecoGuides.forEach(r => { if (r.id === sourceId) r.is_favorite = on; });
+            if (Array.isArray(this.cachedResults)) {
+                this.cachedResults.forEach(r => { if (r && r.id === targetId) r.is_favorite = on; });
+            }
+            if (Array.isArray(this.ecoGuides)) {
+                this.ecoGuides.forEach(r => { if (r && r.id === targetId) r.is_favorite = on; });
+            }
+            if (this.activeStudy && (this.activeStudy.source_id === targetId || this.activeStudy.video_id === targetId)) {
+                this.activeStudy.is_favorite = on;
+            }
+            const btn = document.getElementById('btnScoutFav');
+            if (btn) {
+                btn.textContent = on ? '★ Favorited' : '☆ Favorite';
+                btn.style.color = on ? '#fbbf24' : '';
+            }
             this.renderResults();
             if (window.showToast) {
                 window.showToast(on ? '★ Bookmarked' : 'Bookmark removed', on ? '#4ade80' : '#94a3b8', 2200);
             }
         } catch (e) {
-            // §8.1: never inject this into the flow.
             if (window.showToast) {
                 window.showToast(`Could not update bookmark: ${e && e.message ? e.message : 'error'}`, '#ef4444', 3200);
             }
@@ -1979,6 +2016,29 @@ class OpeningScout {
         if (wrap) {
             wrap.setAttribute('data-sync-uci', isInLine ? bestUci : '');
             wrap.title = isInLine ? `Board move ${bestUci} @ ${formatClock(bestTs)}` : '';
+        }
+        // Step the board to the node matching bestUci if found in lineTree
+        const findNodeByUci = (node) => {
+            if (!node) return null;
+            if (node.move && node.move.uci === bestUci) return node;
+            for (const c of (node.children || [])) {
+                const found = findNodeByUci(c);
+                if (found) return found;
+            }
+            return null;
+        };
+        const targetNode = findNodeByUci(this.lineTree?.root);
+        if (targetNode && this.lineTree.currentNode !== targetNode && this.board) {
+            this.lineTree.currentNode = targetNode;
+            this.board.loadFEN(targetNode.fen);
+            this.lastBoardFen = targetNode.fen;
+            this.board.lastMove = (targetNode.move && targetNode.move.uci && targetNode.move.uci.length >= 4)
+                ? { from: targetNode.move.uci.substring(0, 2), to: targetNode.move.uci.substring(2, 4) }
+                : null;
+            this.board.render();
+            this._updateBoardLabels();
+            this.streamEvaluation(targetNode.fen);
+            this.renderTreeLines();
         }
     }
 
@@ -3533,6 +3593,10 @@ class OpeningScout {
         if (this.board) {
             this.board.setOrientation(this.orientation);
         }
+        const barFill = document.getElementById('scoutEvalBarFill');
+        if (barFill && barFill.parentElement) {
+            barFill.parentElement.classList.toggle('flipped', this.orientation === 'black');
+        }
     }
 
     streamEvaluation(fen) {
@@ -3576,6 +3640,9 @@ class OpeningScout {
         const barFill = document.getElementById('scoutEvalBarFill');
         const barLabel = document.getElementById('scoutEvalBarLabel');
         if (!barFill || !barLabel) return;
+        if (barFill.parentElement) {
+            barFill.parentElement.classList.toggle('flipped', this.orientation === 'black');
+        }
 
         let evalText = '+0.0';
         let pct = 50;
@@ -3586,7 +3653,7 @@ class OpeningScout {
             const m = _scoutNum(mate, 0);
             evalText = `M${Math.abs(m)}`;
             pct = m > 0 ? 100 : 0;
-            barLabel.className = 'eval-bar-label ' + (m > 0 ? 'white-winning' : 'black-winning');
+            barLabel.className = 'eval-bar-label ' + (m > 0 ? 'white-winning white-lead' : 'black-winning black-lead');
         } else if (scoreCp !== null && scoreCp !== undefined) {
             // SEC-M: the logistic curve turns a non-numeric `scoreCp` into NaN, so
             // `style.height` was set to the invalid "NaN%" (the browser then silently
@@ -3598,8 +3665,8 @@ class OpeningScout {
             pct = Math.max(5, Math.min(95, pct));
 
             barLabel.className = 'eval-bar-label ' + (
-                cp > 100 ? 'white-winning' :
-                cp < -100 ? 'black-winning' : 'equal'
+                cp > 100 ? 'white-winning white-lead' :
+                cp < -100 ? 'black-winning black-lead' : 'equal white-lead'
             );
         }
 
@@ -3649,43 +3716,11 @@ class OpeningScout {
             else window.showToast(text, color);
         }
     }
-
-    async toggleFavorite() {
-        if (!this.activeStudy || !this.activeStudy.video_id) return;
-        try {
-            const res = await fetch('/api/scout/favorite', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ source_id: this.activeStudy.video_id })
-            });
-            if (!res.ok) {
-                this._showQuickAddNotice(`✗ Could not update the bookmark (HTTP ${res.status}).`, '#ef4444');
-                return;
-            }
-            const data = await res.json();
-            this.activeStudy.is_favorite = !!data.is_favorite;
-            const btn = document.getElementById('btnScoutFav');
-            if (btn) {
-                btn.textContent = data.is_favorite ? '★ Favorited' : '☆ Favorite';
-                btn.style.color = data.is_favorite ? '#fbbf24' : '';
-            }
-            // Keep the cached result cards in sync so the ★ state is observable
-            // (and the `favorites` filter shows the right thing).
-            this.cachedResults = (this.cachedResults || []).map(item => (
-                item && item.id === this.activeStudy.video_id
-                    ? { ...item, is_favorite: !!data.is_favorite }
-                    : item
-            ));
-            if (this.activeFilter === 'favorites') this.renderResults();
-        } catch (e) {
-            console.error('Favorite toggle error:', e);
-            this._showQuickAddNotice(`✗ Could not update the bookmark: ${e.message}`, '#ef4444');
-        }
-    }
 }
 
 // Global initialization
 window.videoScout = null;
 document.addEventListener('DOMContentLoaded', () => {
     window.videoScout = new OpeningScout();
+    window.openingScout = window.videoScout;
 });

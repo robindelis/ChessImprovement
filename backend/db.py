@@ -1190,17 +1190,45 @@ def list_recent_scouted(limit: int = 20):
     conn.close()
     return [dict(r) for r in rows]
 
-def toggle_favorite_scouted(source_id: str) -> bool:
+def toggle_favorite_scouted(source_id: str, meta: Optional[Dict[str, Any]] = None) -> bool:
+    if not source_id or not isinstance(source_id, str):
+        return False
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("SELECT is_favorite FROM scouted_content WHERE source_id = ?", (source_id,))
     row = cursor.fetchone()
     if not row:
+        cursor.execute("SELECT * FROM scout_video_meta WHERE video_id = ?", (source_id,))
+        vmeta = cursor.fetchone()
+        meta_dict = dict(vmeta) if vmeta else {}
+        if isinstance(meta, dict):
+            for k, v in meta.items():
+                if v is not None and v != "":
+                    meta_dict[k] = v
+        if not meta_dict and not source_id.startswith("eco_") and len(source_id) != 11:
+            conn.close()
+            return False
+        now = int(time.time())
+        stype = str(meta_dict.get("source_type") or ("eco_guide" if source_id.startswith("eco_") else "youtube"))[:32]
+        title = str(meta_dict.get("title") or source_id)[:MAX_TITLE_CHARS_DB]
+        channel = str(meta_dict.get("channel") or ("Chess Encyclopedia" if stype == "eco_guide" else "YouTube"))[:MAX_TITLE_CHARS_DB]
+        opening_name = str(meta_dict.get("opening_name") or title)[:MAX_TITLE_CHARS_DB]
+        eco = str(meta_dict.get("eco") or "")[:16]
+        thumb = str(meta_dict.get("thumbnail_url") or (f"https://i.ytimg.com/vi/{source_id}/hqdefault.jpg" if stype == "youtube" else ""))[:512]
+        duration = int(meta_dict.get("duration") or 0)
+        cursor.execute("""
+        INSERT INTO scouted_content (
+            source_id, source_type, title, channel, opening_name, eco,
+            thumbnail_url, duration, data_json, scouted_at, is_favorite
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, 1)
+        """, (source_id, stype, title, channel, opening_name, eco, thumb, duration, now))
+        conn.commit()
         conn.close()
-        return False
+        return True
     new_fav = 0 if row["is_favorite"] else 1
     cursor.execute("UPDATE scouted_content SET is_favorite = ? WHERE source_id = ?", (new_fav, source_id))
     conn.commit()
     conn.close()
     return bool(new_fav)
+
 

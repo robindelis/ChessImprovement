@@ -41,6 +41,8 @@ const BACKEND_IDENTITY_TITLE = 'Chess Opening Improvement Platform';
 const EXTERNAL_HOST_ALLOWLIST = new Set([
     'lichess.org',
     'www.lichess.org',
+    'chessbook.com',
+    'www.chessbook.com',
     'youtube.com',
     'www.youtube.com',
     'm.youtube.com',

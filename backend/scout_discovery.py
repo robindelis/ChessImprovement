@@ -1405,8 +1405,8 @@ def discover(query: str,
         "results": results,
         "groups": groups,
         "needs_enrichment": [
-            vid for vid, item in list(merged.items())[:MAX_ENRICH_VIDEOS]
-            if not item.get("enriched")
+            item["video_id"] for item in results[:MAX_ENRICH_VIDEOS]
+            if not item.get("enriched") and item.get("video_id")
         ],
         "eco_guides": eco_guides,
         "replies": replies,

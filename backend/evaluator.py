@@ -1136,6 +1136,7 @@ class AsyncEngineEvaluator:
                 mate=cached.get("mate"),
                 best_move=cached.get("best_move", ""),
                 best_san=cached.get("best_san", ""),
+                pv=cached.get("pv"),
                 final=int(cached.get("depth", 0)) >= max_depth,
                 cached=True,
                 fen=norm_fen,

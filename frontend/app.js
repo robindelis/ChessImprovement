@@ -61,7 +61,12 @@ class ChessApp {
             const viewRep = document.getElementById('viewRepertoire');
             if (viewRep) viewRep.classList.add('active');
             if (window.repertoireBuilder) {
-                window.repertoireBuilder.loadRepertoire(window.repertoireBuilder.activeColor || 'white');
+                const col = window.repertoireBuilder.activeColor || 'white';
+                if (typeof window.repertoireBuilder.loadRepertoire === 'function') {
+                    window.repertoireBuilder.loadRepertoire(col);
+                } else if (typeof window.repertoireBuilder.refreshTree === 'function') {
+                    window.repertoireBuilder.refreshTree();
+                }
             }
         } else if (tabName === 'rep-trainer') {
             document.body?.classList?.remove('scout-studio-active');
@@ -76,8 +81,9 @@ class ChessApp {
             if (viewScout?.classList?.contains('studio-mode')) {
                 document.body?.classList?.add('scout-studio-active');
             }
-            if (window.videoScout && window.videoScout.board) {
-                window.videoScout.board.render();
+            const scoutInst = window.openingScout || window.videoScout;
+            if (scoutInst && scoutInst.board) {
+                scoutInst.board.render();
             }
         } else if (tabName === 'settings') {
             document.body?.classList?.remove('scout-studio-active');
@@ -123,6 +129,18 @@ class ChessApp {
             if (data.has_gemini_key && geminiInput) {
                 geminiInput.placeholder = '•••••••••••••••••••• (configured)';
             }
+            if (data.gap_threshold !== undefined && data.gap_threshold !== null) {
+                const gapInput = document.getElementById('inputDefaultGap');
+                if (gapInput) gapInput.value = String(data.gap_threshold);
+                if (window.repertoireBuilder) {
+                    const parsedGap = parseFloat(data.gap_threshold);
+                    if (!Number.isNaN(parsedGap)) {
+                        window.repertoireBuilder.gapThreshold = parsedGap;
+                        const sel = document.getElementById('repGapThreshold');
+                        if (sel) sel.value = String(parsedGap);
+                    }
+                }
+            }
             if (data.sync_perf_types) {
                 const types = data.sync_perf_types.split(',').map(s => s.trim().toLowerCase());
                 const checkboxMap = {
@@ -155,6 +173,12 @@ class ChessApp {
         };
         if (token) payload.lichess_token = token;
         if (geminiKey) payload.gemini_api_key = geminiKey;
+        if (gap !== undefined && gap !== '') {
+            const parsedGapPayload = parseFloat(gap);
+            if (!Number.isNaN(parsedGapPayload) && parsedGapPayload >= 0.1 && parsedGapPayload <= 100) {
+                payload.gap_threshold = parsedGapPayload;
+            }
+        }
 
         const speedCheckboxMap = {
             bullet: 'syncSpeedBullet',

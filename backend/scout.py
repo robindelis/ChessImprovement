@@ -1267,6 +1267,8 @@ class ContentScout:
         # membership of moves the user had already filed, while the response
         # claimed "(No changes needed)".
         if not is_already_present:
+            batch_user_parents = set()
+            rejected_fens = set()
             for m in moves:
                 if not isinstance(m, dict):
                     errors.append("Move entry is not an object.")
@@ -1297,10 +1299,21 @@ class ContentScout:
                         continue
                     move_uci = parsed.uci()
 
-                pair = (normalize_fen(board.fen()), move_uci)
+                norm_parent = normalize_fen(board.fen())
+                pair = (norm_parent, move_uci)
                 if pair in seen_moves:
                     continue
                 seen_moves.add(pair)
+
+                if norm_parent in rejected_fens:
+                    try:
+                        b_skip = board.copy()
+                        b_skip.push(chess.Move.from_uci(move_uci))
+                        rejected_fens.add(normalize_fen(b_skip.fen()))
+                    except Exception:
+                        pass
+                    continue
+
                 # Audit SCOUT-11: a *partial* import re-upserted every ply and
                 # then reported the whole line as "imported", so the user was
                 # told N new moves when only the extending plies were new.
@@ -1311,6 +1324,11 @@ class ContentScout:
                         is_user_move = (board.turn == chess.WHITE)
                     else:
                         is_user_move = (board.turn == chess.BLACK)
+
+                    replace_first = False
+                    if is_user_move and norm_parent not in batch_user_parents:
+                        replace_first = True
+                        batch_user_parents.add(norm_parent)
 
                     res = rm.add_repertoire_move(
                         repertoire=repertoire,
@@ -1323,13 +1341,20 @@ class ContentScout:
                         is_important=m.get('is_important'),
                         comment=m.get('comment'),
                         arrows=m.get('arrows'),
-                        study_name=study_name
+                        study_name=study_name,
+                        replace_existing=replace_first
                     )
                     if res.get('status') == 'success':
                         imported_count += 1
                         if not existed:
                             inserted_count += 1
                     else:
+                        try:
+                            b_rej = board.copy()
+                            b_rej.push(chess.Move.from_uci(move_uci))
+                            rejected_fens.add(normalize_fen(b_rej.fen()))
+                        except Exception:
+                            pass
                         errors.append(res.get('message', 'Unknown error'))
                 except Exception as e:
                     errors.append(str(e))

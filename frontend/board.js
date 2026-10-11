@@ -1050,12 +1050,22 @@ class InteractiveChessboard {
                 if (w > 0) return Math.round(w);
             }
         }
-        return 600;
+        return InteractiveChessboard.computeIdealBoardSize();
+    }
+
+    static computeIdealBoardSize() {
+        if (typeof window === 'undefined') return 460;
+        const vh = window.innerHeight || 800;
+        const vw = window.innerWidth || 1280;
+        const maxV = Math.max(300, vh - 255);
+        const maxH = vw > 1100 ? Math.max(320, vw - 760) : Math.max(300, vw - 80);
+        const optimal = Math.min(maxV, maxH);
+        return Math.max(300, Math.min(620, Math.round(optimal)));
     }
 
     static setGlobalBoardSize(sizeInPx, persist = false) {
         if (typeof document === 'undefined') return;
-        const clamped = Math.max(380, Math.min(1400, Math.round(Number(sizeInPx) || 600)));
+        const clamped = Math.max(300, Math.min(1000, Math.round(Number(sizeInPx) || 460)));
 
         if (document.documentElement && document.documentElement.style) {
             if (typeof document.documentElement.style.setProperty === 'function') {
@@ -1083,31 +1093,36 @@ class InteractiveChessboard {
 
     static fitToScreen() {
         if (typeof window === 'undefined') return;
-        const vh = window.innerHeight || 800;
-        const vw = window.innerWidth || 1200;
-
-        const maxV = Math.max(380, vh - 180);
-        const maxH = Math.max(380, vw - 440);
-
-        const optimal = Math.min(maxV, maxH);
-        const fitSize = Math.max(480, Math.min(1200, Math.round(optimal)));
+        const fitSize = InteractiveChessboard.computeIdealBoardSize();
         InteractiveChessboard.setGlobalBoardSize(fitSize, true);
     }
 
     static initGlobalResizing() {
         if (typeof document === 'undefined') return;
 
+        const ideal = InteractiveChessboard.computeIdealBoardSize();
+        const maxSafeV = (typeof window !== 'undefined' && window.innerHeight)
+            ? Math.max(320, window.innerHeight - 235)
+            : 620;
+        let applied = false;
+
         try {
             if (typeof localStorage !== 'undefined') {
                 const saved = localStorage.getItem('chess_board_size');
                 if (saved) {
                     const parsed = parseInt(saved, 10);
-                    if (!isNaN(parsed) && parsed >= 380 && parsed <= 1400) {
-                        InteractiveChessboard.setGlobalBoardSize(parsed, false);
+                    if (!isNaN(parsed) && parsed >= 300 && parsed <= 1000) {
+                        const safeSize = Math.min(parsed, maxSafeV);
+                        InteractiveChessboard.setGlobalBoardSize(safeSize, safeSize !== parsed);
+                        applied = true;
                     }
                 }
             }
         } catch (e) {}
+
+        if (!applied) {
+            InteractiveChessboard.setGlobalBoardSize(ideal, false);
+        }
 
         const current = InteractiveChessboard.getGlobalBoardSize();
         const labels = (typeof document.querySelectorAll === 'function') ? document.querySelectorAll('.board-size-display-val') : [];
@@ -1124,8 +1139,9 @@ class InteractiveChessboard {
                 btn._hasSizeBound = true;
                 btn.addEventListener('click', (e) => {
                     if (e && e.preventDefault) e.preventDefault();
+                    if (e && e.stopPropagation) e.stopPropagation();
                     const cur = InteractiveChessboard.getGlobalBoardSize();
-                    InteractiveChessboard.setGlobalBoardSize(cur - 40, true);
+                    InteractiveChessboard.setGlobalBoardSize(cur - 36, true);
                 });
             });
             root.querySelectorAll('.btn-board-size-inc').forEach(btn => {
@@ -1133,8 +1149,9 @@ class InteractiveChessboard {
                 btn._hasSizeBound = true;
                 btn.addEventListener('click', (e) => {
                     if (e && e.preventDefault) e.preventDefault();
+                    if (e && e.stopPropagation) e.stopPropagation();
                     const cur = InteractiveChessboard.getGlobalBoardSize();
-                    InteractiveChessboard.setGlobalBoardSize(cur + 40, true);
+                    InteractiveChessboard.setGlobalBoardSize(cur + 36, true);
                 });
             });
             root.querySelectorAll('.btn-board-size-fit').forEach(btn => {
@@ -1142,6 +1159,7 @@ class InteractiveChessboard {
                 btn._hasSizeBound = true;
                 btn.addEventListener('click', (e) => {
                     if (e && e.preventDefault) e.preventDefault();
+                    if (e && e.stopPropagation) e.stopPropagation();
                     InteractiveChessboard.fitToScreen();
                 });
             });
@@ -1149,32 +1167,44 @@ class InteractiveChessboard {
         InteractiveChessboard._bindSizeButtons = bindButtons;
         bindButtons(document);
 
-        if (typeof document.addEventListener === 'function') {
+        if (typeof document.addEventListener === 'function' && !InteractiveChessboard._docClickBound) {
+            InteractiveChessboard._docClickBound = true;
             document.addEventListener('click', (e) => {
                 const target = e.target;
                 if (!target || !target.closest) return;
 
                 const decBtn = target.closest('.btn-board-size-dec');
-                if (decBtn) {
+                if (decBtn && !decBtn._hasSizeBound) {
                     if (e.preventDefault) e.preventDefault();
                     const cur = InteractiveChessboard.getGlobalBoardSize();
-                    InteractiveChessboard.setGlobalBoardSize(cur - 40, true);
+                    InteractiveChessboard.setGlobalBoardSize(cur - 36, true);
                     return;
                 }
 
                 const incBtn = target.closest('.btn-board-size-inc');
-                if (incBtn) {
+                if (incBtn && !incBtn._hasSizeBound) {
                     if (e.preventDefault) e.preventDefault();
                     const cur = InteractiveChessboard.getGlobalBoardSize();
-                    InteractiveChessboard.setGlobalBoardSize(cur + 40, true);
+                    InteractiveChessboard.setGlobalBoardSize(cur + 36, true);
                     return;
                 }
 
                 const fitBtn = target.closest('.btn-board-size-fit');
-                if (fitBtn) {
+                if (fitBtn && !fitBtn._hasSizeBound) {
                     if (e.preventDefault) e.preventDefault();
                     InteractiveChessboard.fitToScreen();
                     return;
+                }
+            });
+        }
+
+        if (typeof window !== 'undefined' && typeof window.addEventListener === 'function' && !InteractiveChessboard._resizeBound) {
+            InteractiveChessboard._resizeBound = true;
+            window.addEventListener('resize', () => {
+                const cur = InteractiveChessboard.getGlobalBoardSize();
+                const maxV = Math.max(300, (window.innerHeight || 800) - 235);
+                if (cur > maxV) {
+                    InteractiveChessboard.setGlobalBoardSize(maxV, false);
                 }
             });
         }

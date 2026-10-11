@@ -1063,6 +1063,13 @@ class ScoutCheckTreePayload(BaseModel):
 
 class ScoutFavoritePayload(BaseModel):
     source_id: str = Field(..., max_length=MAX_SOURCE_ID_LEN)
+    source_type: Optional[str] = Field(None, max_length=32)
+    title: Optional[str] = Field(None, max_length=MAX_STUDY_NAME_LEN * 2)
+    channel: Optional[str] = Field(None, max_length=MAX_STUDY_NAME_LEN)
+    opening_name: Optional[str] = Field(None, max_length=MAX_STUDY_NAME_LEN)
+    eco: Optional[str] = Field(None, max_length=16)
+    thumbnail_url: Optional[str] = Field(None, max_length=512)
+    duration: Optional[int] = Field(None, ge=0, le=86400 * 7)
 
 class MoveAttemptPayload(BaseModel):
     # `ge/le` on the id keeps a value outside SQLite's signed 64-bit INTEGER out
@@ -1083,6 +1090,7 @@ class RepertoireMovePayload(BaseModel):
     comment: Optional[str] = Field(None, max_length=MAX_COMMENT_LEN)
     arrows: Optional[str] = Field(None, max_length=MAX_ARROWS_LEN)
     study_name: Optional[str] = Field(None, max_length=MAX_STUDY_NAME_LEN)
+    replace_existing: Optional[bool] = False
 
 class UpdateMoveMetaPayload(BaseModel):
     repertoire: Literal['white', 'black']
@@ -1387,6 +1395,7 @@ class ImportGameOpeningRequest(BaseModel):
     game_id: str = Field(..., max_length=32)
     repertoire: Literal["white", "black"]
     max_ply: Optional[int] = Field(None, ge=1, le=100)
+    replace_existing: Optional[bool] = False
 
 @app.get("/api/games/recent")
 def get_recent_games(
@@ -1567,7 +1576,12 @@ async def stream_sync_recent_games_endpoint(
 def import_game_opening_endpoint(payload: ImportGameOpeningRequest):
     rm = RepertoireManager.get_instance()
     try:
-        return rm.import_game_opening(payload.game_id, payload.repertoire, payload.max_ply)
+        return rm.import_game_opening(
+            payload.game_id,
+            payload.repertoire,
+            payload.max_ply,
+            replace_existing=bool(payload.replace_existing),
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -2229,7 +2243,8 @@ def add_repertoire_move(payload: RepertoireMovePayload):
         is_important=payload.is_important,
         comment=payload.comment,
         arrows=payload.arrows,
-        study_name=payload.study_name
+        study_name=payload.study_name,
+        replace_existing=bool(payload.replace_existing),
     )
     if res.get("status") == "error":
         raise HTTPException(status_code=400, detail=res.get("message", "Error adding move"))
@@ -2882,7 +2897,16 @@ def scout_check_tree(payload: ScoutCheckTreePayload):
 @app.post("/api/scout/favorite")
 def scout_toggle_favorite(payload: ScoutFavoritePayload):
     """Toggles bookmark/favorite status for a scouted item."""
-    new_fav = toggle_favorite_scouted(payload.source_id)
+    meta = {
+        "source_type": payload.source_type,
+        "title": payload.title,
+        "channel": payload.channel,
+        "opening_name": payload.opening_name,
+        "eco": payload.eco,
+        "thumbnail_url": payload.thumbnail_url,
+        "duration": payload.duration,
+    }
+    new_fav = toggle_favorite_scouted(payload.source_id, meta=meta)
     return {"status": "ok", "source_id": payload.source_id, "is_favorite": new_fav}
 
 # --- Aliases (kept for the frontend; delegate to the canonical handlers) ---

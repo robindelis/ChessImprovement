@@ -587,8 +587,7 @@ class RepertoireBuilder {
                 this.updateSortHeaderUI();
                 const curr = this.history[this.currentStepIndex];
                 if (curr) {
-                    const isUserTurn = (this.activeColor === 'white' && (curr.ply % 2 === 0)) ||
-                                       (this.activeColor === 'black' && (curr.ply % 2 === 1));
+                    const isUserTurn = this.isUserTurnAtFen(curr.fen);
                     this.renderCandidateTable(curr.fen, isUserTurn);
                 }
             });
@@ -606,6 +605,21 @@ class RepertoireBuilder {
         if (btnTabTree) btnTabTree.addEventListener('click', () => this.switchSidebarTab('tree'));
         if (btnTabGames) btnTabGames.addEventListener('click', () => this.switchSidebarTab('games'));
         if (btnTabGaps) btnTabGaps.addEventListener('click', () => this.switchSidebarTab('gaps'));
+
+        const btnTogglePatched = document.getElementById('btnRepTogglePatchedGaps');
+        if (btnTogglePatched) {
+            btnTogglePatched.addEventListener('click', async () => {
+                this.showPatchedGaps = !this.showPatchedGaps;
+                btnTogglePatched.classList.toggle('active', this.showPatchedGaps);
+                btnTogglePatched.textContent = this.showPatchedGaps ? 'Hide Patched' : 'Show Patched';
+                await this.refreshTree();
+            });
+        }
+
+        const btnTopBlunder = document.getElementById('btnRepAddressTopBlunder');
+        if (btnTopBlunder) {
+            btnTopBlunder.addEventListener('click', () => this.addressNextGameGap());
+        }
 
         // Recent Games filters and actions
         const filterBtns = [
@@ -1350,6 +1364,79 @@ class RepertoireBuilder {
     async onStudyChange(studyName) {
         this.currentStudy = studyName ? studyName.trim() : '';
         await this.refreshTree();
+        this._seedLineTreeFromStudy(this.currentStudy);
+        this.updateActiveLineCounts();
+        this.renderTreeLines();
+        const curr = this.history[this.currentStepIndex];
+        if (curr) {
+            this.renderCandidateTable(curr.fen, this.isUserTurnAtFen(curr.fen));
+        }
+    }
+
+    _seedLineTreeFromStudy(studyName) {
+        if (!this.lineTree) return;
+        this.lineTree.reset();
+        if (!studyName || !this.treeData || !this.treeData.moves_by_parent) {
+            this.ensureHistoryInLineTree(this.currentStepIndex);
+            return;
+        }
+        const startFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+        const matchingLines = [];
+        const dfs = (fen, pathMoves, visited, hasStudyMove) => {
+            if (pathMoves.length >= 40) {
+                if (hasStudyMove) matchingLines.push(pathMoves);
+                return;
+            }
+            const children = this.getMovesForParent(fen);
+            const nextChildren = [];
+            for (const c of children) {
+                const cFen = c.fen || '';
+                const normC = cFen ? normalizeTreeFen(cFen) : '';
+                if (!cFen || visited.has(normC)) continue;
+                nextChildren.push({ c, cFen, normC });
+            }
+            if (nextChildren.length === 0) {
+                if (hasStudyMove && pathMoves.length > 0) {
+                    matchingLines.push(pathMoves);
+                }
+                return;
+            }
+            let branched = false;
+            for (const { c, cFen, normC } of nextChildren) {
+                const inStudy = (c.study_name === studyName);
+                const nextVisited = new Set(visited);
+                nextVisited.add(normC);
+                const ply = pathMoves.length + 1;
+                const moveObj = {
+                    fen_before: fen,
+                    fen: cFen,
+                    fen_after: cFen,
+                    uci: c.move_uci || c.uci,
+                    san: c.move_san || c.san || c.move_uci,
+                    color: (fen.split(' ')[1] === 'w') ? 'white' : 'black',
+                    move_number: Math.floor((ply - 1) / 2) + 1,
+                    opening_name: c.opening_name || studyName,
+                    eco: c.eco || '',
+                    comment: c.comment || '',
+                    is_important: Boolean(c.is_important),
+                    arrows: c.arrows || ''
+                };
+                branched = true;
+                dfs(cFen, [...pathMoves, moveObj], nextVisited, hasStudyMove || inStudy);
+            }
+            if (!branched && hasStudyMove && pathMoves.length > 0) {
+                matchingLines.push(pathMoves);
+            }
+        };
+
+        dfs(startFen, [], new Set([normalizeTreeFen(startFen)]), false);
+        for (const lineMoves of matchingLines.slice(0, 60)) {
+            this.lineTree.currentNode = this.lineTree.root;
+            for (const m of lineMoves) {
+                this.lineTree.addMove(m);
+            }
+        }
+        this.syncLineTreeNode();
     }
 
     async onNewStudyClick() {
@@ -2179,15 +2266,33 @@ class RepertoireBuilder {
     }
     async importGameOpening(gameId, repertoire) {
         try {
-            const res = await fetch('/api/repertoire/import_game_opening', {
+            let res = await fetch('/api/repertoire/import_game_opening', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ game_id: gameId, repertoire: repertoire })
             });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const data = await res.json();
-            if (data && data.status === 'success') {
-                this.notify(`✓ Imported ${data.opening_name || 'opening'} (${data.imported_moves} moves) into ${repertoire} repertoire!`, '#4ade80');
+            let data = await res.json();
+            if (data && data.status === 'conflict') {
+                const confirmed = confirm(
+                    `${data.message || 'This game opening conflicts with an existing move in your repertoire.'}\n\n` +
+                    `Replace your existing move with this game's opening line?`
+                );
+                if (!confirmed) return false;
+                res = await fetch('/api/repertoire/import_game_opening', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ game_id: gameId, repertoire: repertoire, replace_existing: true })
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                data = await res.json();
+            }
+            if (data && (data.status === 'success' || (data.status === 'incomplete' && (data.imported_moves || 0) > 0))) {
+                const tone = data.status === 'success' ? '#4ade80' : '#f59e0b';
+                const msg = data.status === 'success'
+                    ? `✓ Imported ${data.opening_name || 'opening'} (${data.imported_moves} moves) into ${repertoire} repertoire!`
+                    : (data.message || `Imported ${data.imported_moves} moves into ${repertoire} repertoire.`);
+                this.notify(msg, tone);
                 await this.refreshTree();
                 return true;
             }
@@ -2202,6 +2307,22 @@ class RepertoireBuilder {
 
     normalizeFen(fen) {
         return fen.split(' ').slice(0, 3).join(' ');
+    }
+
+    isUserTurnAtFen(fen) {
+        if (!fen || typeof fen !== 'string') return true;
+        const turn = fen.split(' ')[1] || 'w';
+        return (this.activeColor === 'white' && turn === 'w') || (this.activeColor === 'black' && turn === 'b');
+    }
+
+    getMovesForParent(parentFen) {
+        if (!this.treeData || !this.treeData.moves_by_parent || !parentFen) return [];
+        const norm4 = normalizeTreeFen(parentFen);
+        const norm3 = this.normalizeFen(parentFen);
+        return this.treeData.moves_by_parent[parentFen]
+            || this.treeData.moves_by_parent[norm4]
+            || this.treeData.moves_by_parent[norm3]
+            || [];
     }
 
     /**
@@ -2295,8 +2416,7 @@ class RepertoireBuilder {
 
     findMoveInTree(parentFen, uci) {
         if (!this.treeData || !this.treeData.moves_by_parent || !parentFen || !uci) return null;
-        const norm = this.normalizeFen(parentFen);
-        const candidates = this.treeData.moves_by_parent[parentFen] || this.treeData.moves_by_parent[norm] || [];
+        const candidates = this.getMovesForParent(parentFen);
         return candidates.find(m => m.move_uci === uci) || null;
     }
 
@@ -2330,12 +2450,14 @@ class RepertoireBuilder {
 
         if (commentEl) commentEl.disabled = false;
         if (sanEl) sanEl.textContent = curr.san || 'Move';
-        const isUserTurnMove = (this.activeColor === 'white' && (curr.ply % 2 === 1)) ||
-                               (this.activeColor === 'black' && (curr.ply % 2 === 0));
-        if (typeEl) typeEl.textContent = isUserTurnMove ? '(Your Move)' : '(Opponent Reply)';
 
         const parent = this.history[this.currentStepIndex - 1];
         const parentFen = parent ? parent.fen : '';
+        const isUserTurnMove = parentFen
+            ? this.isUserTurnAtFen(parentFen)
+            : !this.isUserTurnAtFen(curr.fen);
+        if (typeEl) typeEl.textContent = isUserTurnMove ? '(Your Move)' : '(Opponent Reply)';
+
         const repMove = this.findMoveInTree(parentFen, curr.uci);
 
         if (btnImportant) {
@@ -2529,8 +2651,7 @@ class RepertoireBuilder {
 
         const repMove = this.findMoveInTree(parent.fen, curr.uci);
         if (!repMove) {
-            const isUserTurn = (this.activeColor === 'white' && (curr.ply % 2 === 1)) ||
-                               (this.activeColor === 'black' && (curr.ply % 2 === 0));
+            const isUserTurn = this.isUserTurnAtFen(parent.fen);
             await this.saveMove(parent.fen, { uci: curr.uci, san: curr.san }, isUserTurn);
         }
 
@@ -3046,7 +3167,46 @@ class RepertoireBuilder {
     renderBlunderBanner(curr) {
         if (this.activeReviewGame) {
             this.renderGameReviewBanner(this.activeReviewGame);
+            return;
         }
+        const banner = document.getElementById('gameReviewBanner');
+        if (!banner) return;
+        const gap = (curr && curr.blunder) || (this.activeReviewGap && this.activeReviewGap.fen_before ? this.activeReviewGap : null);
+        if (!gap || !gap.fen_before) {
+            banner.style.display = 'none';
+            return;
+        }
+        const moveNum = this._num(gap.move_number, 1);
+        const cpl = Math.round(this._num(gap.cpl_loss, 0));
+        const played = this._escapeHtml(gap.played_san || '?');
+        const best = this._escapeHtml(gap.best_san || '?');
+        const opp = this._escapeHtml(gap.opponent_name || 'Opponent');
+        const opening = this._escapeHtml(gap.opening_name || 'Opening');
+        banner.style.display = 'block';
+        banner.innerHTML = `
+            <div class="blunder-banner-alert" style="justify-content:space-between; align-items:center; gap:0.5rem; padding:0 0.75rem;">
+                <div style="display:flex; align-items:center; gap:0.5rem; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">
+                    <span class="badge-critical">Move ${moveNum}</span>
+                    <span style="font-weight:700; color:#fff; font-size:0.84rem;">Played ${played} &rarr; Engine best: <strong style="color:#4ade80;">${best}</strong> (${cpl > 0 ? '-' + cpl + ' cp' : 'blunder'})</span>
+                    <span style="color:var(--text-secondary); font-size:0.78rem; overflow:hidden; text-overflow:ellipsis;">• vs ${opp} (${opening})</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:0.35rem; flex-shrink:0;">
+                    <button type="button" data-action="adopt" class="btn-primary" style="font-size:0.74rem; padding:0.22rem 0.6rem;">✓ Adopt ${best}</button>
+                    <button type="button" data-action="next" class="btn-secondary" style="font-size:0.74rem; padding:0.22rem 0.55rem;">Next Blunder &rarr;</button>
+                    <button type="button" data-action="exit" class="btn-secondary" style="font-size:0.74rem; padding:0.22rem 0.5rem; color:#f87171;">✕ Exit</button>
+                </div>
+            </div>
+        `;
+        banner.querySelectorAll('button[data-action]').forEach(btn => {
+            const act = btn.getAttribute('data-action');
+            if (act === 'adopt') {
+                btn.addEventListener('click', () => this.adoptBlunderSolution(gap, btn));
+            } else if (act === 'next') {
+                btn.addEventListener('click', () => this.addressNextGameGap());
+            } else if (act === 'exit') {
+                btn.addEventListener('click', () => this.exitGameReview());
+            }
+        });
     }
 
     _escapeHtml(s) {
@@ -3103,7 +3263,8 @@ class RepertoireBuilder {
 
     /** Header action "Address #1 Blunder". */
     addressNextGameGap() {
-        const gap = this.nextUnpatchedGameGap(null);
+        const curId = this.activeReviewGap ? this.activeReviewGap.id : null;
+        const gap = this.nextUnpatchedGameGap(curId) || this.nextUnpatchedGameGap(null);
         if (!gap) {
             this.notify('No unaddressed opening blunders found. Sync more games or lower the opening cutoff.', '#94a3b8');
             return;
@@ -3156,10 +3317,21 @@ class RepertoireBuilder {
      */
     renderGapLists() {
         const covGaps = Array.isArray(this.treeData?.gaps) ? this.treeData.gaps : [];
+        const gameGapsData = this.treeData?.game_gaps || {};
+        const gameGaps = Array.isArray(gameGapsData.gaps) ? gameGapsData.gaps : [];
         const tabCount = document.getElementById('repCoverageGapsCount');
         if (tabCount) {
-            tabCount.textContent = covGaps.length;
-            tabCount.title = `${covGaps.length} unprepared opponent moves to address`;
+            tabCount.textContent = covGaps.length + gameGaps.length;
+            tabCount.title = `${covGaps.length} unprepared opponent moves · ${gameGaps.length} game blunders`;
+        }
+
+        const btnTogglePatched = document.getElementById('btnRepTogglePatchedGaps');
+        if (btnTogglePatched) {
+            const patchedCount = this._num(gameGapsData.patched_count, 0);
+            btnTogglePatched.classList.toggle('active', Boolean(this.showPatchedGaps));
+            btnTogglePatched.textContent = this.showPatchedGaps
+                ? `Hide Patched (${patchedCount})`
+                : `Show Patched (${patchedCount})`;
         }
 
         // AGENTS.md 4.G: a coverage gap is one of TWO honest things, and they are not the
@@ -3189,7 +3361,10 @@ class RepertoireBuilder {
                 btn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     const pf = btn.getAttribute('data-parent');
-                    const gap = covGaps.find(x => x.parent_fen === pf) || null;
+                    const uci = btn.getAttribute('data-uci');
+                    const gap = covGaps.find(x => x.parent_fen === pf && (!uci || x.opponent_uci === uci))
+                        || covGaps.find(x => x.parent_fen === pf)
+                        || null;
                     this.addressGap(gap);
                 });
             });
@@ -3197,16 +3372,15 @@ class RepertoireBuilder {
 
         const gapsList = document.getElementById('repGapsList');
         if (gapsList) {
-            const gameGapsData = this.treeData?.game_gaps || {};
-            const gaps = Array.isArray(gameGapsData.gaps) ? gameGapsData.gaps : [];
-            gapsList.innerHTML = gaps.length === 0
-                ? '<div style="text-align:center; color:var(--text-muted); padding:0.75rem;">No unpatched blunders found in your recent games. 🎉</div>'
-                : gaps.map((g, idx) => this._blunderGapCardHtml(g, idx)).join('');
+            gapsList.style.display = 'flex';
+            gapsList.innerHTML = gameGaps.length === 0
+                ? '<div style="text-align:center; color:var(--text-muted); padding:0.6rem; font-size:0.78rem;">No unpatched opening blunders found in your recent games. 🎉</div>'
+                : gameGaps.map((g, idx) => this._blunderGapCardHtml(g, idx)).join('');
             gapsList.querySelectorAll('.btn-address-blunder').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     const gid = btn.getAttribute('data-gap-id');
-                    const gap = gaps.find(x => String(x.id) === gid) || null;
+                    const gap = gameGaps.find(x => String(x.id) === gid) || null;
                     this.addressGap(gap);
                 });
             });
@@ -3276,7 +3450,7 @@ class RepertoireBuilder {
                 </div>
                 <div style="flex-shrink:0; margin-top:0.3rem;">
                     <button class="btn-secondary btn-address-coverage-gap" style="font-size:0.7rem; padding:0.18rem 0.45rem; min-width:110px; justify-content:center;"
-                        data-parent="${this._escapeAttr(gap.parent_fen || '')}">${unanswered ? 'Add your reply →' : 'Add this reply →'}</button>
+                        data-parent="${this._escapeAttr(gap.parent_fen || '')}" data-uci="${this._escapeAttr(gap.opponent_uci || '')}">${unanswered ? 'Add your reply →' : 'Add this reply →'}</button>
                 </div>
             </div>
         `;
@@ -3374,10 +3548,12 @@ class RepertoireBuilder {
         if (!curr) return;
 
         const normParent = this.normalizeFen(curr.fen);
-        const inTreeMoves = (this.treeData?.moves_by_parent?.[normParent]) || [];
+        const inTreeMoves = this.getMovesForParent(curr.fen);
 
-        // 1. Check if user's turn and has prepared move
-        const userPrepared = inTreeMoves.find(m => m.is_user_move === 1);
+        // 1. Check if user's turn and has prepared move (prefer active study if filtered)
+        const userPrepared = (this.currentStudy
+            ? inTreeMoves.find(m => m.is_user_move === 1 && m.study_name === this.currentStudy)
+            : null) || inTreeMoves.find(m => m.is_user_move === 1);
         if (userPrepared) {
             this.playMoveFromUci(userPrepared.move_uci, userPrepared.move_san);
             return;
@@ -3386,7 +3562,9 @@ class RepertoireBuilder {
         // 2. Check if opponent's turn and has branch in tree
         const oppBranches = inTreeMoves.filter(m => m.is_user_move === 0);
         if (oppBranches.length > 0) {
-            const topOpp = [...oppBranches].sort((a, b) => (b.popularity_pct || 0) - (a.popularity_pct || 0))[0];
+            const studyOpp = this.currentStudy ? oppBranches.filter(m => m.study_name === this.currentStudy) : [];
+            const pool = studyOpp.length > 0 ? studyOpp : oppBranches;
+            const topOpp = [...pool].sort((a, b) => (b.popularity_pct || 0) - (a.popularity_pct || 0))[0];
             this.playMoveFromUci(topOpp.move_uci, topOpp.move_san);
             return;
         }
@@ -3569,8 +3747,7 @@ class RepertoireBuilder {
         const moves = this.sortCandidateMoves(rawMoves);
 
         // Find moves already in tree for this parent_fen
-        const normParent = this.normalizeFen(fen);
-        const inTreeMoves = (this.treeData?.moves_by_parent?.[normParent]) || [];
+        const inTreeMoves = this.getMovesForParent(fen);
         const userPreparedUci = inTreeMoves.find(m => m.is_user_move === 1)?.move_uci;
         const oppPreparedUcis = new Set(inTreeMoves.filter(m => m.is_user_move === 0).map(m => m.move_uci));
 
@@ -3777,13 +3954,29 @@ class RepertoireBuilder {
         };
 
         try {
-            const res = await fetch('/api/repertoire/move', {
+            let res = await fetch('/api/repertoire/move', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const data = await res.json();
+            let data = await res.json();
+            if (data && data.status === 'conflict') {
+                const existingSan = data.existing_san || data.existing_uci || 'an existing move';
+                const newSan = moveObj.san || moveObj.uci;
+                const confirmed = confirm(
+                    `You already have ${existingSan} prepared in this position.\n\n` +
+                    `Replace ${existingSan} (and its continuing branch) with ${newSan}?`
+                );
+                if (!confirmed) return false;
+                res = await fetch('/api/repertoire/move', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ...payload, replace_existing: true })
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                data = await res.json();
+            }
             if (data && data.status === 'success') {
                 if (window.chessAudio) window.chessAudio.playSuccess();
                 await this.loadStudies();
@@ -3820,9 +4013,7 @@ class RepertoireBuilder {
             if (data && data.status === 'ok') {
                 if (window.chessAudio) window.chessAudio.playSuccess();
                 await this.refreshTree();
-                const curr = this.history[this.currentStepIndex];
-                const isUserTurn = curr ? ((this.activeColor === 'white' && (curr.ply % 2 === 0)) ||
-                                           (this.activeColor === 'black' && (curr.ply % 2 === 1))) : true;
+                const isUserTurn = this.isUserTurnAtFen(parentFen);
                 await this.loadCandidateMoves(parentFen, isUserTurn);
                 return true;
             }
@@ -3929,6 +4120,65 @@ class RepertoireBuilder {
         this.notify(`Reviewing move ${gap.move_number}: ${gap.played_san || '?'} → ${gap.best_san || '?'}`, '#f59e0b');
     }
 
+    _reconstructHistoryToFen(targetFen, fallbackOpeningName = 'Line', fallbackEco = '') {
+        const startFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+        const normTarget4 = normalizeTreeFen(targetFen);
+        const normTarget3 = this.normalizeFen(targetFen);
+        const rootStep = {
+            ply: 0,
+            fen: startFen,
+            san: 'Start',
+            uci: null,
+            openingName: fallbackOpeningName,
+            eco: fallbackEco
+        };
+        if (normalizeTreeFen(startFen) === normTarget4 || this.normalizeFen(startFen) === normTarget3) {
+            return [rootStep];
+        }
+        if (this.treeData && this.treeData.moves_by_parent) {
+            const queue = [{ fen: startFen, path: [rootStep] }];
+            const visited = new Set([normalizeTreeFen(startFen), this.normalizeFen(startFen)]);
+            while (queue.length > 0) {
+                const { fen, path } = queue.shift();
+                if (path.length >= 40) continue;
+                const children = this.getMovesForParent(fen);
+                for (const m of children) {
+                    const mFen = m.fen || '';
+                    if (!mFen) continue;
+                    const mNorm4 = normalizeTreeFen(mFen);
+                    const mNorm3 = this.normalizeFen(mFen);
+                    const step = {
+                        ply: path.length,
+                        fen: mFen,
+                        san: m.move_san || m.san || m.move_uci || 'Move',
+                        uci: m.move_uci || m.uci || null,
+                        openingName: m.opening_name || fallbackOpeningName,
+                        eco: m.eco || fallbackEco
+                    };
+                    const nextPath = [...path, step];
+                    if (mNorm4 === normTarget4 || mNorm3 === normTarget3) {
+                        return nextPath;
+                    }
+                    if (!visited.has(mNorm4) && !visited.has(mNorm3)) {
+                        visited.add(mNorm4);
+                        visited.add(mNorm3);
+                        queue.push({ fen: mFen, path: nextPath });
+                    }
+                }
+            }
+        }
+        return [
+            {
+                ply: 0,
+                fen: targetFen,
+                san: 'Position',
+                uci: null,
+                openingName: fallbackOpeningName,
+                eco: fallbackEco
+            }
+        ];
+    }
+
     /**
      * Loads a coverage gap (an unprepared, frequent opponent reply from `treeData.gaps`) onto the
      * board by playing the opponent's move. Reachable from the "🛡 Unprepared Opponent Moves"
@@ -3951,34 +4201,33 @@ class RepertoireBuilder {
         const to = oppUci.slice(2, 4);
         const promo = oppUci.length === 5 ? oppUci[4] : undefined;
 
-        this.board.loadFEN(gap.parent_fen);
+        const baseHistory = this._reconstructHistoryToFen(
+            gap.parent_fen,
+            gap.opening_name || 'Line',
+            gap.eco || ''
+        );
+        const parentStep = baseHistory[baseHistory.length - 1];
+        const parentFenToLoad = (parentStep && parentStep.ply > 0 && parentStep.fen) ? parentStep.fen : gap.parent_fen;
+
+        this.board.loadFEN(parentFenToLoad);
         const moveRes = this.board.playMove(from, to, promo, false);
 
-        this.history = [
-            {
-                ply: 0,
-                fen: gap.parent_fen,
-                san: 'Position',
-                uci: null,
-                openingName: gap.opening_name || 'Line',
-                eco: gap.eco || ''
-            }
-        ];
+        this.history = baseHistory;
 
         if (moveRes) {
             this.history.push({
-                ply: 1,
+                ply: this.history.length,
                 fen: this.board.getFEN(),
                 san: moveRes.san,
                 uci: oppUci,
                 openingName: gap.opening_name || 'Line',
                 eco: gap.eco || ''
             });
-            this.currentStepIndex = 1;
+            this.currentStepIndex = this.history.length - 1;
         } else {
             // The opponent move is not legal from this position (stale explorer data): stay on the
             // parent so the user can still prepare a reply manually.
-            this.currentStepIndex = 0;
+            this.currentStepIndex = this.history.length - 1;
             this.notify(`Could not replay ${gap.opponent_san || oppUci} — showing the parent position.`, '#f59e0b');
         }
 
