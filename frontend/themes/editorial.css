@@ -1,0 +1,480 @@
+/* =============================================================================
+   THEME B — "VELLUM & INK"
+   -----------------------------------------------------------------------------
+   Design language: a printed chess column / scholarly folio. Warm vellum paper,
+   serif display type (system serif only — CSP forbids web fonts), deep ink body
+   text, a burgundy + cobalt ink palette, hairline rules, generous whitespace,
+   small-caps kickers. Numbers and move notation stay monospaced (the typographic
+   discipline). The board is a classic warm-wood tournament set with sepia pieces.
+   UX decision: the calm, high-contrast, reading-first opposite of a dark game UI.
+
+   Loaded AFTER style.css. Remaps the many hard-coded dark inline colours so the
+   paper reads cleanly (see the scoped attribute rules below).
+   ========================================================================== */
+
+:root {
+    --bg-main: #f2ecdf;
+    --bg-dark: #eae2d0;
+    --bg-card: #fbf7ec;
+    --bg-panel: #f7f1e3;
+    --bg-card-hover: #fffdf6;
+    --bg-elevated: #fffdf6;
+
+    --border-color: #ddd2b9;
+    --border-accent: #a02c2c;
+
+    --text-primary: #1f1b14;
+    --text-secondary: #584f3f;
+    --text-muted: #8c8371;
+
+    --accent-primary: #a02c2c;   /* burgundy */
+    --accent-hover: #bd3838;
+    --accent-secondary: #1f4e8c; /* cobalt ink */
+    --accent-emerald: #2f7d4f;
+    --accent-crimson: #b23030;
+    --accent-amber: #a9760b;
+    --accent-primary-glow: rgba(160, 44, 44, 0.1);
+
+    --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, "Times New Roman", serif;
+    --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+    /* Board: classic warm tournament wood */
+    --board-light: #e9d8b4;
+    --board-dark: #9c6a3a;
+    --board-highlight: rgba(160, 44, 44, 0.35);
+}
+
+/* --- Type: serif for prose + headings; mono stays on numbers/moves --------- */
+* { font-family: var(--font-serif); }
+.breadcrumb-chip, .explorer-move-san, .gap-san, .scout-move-san, .scout-var-pgn,
+.pv-step-btn, .eval-badge, .scout-detail-value.mono, .scout-suggest-moves,
+.scout-suggest-eco, .scout-time-badge, .scout-reply-san, code, kbd, .mono,
+.trainer-breadcrumb-moves, #repMoveToolSan, .eval-bar-label {
+    font-family: var(--font-mono);
+}
+
+body {
+    background-color: var(--bg-main);
+    /* faint laid-paper texture + a warm wash from the top */
+    background-image:
+        repeating-linear-gradient(0deg, rgba(120, 100, 60, 0.035) 0px, rgba(120, 100, 60, 0.035) 1px, transparent 1px, transparent 4px),
+        repeating-linear-gradient(90deg, rgba(120, 100, 60, 0.02) 0px, rgba(120, 100, 60, 0.02) 1px, transparent 1px, transparent 4px),
+        radial-gradient(120% 80% at 50% -10%, rgba(160, 44, 44, 0.06) 0%, transparent 55%);
+    color: var(--text-primary);
+    font-feature-settings: "kern", "liga";
+}
+
+::selection { background: rgba(160, 44, 44, 0.22); color: #1f1b14; }
+
+* { scrollbar-color: rgba(120, 100, 60, 0.5) transparent; scrollbar-width: thin; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: var(--bg-dark); }
+*::-webkit-scrollbar-thumb { background: rgba(120, 100, 60, 0.4); border-radius: 0; border: 2px solid var(--bg-dark); }
+*::-webkit-scrollbar-thumb:hover { background: var(--accent-primary); }
+
+/* ============================ HEADER / SHELL ============================== */
+header {
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border-color);
+    box-shadow: 0 2px 0 var(--accent-primary), 0 6px 18px -12px rgba(60, 40, 20, 0.4);
+}
+.brand {
+    font-family: var(--font-serif);
+    font-weight: 700;
+    font-style: italic;
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
+    text-transform: none;
+}
+.brand span { color: var(--accent-primary); margin: 0 0.05em; }
+
+.nav-tabs {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    gap: 0.9rem;
+}
+.nav-tab {
+    border: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-size: 0.72rem;
+    font-family: var(--font-serif);
+    font-weight: 700;
+    padding: 0.5rem 0.2rem;
+}
+.nav-tab:hover { color: var(--accent-primary); }
+.nav-tab.active {
+    color: var(--accent-primary);
+    border-bottom-color: var(--accent-primary);
+    background: transparent;
+    box-shadow: none;
+}
+
+.user-badge {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: 2px;
+    color: var(--text-secondary);
+    font-family: var(--font-serif);
+}
+.user-badge-online-dot { background: var(--accent-emerald); box-shadow: none; }
+.user-badge .rating-pill {
+    background: var(--accent-primary);
+    color: var(--bg-card);
+    border-radius: 2px;
+    font-family: var(--font-mono);
+    font-weight: 700;
+}
+
+/* ================================ BUTTONS ================================= */
+.btn-primary, .btn-secondary, .btn-danger { border-radius: 2px; }
+.btn-primary {
+    background: var(--accent-primary);
+    color: var(--bg-card);
+    border: 1px solid var(--accent-primary);
+    box-shadow: 0 1px 0 rgba(0,0,0,0.06);
+    font-family: var(--font-serif);
+    font-weight: 700;
+}
+.btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn-secondary {
+    background: transparent;
+    color: var(--accent-secondary);
+    border: 1px solid var(--border-color);
+}
+.btn-secondary:hover { background: var(--bg-card-hover); border-color: var(--accent-secondary); color: var(--accent-secondary); }
+.btn-danger { background: transparent; color: var(--accent-crimson); border: 1px solid rgba(178,48,48,0.4); }
+.btn-danger:hover { background: rgba(178,48,48,0.08); border-color: var(--accent-crimson); }
+
+.repertoire-color-toggle, .filter-pill-group, .scout-intent-group {
+    background: var(--bg-card-hover) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 3px !important;
+}
+.rep-toggle-btn, .filter-pill-btn, .scout-intent-btn, .scout-chip, .scout-filter-btn,
+.rep-subcard-tab, .scout-candidate-chip { border-radius: 2px !important; color: var(--text-secondary); }
+.rep-toggle-btn.active, .filter-pill-btn.active, .scout-intent-btn.active,
+.scout-chip.active, .scout-filter-btn.active, .rep-subcard-tab.active {
+    background: rgba(160, 44, 44, 0.1) !important;
+    border-color: var(--accent-primary) !important;
+    color: var(--accent-primary) !important;
+}
+.scout-chip:hover, .scout-filter-btn:hover, .rep-subcard-tab:hover { color: var(--accent-primary); }
+.scout-chip-rep { border-color: rgba(169,118,11,0.5) !important; color: var(--accent-amber) !important; }
+.scout-chip-rep:hover { background: rgba(169,118,11,0.1) !important; }
+
+.btn-tree-action, .btn-quick-rep, .btn-var-action, .btn-add-move {
+    border-radius: 2px !important;
+    border: 1px solid var(--border-color) !important;
+    color: var(--accent-secondary);
+}
+.btn-tree-action:hover, .btn-quick-rep:hover, .btn-var-action:hover, .btn-add-move:hover {
+    background: var(--bg-card-hover) !important; border-color: var(--accent-secondary) !important; color: var(--accent-secondary) !important;
+}
+.btn-add-move { background: rgba(31,78,140,0.08) !important; border-color: rgba(31,78,140,0.3) !important; color: var(--accent-secondary) !important; }
+
+/* =============================== SURFACES ================================= */
+.repertoire-top-bar, .card-panel, .repertoire-sidebar-card, .drill-sidebar,
+.move-breadcrumbs, .rep-line-actions-bar, .rep-move-tools-compact,
+.coverage-box, .analysis-accordion, .trainer-session-strip, .trainer-mastery-card {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 4px !important;
+    box-shadow: 0 1px 2px rgba(80, 60, 30, 0.06);
+}
+.panel-title, .scout-main-title, .drill-title, .scout-shelf-title, .gaps-section-title {
+    font-family: var(--font-serif);
+    color: var(--text-primary);
+    text-transform: none;
+    letter-spacing: -0.01em;
+    font-weight: 700;
+}
+.metric-title, .metric-desc, .scout-subtitle, .drill-subtitle, .trainer-stat-lbl,
+.sync-detail-label, .scout-intent-label, .scout-chips-label, .gaps-section-sub,
+.accordion-title {
+    font-family: var(--font-serif);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-muted);
+    font-weight: 700;
+    font-size: 0.66rem;
+}
+.accordion-title { color: var(--accent-secondary); }
+#repOpeningTitle { color: var(--text-primary); font-family: var(--font-serif); }
+#repOpeningEco, .gaps-section-sub { font-family: var(--font-mono); }
+
+/* ============================ REMAP INLINE COLOURS ========================
+   The shell carries many hard-coded dark/neon inline colours. On paper these
+   become illegible, so map the white/neon text + ink accents to the print
+   palette. (Specific class/id/element rules below handle the backgrounds, so
+   the black/white colour-toggles keep their literal swatches.)               */
+[style*="color:#fff"], [style*="color: #fff"],
+[style*="color:#f8fafc"], [style*="color:#f1f5f9"] { color: var(--text-primary) !important; }
+[style*="color:#38bdf8"] { color: var(--accent-secondary) !important; }
+[style*="color:#4ade80"], [style*="color:#22c55e"] { color: var(--accent-emerald) !important; }
+[style*="color:#fbbf24"], [style*="color:#f59e0b"] { color: var(--accent-amber) !important; }
+[style*="color:#f87171"], [style*="color:#ef4444"] { color: var(--accent-crimson) !important; }
+
+/* ============================== FORM FIELDS =============================== */
+select, input[type="text"], input[type="password"], input[type="number"], textarea {
+    background: var(--bg-card-hover) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 3px !important;
+    font-family: var(--font-serif) !important;
+}
+select:focus, input:focus, textarea:focus {
+    outline: none !important;
+    border-color: var(--accent-secondary) !important;
+    box-shadow: 0 0 0 2px rgba(31, 78, 140, 0.15) !important;
+}
+.study-selector-wrap, .sync-switch-wrap, #importPgnDropZone,
+.scout-note-bar, #trainPrompt, #trainNoteBox {
+    background: var(--bg-card-hover) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 3px !important;
+}
+#importPgnDropZone { border: 2px dashed rgba(31,78,140,0.4) !important; background: var(--bg-card) !important; }
+.study-selector-wrap > span { color: var(--accent-secondary); font-family: var(--font-serif); text-transform: uppercase; letter-spacing: 0.1em; font-size: 0.68rem; font-weight: 700; }
+::placeholder { color: var(--text-muted); font-style: italic; }
+
+/* ============================ TABLES (DATA FEED) ========================== */
+.explorer-table th, .data-table th, .repertoire-sidebar-card .explorer-table th {
+    background: var(--bg-dark) !important;
+    color: var(--text-secondary) !important;
+    border-bottom: 1px solid var(--border-accent) !important;
+    font-family: var(--font-serif);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.66rem;
+}
+.explorer-table td, .data-table td { border-bottom: 1px solid var(--border-color) !important; }
+.explorer-row:hover, .game-card:hover { background: var(--bg-card-hover) !important; }
+.sortable-th.active-sort { color: var(--accent-primary) !important; }
+.explorer-move-san, .gap-san { color: var(--text-primary); text-shadow: none; }
+.pop-bar-track { background: var(--bg-dark) !important; }
+.pop-bar-fill { background: var(--accent-secondary) !important; }
+.winrate-bar-wrap { border: 1px solid var(--border-color); }
+.wr-white { background: #fbf7ec; color: #1f1b14; }
+.wr-draw { background: #b7ab90; color: #1f1b14; }
+.wr-black { background: #241f18; color: #f2ecdf; border: 1px solid #241f18; }
+.eval-badge.plus { color: var(--accent-emerald); border-color: rgba(47,125,79,.4); background: rgba(47,125,79,.08); }
+.eval-badge.minus { color: var(--accent-crimson); border-color: rgba(178,48,48,.4); background: rgba(178,48,48,.08); }
+.eval-badge.zero { color: var(--text-secondary); border-color: var(--border-color); }
+
+/* ================================ BOARD =================================== */
+.chess-board-wrapper {
+    border-radius: 3px;
+    box-shadow: 0 0 0 1px var(--border-color), 0 14px 30px -14px rgba(60, 40, 20, 0.55);
+}
+.square.highlight-last { background-color: rgba(217, 164, 60, 0.6) !important; }
+.square.selected { background-color: rgba(31, 78, 140, 0.42) !important; }
+.square.check { background: radial-gradient(circle, rgba(178,48,48,.6) 30%, transparent 74%) !important; }
+.square.marked { box-shadow: inset 0 0 0 4px rgba(160, 44, 44, 0.85) !important; }
+.move-hint { background-color: rgba(60, 40, 20, 0.28); }
+.capture-hint { border-color: rgba(60, 40, 20, 0.45); }
+.piece { filter: sepia(0.28) saturate(1.05) contrast(1.02) drop-shadow(0 1px 1px rgba(60,40,20,0.28)); }
+.floating-drag-piece { filter: sepia(0.28) drop-shadow(0 8px 16px rgba(60,40,20,0.4)); }
+
+/* Eval bar: warm ink gauge on paper */
+.eval-bar-wrapper { background-color: #33291c !important; border: 1px solid var(--border-color); }
+.eval-bar-fill { background-color: #fbf7ec !important; }
+.eval-bar-label { color: var(--accent-crimson); }
+.eval-bar-label.black-lead { color: #f2ecdf; }
+.eval-bar-label.equal { background: rgba(31,27,20,.85); color: #f2ecdf; }
+
+/* ============================ PROGRESS / SYNC ============================= */
+.coverage-bar-track, .mastery-progress-track { background: var(--bg-dark) !important; border: 1px solid var(--border-color); }
+.coverage-bar-fill { background: linear-gradient(90deg, var(--accent-secondary), var(--accent-primary)) !important; }
+#trainSessionProgressBar { background: linear-gradient(90deg, var(--accent-secondary), var(--accent-primary)) !important; }
+.sync-progress-card {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border-color) !important;
+    border-left: 3px solid var(--accent-secondary) !important;
+    border-radius: 4px !important;
+    box-shadow: 0 1px 2px rgba(80,60,30,0.08);
+}
+.sync-pulse-dot { background: var(--accent-secondary) !important; box-shadow: none !important; }
+.sync-pct-badge { background: var(--accent-secondary) !important; color: #fff !important; border-radius: 2px; }
+.sync-pct-badge.completed { background: var(--accent-emerald) !important; }
+.sync-blunder-pill { color: var(--accent-crimson); border-color: rgba(178,48,48,.4); background: rgba(178,48,48,.08); border-radius: 2px; }
+.sync-progress-element { background-color: var(--bg-dark) !important; }
+.sync-progress-element::-webkit-progress-value { background: linear-gradient(90deg, var(--accent-secondary), var(--accent-primary)) !important; }
+.sync-progress-element::-moz-progress-bar { background: var(--accent-secondary) !important; }
+.mastery-seg-mastered { background: var(--accent-emerald) !important; }
+.mastery-seg-learning { background: var(--accent-amber) !important; }
+.mastery-seg-unlearned { background: var(--bg-dark) !important; }
+
+/* ============================ BREADCRUMBS / CHIPS ========================= */
+.breadcrumb-chip {
+    background: var(--bg-card-hover);
+    border: 1px solid var(--border-color);
+    border-radius: 2px;
+    color: var(--text-secondary);
+}
+.breadcrumb-chip:hover { color: var(--accent-primary); border-color: var(--border-accent); }
+.breadcrumb-chip.active { background: rgba(160,44,44,.08); color: var(--accent-primary); border-color: var(--accent-primary); }
+.breadcrumb-chip.blunder-step { color: var(--accent-crimson) !important; border-color: var(--accent-crimson) !important; background: rgba(178,48,48,.06) !important; }
+.breadcrumb-chip.theory-step { color: var(--accent-secondary) !important; border-bottom: 2px solid var(--accent-secondary); }
+
+/* ============================== GAPS / GAMES ============================== */
+.gap-item, .game-card {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border-color) !important;
+    border-left: 3px solid var(--accent-amber);
+    border-radius: 3px !important;
+}
+.gap-item:hover, .game-card:hover { border-color: var(--border-accent) !important; }
+.gap-item--unanswered { box-shadow: inset 3px 0 0 var(--accent-amber) !important; }
+.gap-item--missing { box-shadow: inset 3px 0 0 var(--accent-crimson) !important; }
+.critical-blunder-card { border-color: rgba(178,48,48,.5) !important; background: linear-gradient(180deg, rgba(178,48,48,.06), var(--bg-card)) !important; }
+.game-review-banner { background: var(--bg-card) !important; border-left: 3px solid var(--accent-secondary) !important; border-radius: 3px; }
+.badge-pill { color: var(--accent-secondary); border-color: rgba(31,78,140,.35); background: rgba(31,78,140,.08); }
+.game-outcome-pill.win { color: var(--accent-emerald); border:1px solid rgba(47,125,79,.4); background: rgba(47,125,79,.08); }
+.game-outcome-pill.loss { color: var(--accent-crimson); border:1px solid rgba(178,48,48,.4); background: rgba(178,48,48,.08); }
+.game-outcome-pill.draw { color: var(--text-secondary); border:1px solid var(--border-color); }
+
+/* ============================== TRAINER =================================== */
+.trainer-stats-strip { background: var(--bg-card) !important; border: 1px solid var(--border-color) !important; border-radius: 4px; }
+#trainPrompt { border-left: 3px solid var(--accent-primary) !important; }
+.feedback-box.correct { background: rgba(47,125,79,.08) !important; border-color: rgba(47,125,79,.4) !important; color: var(--accent-emerald); }
+.feedback-box.blunder { background: rgba(178,48,48,.08) !important; border-color: rgba(178,48,48,.4) !important; color: var(--accent-crimson); }
+.feedback-box.good_alternative { background: rgba(31,78,140,.08) !important; border-color: rgba(31,78,140,.4) !important; color: var(--accent-secondary); }
+.feedback-box.suboptimal { background: rgba(169,118,11,.08) !important; border-color: rgba(169,118,11,.4) !important; color: var(--accent-amber); }
+.trainer-reason-badge.badge-frontier { color: var(--accent-emerald); border:1px solid rgba(47,125,79,.4); background: rgba(47,125,79,.08); }
+.trainer-reason-badge.badge-due { color: var(--accent-amber); border:1px solid rgba(169,118,11,.4); background: rgba(169,118,11,.08); }
+.trainer-reason-badge.badge-lapse { color: var(--accent-crimson); border:1px solid rgba(178,48,48,.4); background: rgba(178,48,48,.08); }
+.trainer-reason-badge.badge-maintenance { color: var(--accent-secondary); border:1px solid rgba(31,78,140,.4); background: rgba(31,78,140,.08); }
+.blunder-banner-alert { background: var(--bg-card) !important; border:1px solid var(--border-color) !important; }
+.blunder-banner-alert.has-blunder { border-left-color: var(--accent-crimson) !important; }
+.blunder-banner-alert.has-solution { border-left-color: var(--accent-emerald) !important; }
+.blunder-banner-alert.has-info { border-left-color: var(--accent-secondary) !important; }
+.blunder-banner-text strong { color: var(--accent-crimson); }
+#trainDeviationBanner { background: var(--bg-card) !important; border-left: 3px solid var(--accent-crimson) !important; }
+#trainFocusBanner { background: rgba(31,78,140,.06) !important; border-color: rgba(31,78,140,.28) !important; }
+#trainImportantBadge { color: var(--accent-amber) !important; border-color: rgba(169,118,11,.4) !important; background: rgba(169,118,11,.08) !important; }
+
+/* Status strips — recolor only; never touch their locked 22px heights */
+.rep-status-strip .rep-status-text { color: var(--text-secondary); }
+.rep-status-strip.is-live .rep-status-text { color: var(--accent-secondary); }
+.rep-status-strip.is-idle .rep-status-text { color: var(--text-muted); }
+
+/* ================================ SCOUT =================================== */
+.scout-search-panel { background: var(--bg-card) !important; border:1px solid var(--border-color) !important; }
+.scout-input-wrapper { background: var(--bg-card-hover) !important; border: 1px solid var(--border-color) !important; border-radius: 3px; }
+.scout-input-wrapper:focus-within { border-color: var(--accent-secondary) !important; box-shadow: 0 0 0 2px rgba(31,78,140,.15) !important; }
+.scout-input { color: var(--text-primary); }
+.scout-status-strip { background: rgba(31,78,140,.06) !important; border-left: 3px solid var(--accent-secondary) !important; color: var(--accent-secondary); border-radius: 2px; }
+.scout-suggest-box { background: var(--bg-card-hover) !important; border: 1px solid var(--border-color) !important; }
+.scout-suggest-item:hover { background: rgba(31,78,140,.08) !important; }
+.scout-suggest-eco { color: var(--accent-amber); }
+.scout-candidate-label, .scout-candidate-eco { color: var(--accent-amber); }
+.scout-candidate-chip { border:1px solid rgba(169,118,11,.3) !important; background: rgba(169,118,11,.06) !important; }
+.scout-studio-top-bar { background: var(--bg-card) !important; border:1px solid var(--border-color) !important; }
+.scout-card { background: var(--bg-card) !important; border: 1px solid var(--border-color) !important; border-radius: 4px; }
+.scout-card:hover { border-color: var(--border-accent) !important; box-shadow: 0 8px 20px -12px rgba(60,40,20,0.4) !important; transform: translateY(-1px); }
+.scout-card-title { color: var(--text-primary); font-family: var(--font-serif); }
+.scout-card-channel, .scout-card-desc, .scout-card-foot, .scout-card-stat { color: var(--text-secondary); }
+.scout-var-card, .scout-timeline-item { background: var(--bg-card-hover) !important; border:1px solid var(--border-color) !important; }
+.scout-timeline-item.active { border-left: 3px solid var(--accent-primary) !important; background: rgba(160,44,44,.06) !important; }
+.scout-card-thumb-icon { background: linear-gradient(135deg, var(--bg-dark), var(--bg-panel)); }
+.badge-eco { color: var(--accent-secondary); background: rgba(31,78,140,.08); font-family: var(--font-mono); }
+.scout-badge-youtube { color: var(--accent-crimson); border:1px solid rgba(178,48,48,.35); background: rgba(178,48,48,.07); }
+.scout-badge-guide { color: var(--accent-secondary); border:1px solid rgba(31,78,140,.35); background: rgba(31,78,140,.07); }
+.scout-overlap-badge.rep-present { color: var(--accent-emerald); border-color: rgba(47,125,79,.4); background: rgba(47,125,79,.07); }
+.scout-overlap-badge.rep-partial { color: var(--accent-amber); border-color: rgba(169,118,11,.4); background: rgba(169,118,11,.07); }
+.scout-overlap-badge.rep-new { color: var(--accent-secondary); border-color: rgba(31,78,140,.4); background: rgba(31,78,140,.07); }
+.scout-live-indicator, .scout-live-indicator.live { background: var(--accent-emerald) !important; box-shadow: none !important; }
+.scout-var-badge { color: var(--accent-secondary); border:1px solid rgba(31,78,140,.35); background: rgba(31,78,140,.08); font-family: var(--font-mono); }
+.scout-var-status { color: var(--accent-emerald); border:1px solid rgba(47,125,79,.3); background: rgba(47,125,79,.07); }
+.scout-badge-play { color: var(--accent-primary); border:1px solid rgba(160,44,44,.35); background: rgba(160,44,44,.07); }
+.scout-why-chip { color: var(--accent-secondary); border:1px solid rgba(31,78,140,.24); background: rgba(31,78,140,.06); }
+.scout-reply-san { color: var(--accent-emerald); }
+.scout-reply-chip { border:1px solid rgba(47,125,79,.3); background: rgba(47,125,79,.06); }
+.scout-loading-card .spinner { border-top-color: var(--accent-primary); }
+.scout-quick-rep-bar { background: var(--bg-card) !important; border-top: 1px solid var(--border-color); }
+.scout-tree-header { background: var(--bg-card) !important; border-bottom: 1px solid var(--border-color); }
+.scout-transcript-time, .scout-time-badge, .scout-move-san { color: var(--accent-primary); font-family: var(--font-mono); }
+
+/* ============================ MODALS / TOASTS ============================= */
+/* Repaint the modal + its bare inline-styled stat boxes onto paper */
+.scout-modal, .modal-content, #studySelectModal, #importRepertoireModal, #groupSubtreeModal {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 6px !important;
+    color: var(--text-primary);
+    box-shadow: 0 24px 50px -18px rgba(60, 40, 20, 0.5);
+}
+#trainSessionCompleteModal .card-panel { border: 2px solid var(--accent-primary) !important; }
+#trainSessionCompleteModal .card-panel [style*="background"],
+#importRepertoireModal [style*="background"]:not(select):not(input):not(textarea) {
+    background: var(--bg-card-hover) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+.scout-modal::backdrop, .modal-overlay.active { background: rgba(40, 30, 12, 0.35); backdrop-filter: blur(2px); }
+.scout-modal-header { border-bottom: 1px solid var(--border-color); }
+.scout-modal-header h3 { color: var(--text-primary); font-family: var(--font-serif); }
+
+.app-toast {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border-color) !important;
+    border-left: 3px solid var(--accent-primary) !important;
+    border-radius: 3px !important;
+    color: var(--text-primary);
+    font-family: var(--font-serif);
+    box-shadow: 0 8px 24px -10px rgba(60,40,20,0.4);
+}
+
+/* ================================ MISC ==================================== */
+.spinner { border-top-color: var(--accent-primary); }
+.active-important { color: var(--accent-amber) !important; border-color: rgba(169,118,11,.5) !important; background: rgba(169,118,11,.1) !important; }
+.board-kbd-hint-row kbd { background: var(--bg-card-hover); border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: 2px; font-family: var(--font-mono); }
+.sync-detail-value.mono, .gaps-section-sub { font-family: var(--font-mono); }
+
+/* ===================== LEGIBILITY & CONTRAST (WCAG AA) ====================
+   On warm paper, the base theme's light-tinted badge labels (light-green /
+   sky text on a cream wash) drop to ~2:1 and become hard to read. Recoloured
+   to dark ink-on-tint variants (all >=4.5:1). Guidance: white on #1E293B ~12.6:1,
+   white on #0284C7 ~4.8:1; light tints need DARK text.                       */
+
+/* Master Win % bar: centre the segment % labels and give them room so they no
+   longer sit on the border / look clipped. */
+.winrate-bar-wrap { height: 18px; line-height: 18px; font-size: 0.68rem; }
+.wr-white, .wr-draw, .wr-black {
+    display: flex; align-items: center; justify-content: center; line-height: 1;
+}
+
+/* In-tree / in-repertoire indicators (★ Your Move / ✓ In Tree). */
+.badge-in-tree  { color: #235c3a; border: 1px solid rgba(35,92,58,.45); background: rgba(35,92,58,.10); }
+.badge-opp-tree { color: #1f4e8c; border: 1px solid rgba(31,78,140,.45); background: rgba(31,78,140,.10); }
+
+/* Personal-stats pills (threat / neutral / win). */
+.my-stat-badge.win     { color: #235c3a; border: 1px solid rgba(35,92,58,.4);  background: rgba(35,92,58,.09); }
+.my-stat-badge.neutral { color: #8a5b06; border: 1px solid rgba(138,91,6,.4);  background: rgba(138,91,6,.09); }
+.my-stat-badge.threat  { color: #a52a2a; border: 1px solid rgba(165,42,42,.4); background: rgba(165,42,42,.09); }
+
+/* Generic theme badges that could appear on cream. */
+.badge-mastered { color:#235c3a; border:1px solid rgba(35,92,58,.4);  background: rgba(35,92,58,.09); }
+.badge-blunder  { color:#a52a2a; border:1px solid rgba(165,42,42,.4); background: rgba(165,42,42,.09); }
+.badge-mistake  { color:#8a5b06; border:1px solid rgba(138,91,6,.4);  background: rgba(138,91,6,.09); }
+
+/* A clearer boundary on outline buttons (~3:1 vs paper) so they read as controls. */
+.btn-secondary { border-color: #c6b691; }
+.btn-secondary:hover { border-color: var(--accent-secondary); }
+
+/* ---- Scout intent buttons ("I PLAY"/"I WANT"): bigger + readable --------- */
+.scout-intent-group { align-items: center; min-height: 38px; }
+.scout-intent-btn { min-width: 108px; min-height: 38px; padding: 0.5rem 0.9rem; font-size: 0.82rem; }
+.scout-intent-group--sort .scout-intent-btn { min-width: 116px; }
+.scout-intent-btn.active {
+    background: var(--accent-primary) !important; color: #fdf6ec !important; border-color: var(--accent-primary) !important;
+    box-shadow: 0 1px 0 rgba(0,0,0,.06);
+}
+/* Keep the active pill's text crisp even on hover. */
+.scout-intent-btn.active:hover { color: #fff !important; }

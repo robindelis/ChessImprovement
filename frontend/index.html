@@ -5,6 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chess Repertoire Studio</title>
     <link rel="stylesheet" href="/style.css?v=20260926_1">
+    <!-- DEFAULT LOOK: "Vellum & Ink" editorial reskin. Loaded AFTER the base so it
+         outranks the palette; same-origin CSS -> allowed by style-src 'self'. -->
+    <link rel="stylesheet" href="/themes/editorial.css?v=20261012_2">
+    <!-- CONSOLE LAYOUT: permanent power-user shell (left grouped sidebar + dense
+         multi-pane workspaces). Loaded AFTER editorial.css. Same-origin -> style-src 'self'. -->
+    <link rel="stylesheet" href="/workflows/workflow.css?v=20261012_3">
     <script src="/vendor/chess.min.js"></script>
     <script src="/audio.js?v=20260924_2"></script>
     <script src="/board.js?v=20260926_1"></script>
@@ -20,13 +26,6 @@
             <div>Chess<span>Repertoire</span>Studio</div>
         </div>
 
-        <nav class="nav-tabs">
-            <button class="nav-tab active" data-tab="repertoire">Repertoire Builder</button>
-            <button class="nav-tab" data-tab="rep-trainer">Repertoire Trainer</button>
-            <button class="nav-tab" data-tab="scout">Opening Scout</button>
-            <button class="nav-tab" data-tab="settings">Settings</button>
-        </nav>
-
         <div class="header-actions">
             <div id="userBadge" class="user-badge" style="display:none;" title="Connected Lichess Account">
                 <span class="user-badge-online-dot" aria-hidden="true"></span>
@@ -35,6 +34,25 @@
             </div>
         </div>
     </header>
+
+    <!-- CONSOLE: single left grouped sidebar. app.js binds every `.nav-tab` by
+         data-tab; the four views are unchanged. -->
+    <nav class="wf-nav wf-nav--side" aria-label="Sidebar">
+        <div class="wf-group">
+            <div class="wf-group-label">Prepare</div>
+            <button class="nav-tab active" data-tab="repertoire"><span class="wf-ico">🌳</span> Repertoire Builder</button>
+            <button class="nav-tab" data-tab="scout"><span class="wf-ico">🔭</span> Opening Scout</button>
+        </div>
+        <div class="wf-group">
+            <div class="wf-group-label">Practice</div>
+            <button class="nav-tab" data-tab="rep-trainer"><span class="wf-ico">🎯</span> Trainer</button>
+        </div>
+        <div class="wf-group">
+            <div class="wf-group-label">System</div>
+            <button class="nav-tab" data-tab="settings"><span class="wf-ico">⚙️</span> Settings</button>
+        </div>
+        <div class="wf-brand-foot">Vellum &amp; Ink · Console</div>
+    </nav>
 
     <main>
         <!-- REPERTOIRE BUILDER VIEW (CHESSBOOK STYLE) -->
@@ -223,44 +241,8 @@
                         <span><kbd>&darr;</kbd>/<kbd>j</kbd> End</span>
                         <span>💡 Right-click drag for arrows</span>
                     </div>
-                </div>
 
-                <!-- Right: Database Moves, Line/Move Inspector & Gaps -->
-                <div class="repertoire-sidebar-col">
-                    <!-- 2000+ Online Database Table -->
-                    <div class="card-panel repertoire-sidebar-card" id="repExplorerCard" style="margin-bottom:0;">
-                        <div class="panel-header" style="padding-bottom:0.35rem; margin-bottom:0.35rem;">
-                            <div style="display:flex; align-items:baseline; gap:0.6rem; flex-wrap:wrap;">
-                                <div class="panel-title" style="font-size:0.9rem;">2000+ Online Database</div>
-                                <div id="repTurnIndicator" style="font-size:0.74rem; color:var(--text-secondary);">
-                                    Loading database...
-                                </div>
-                            </div>
-                            <div id="repDbStats" style="font-size:0.75rem; font-weight:600; color:var(--text-muted);">
-                                - games
-                            </div>
-                        </div>
-
-                        <div class="explorer-table-wrap">
-                            <table class="explorer-table">
-                                <thead>
-                                    <tr>
-                                        <th id="thSortMove" class="sortable-th" title="Sort by Move">Move</th>
-                                        <th id="thSortMaster" class="sortable-th" title="Sort by Master 2000+ Popularity">Master (2000+)</th>
-                                        <th>Master Win %</th>
-                                        <th id="thSortMyStats" class="sortable-th active-sort" title="Sort by Personal Game Frequency &amp; Threat Score">My Stats <span class="sort-arrow">▾</span></th>
-                                        <th id="thSortEval" class="sortable-th" title="Stockfish Evaluation (+ White advantage, - Black advantage)">Eval</th>
-                                        <th>Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="repExplorerTbody">
-                                    <tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:0.75rem;">Loading 2000+ moves...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <!-- Compact Move & Line Inspector Dock (Relocated from under board to eliminate vertical scroll) -->
+                    <!-- Move & Line Inspector Dock (Console: kept under the board) -->
                     <div class="rep-inspector-dock">
                         <!-- Quick Whole-Line Import & Explored Tree Control Bar -->
                         <div class="rep-line-actions-bar">
@@ -300,6 +282,42 @@
                                 </div>
                             </div>
                             <textarea id="repMoveComment" placeholder="Write move notes, plans, or key ideas (shown in Trainer)..." rows="1" class="rep-move-comment-input"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: Database Moves, Line/Move Inspector & Gaps -->
+                <div class="repertoire-sidebar-col">
+                    <!-- 2000+ Online Database Table -->
+                    <div class="card-panel repertoire-sidebar-card" id="repExplorerCard" style="margin-bottom:0;">
+                        <div class="panel-header" style="padding-bottom:0.35rem; margin-bottom:0.35rem;">
+                            <div style="display:flex; align-items:baseline; gap:0.6rem; flex-wrap:wrap;">
+                                <div class="panel-title" style="font-size:0.9rem;">2000+ Online Database</div>
+                                <div id="repTurnIndicator" style="font-size:0.74rem; color:var(--text-secondary);">
+                                    Loading database...
+                                </div>
+                            </div>
+                            <div id="repDbStats" style="font-size:0.75rem; font-weight:600; color:var(--text-muted);">
+                                - games
+                            </div>
+                        </div>
+
+                        <div class="explorer-table-wrap">
+                            <table class="explorer-table">
+                                <thead>
+                                    <tr>
+                                        <th id="thSortMove" class="sortable-th" title="Sort by Move">Move</th>
+                                        <th id="thSortMaster" class="sortable-th" title="Sort by Master 2000+ Popularity">Master (2000+)</th>
+                                        <th>Master Win %</th>
+                                        <th id="thSortMyStats" class="sortable-th active-sort" title="Sort by Personal Game Frequency &amp; Threat Score">My Stats <span class="sort-arrow">▾</span></th>
+                                        <th id="thSortEval" class="sortable-th" title="Stockfish Evaluation (+ White advantage, - Black advantage)">Eval</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="repExplorerTbody">
+                                    <tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:0.75rem;">Loading 2000+ moves...</td></tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
 
