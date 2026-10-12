@@ -438,7 +438,7 @@ function scoutEcoGuideMarkup(guide) {
             <div class="scout-card-body">
                 <div class="scout-card-meta">
                     <span class="scout-badge-guide">Master Guide</span>
-                    ${g.eco ? safeHtml`<span class="badge-eco">${g.eco}</span>` : ''}
+                    ${g.eco ? rawHtml(`<span class="badge-eco">${escapeHtml(g.eco)}</span>`) : ''}
                     <span class="scout-perspective scout-perspective--theory">${side}</span>
                 </div>
                 <div class="scout-card-title" title="${g.label || g.title || ''}">${g.label || g.title || 'Theory line'}</div>
