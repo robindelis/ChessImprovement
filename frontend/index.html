@@ -51,6 +51,24 @@
             <div class="wf-group-label">System</div>
             <button class="nav-tab" data-tab="settings"><span class="wf-ico">⚙️</span> Settings</button>
         </div>
+
+        <!-- Glanceable Telemetry Widget: Reclaims sidebar empty space -->
+        <div class="wf-quick-stats" id="wfQuickStats">
+            <div class="wf-quick-stats-title">Repertoire Overview</div>
+            <div class="wf-stat-item">
+                <span class="wf-stat-label">Stockfish 19</span>
+                <span class="wf-stat-val" style="color:var(--accent-emerald);">Ready</span>
+            </div>
+            <div class="wf-stat-item">
+                <span class="wf-stat-label">Coverage</span>
+                <span class="wf-stat-val" id="railCoverageVal">--%</span>
+            </div>
+            <div class="wf-stat-item">
+                <span class="wf-stat-label">Mode</span>
+                <span class="wf-stat-val">2000+ Master</span>
+            </div>
+        </div>
+
         <div class="wf-brand-foot">Vellum &amp; Ink · Console</div>
     </nav>
 
@@ -72,9 +90,9 @@
                         </button>
                     </div>
 
-                    <div class="study-selector-wrap" style="display:flex; align-items:center; gap:0.5rem; background:rgba(30, 41, 59, 0.7); padding:0.3rem 0.6rem; border-radius:8px; border:1px solid #334155;">
-                        <span style="font-size:0.8rem; font-weight:700; color:#38bdf8;">STUDY:</span>
-                        <select id="builderStudySelect" style="padding:0.25rem 0.5rem; border-radius:5px; background:#0f172a; color:#fff; border:1px solid #475569; font-size:0.85rem; max-width:200px;">
+                    <div class="study-selector-wrap" style="display:flex; align-items:center; gap:0.5rem; padding:0.3rem 0.6rem; border-radius:8px;">
+                        <span style="font-size:0.8rem; font-weight:700; color:var(--accent-secondary);">STUDY:</span>
+                        <select id="builderStudySelect" style="padding:0.25rem 0.5rem; border-radius:5px; font-size:0.85rem; max-width:200px;">
                             <option value="">(All Studies)</option>
                         </select>
                         <button id="btnNewStudy" type="button" class="btn-secondary" style="font-size:0.75rem; padding:0.25rem 0.5rem;" title="Create a new study">+ New</button>
@@ -84,7 +102,7 @@
                     </div>
 
                     <div class="rep-header-title-box">
-                        <span id="repOpeningTitle" style="font-weight:700; font-size:1.1rem; color:#fff;">Italian Game</span>
+                        <span id="repOpeningTitle" style="font-weight:700; font-size:1.1rem; color:var(--text-primary);">Italian Game</span>
                         <span id="repOpeningEco" style="font-size:0.8rem; color:var(--text-secondary);">Start Position</span>
                     </div>
                 </div>
@@ -93,7 +111,7 @@
                     <div class="coverage-gauge">
                         <div class="coverage-gauge-header">
                             <span>2000+ Coverage</span>
-                            <span id="repCoveragePct" style="color:#38bdf8; font-weight:700;">--%</span>
+                            <span id="repCoveragePct" style="color:var(--accent-secondary); font-weight:700;">--%</span>
                         </div>
                         <div class="coverage-bar-track">
                             <div id="repCoverageFill" class="coverage-bar-fill" style="width:0%;"></div>
@@ -226,7 +244,7 @@
                                     title="Draw Stockfish's best line on the board. Right-click a square to mark it, drag right-click to draw an arrow, left-click an empty square to clear everything.">Engine Line</button>
                             <button id="btnRepFlip" class="btn-secondary">Flip</button>
                             <button id="btnRepReset" class="btn-secondary">Reset</button>
-                            <div class="board-size-control-group" style="display:inline-flex; align-items:center; gap:2px; margin-left:0.15rem; background:rgba(19, 22, 31, 0.85); border:1px solid var(--border-color); border-radius:4px; padding:2px 4px;">
+                            <div class="board-size-control-group" style="display:inline-flex; align-items:center; gap:2px; margin-left:0.15rem; background:var(--bg-card-hover); border:1px solid var(--border-color); border-radius:4px; padding:2px 4px;">
                                 <button type="button" class="btn-board-size btn-board-size-dec" title="Decrease board size">−</button>
                                 <span id="repBoardSizeLabel" class="board-size-display-val" style="font-size:0.75rem; color:var(--text-muted); font-family:monospace; min-width:44px; text-align:center;">---</span>
                                 <button type="button" class="btn-board-size btn-board-size-inc" title="Increase board size">+</button>
@@ -266,9 +284,9 @@
                         <div id="repMoveToolsPanel" class="card-panel rep-move-tools-compact">
                             <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.35rem; margin-bottom:0.3rem;">
                                 <div style="display:flex; align-items:center; gap:0.4rem;">
-                                    <span id="repMoveToolSan" style="font-weight:700; font-size:0.88rem; color:#fff;">Starting Position</span>
+                                    <span id="repMoveToolSan" style="font-weight:700; font-size:0.88rem; color:var(--text-primary);">Starting Position</span>
                                     <span id="repMoveToolType" style="font-size:0.72rem; color:var(--text-muted);">(Root)</span>
-                                    <span id="repCommentSaveStatus" style="font-size:0.7rem; color:#4ade80; opacity:0; transition:opacity 0.2s ease;">Saved ✓</span>
+                                    <span id="repCommentSaveStatus" style="font-size:0.7rem; color:var(--accent-emerald); opacity:0; transition:opacity 0.2s ease;">Saved ✓</span>
                                 </div>
                                 <div style="display:flex; gap:0.3rem; align-items:center;">
                                     <span id="repArrowsCount" style="font-size:0.72rem; color:var(--text-secondary);">0 arrows</span>
@@ -389,7 +407,7 @@
                         <!-- Recent Games View Container -->
                         <div id="repGamesContainer" style="display:none; flex-direction:column; flex:1; min-height:0; overflow:hidden;">
                             <div style="display:flex; align-items:center; gap:0.4rem; margin-bottom:0.35rem; padding:0 0.1rem;">
-                                <input type="text" id="repGamesSearchInput" placeholder="Search opponent or opening..." style="flex:1; background:rgba(12,14,19,0.75); border:1px solid var(--border-color); border-radius:4px; color:var(--text-primary); font-size:0.75rem; padding:0.25rem 0.5rem;">
+                                <input type="text" id="repGamesSearchInput" placeholder="Search opponent or opening..." style="flex:1; background:var(--bg-card-hover); border:1px solid var(--border-color); border-radius:4px; color:var(--text-primary); font-size:0.75rem; padding:0.25rem 0.5rem;">
                             </div>
                             <div id="repGamesList" class="rep-games-list" style="flex:1; overflow-y:auto; padding:0.2rem 0.1rem;">
                                 <div style="text-align:center; color:var(--text-muted); padding:0.75rem;">Loading recent games...</div>
@@ -439,7 +457,7 @@
                     <!-- Opening Focus Selector -->
                     <div style="display:flex; align-items:center; gap:0.35rem;">
                         <label for="trainOpeningFilter" style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">Focus:</label>
-                        <select id="trainOpeningFilter" class="trainer-focus-select" style="font-size:0.78rem; padding:0.25rem 0.5rem; background:var(--bg-card); color:#fff; border:1px solid var(--border-color); border-radius:6px; max-width:200px;">
+                        <select id="trainOpeningFilter" class="trainer-focus-select" style="font-size:0.78rem; padding:0.25rem 0.5rem; border:1px solid var(--border-color); border-radius:6px; max-width:200px;">
                             <option value="">All Openings</option>
                         </select>
                     </div>
@@ -447,7 +465,7 @@
                     <!-- Training Curriculum Mode -->
                     <div style="display:flex; align-items:center; gap:0.35rem;">
                         <label for="trainModeSelect" style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">Mode:</label>
-                        <select id="trainModeSelect" class="trainer-focus-select" style="font-size:0.78rem; padding:0.25rem 0.5rem; background:var(--bg-card); color:#fff; border:1px solid var(--border-color); border-radius:6px;">
+                        <select id="trainModeSelect" class="trainer-focus-select" style="font-size:0.78rem; padding:0.25rem 0.5rem; border:1px solid var(--border-color); border-radius:6px;">
                             <option value="adaptive">🧠 Adaptive</option>
                             <option value="frontier_only">🌱 New Lines</option>
                             <option value="due_only">⏰ Due Reviews</option>
@@ -461,11 +479,11 @@
 
                 <div class="trainer-stats-strip" style="padding:0.2rem 0.55rem; gap:0.85rem;">
                     <div class="trainer-stat">
-                        <div id="trainStatStreak" class="trainer-stat-val" style="color:#4ade80; font-size:0.95rem;">0</div>
+                        <div id="trainStatStreak" class="trainer-stat-val" style="color:var(--accent-emerald); font-size:0.95rem;">0</div>
                         <div class="trainer-stat-lbl" style="font-size:0.65rem;">Streak</div>
                     </div>
                     <div class="trainer-stat">
-                        <div id="trainStatAccuracy" class="trainer-stat-val" style="color:#38bdf8; font-size:0.95rem;">100%</div>
+                        <div id="trainStatAccuracy" class="trainer-stat-val" style="color:var(--accent-secondary); font-size:0.95rem;">100%</div>
                         <div class="trainer-stat-lbl" style="font-size:0.65rem;">Accuracy</div>
                     </div>
                     <div class="trainer-stat">
@@ -498,7 +516,7 @@
                             <div style="display:flex; gap:0.5rem; align-items:center;">
                                 <button id="btnTrainFlip" class="btn-secondary">Flip</button>
                                 <button id="btnTrainRetry" class="btn-secondary">Try Again</button>
-                                <div class="board-size-control-group" style="display:inline-flex; align-items:center; gap:2px; margin-left:0.25rem; background:rgba(19, 22, 31, 0.85); border:1px solid var(--border-color); border-radius:4px; padding:2px 4px;">
+                                <div class="board-size-control-group" style="display:inline-flex; align-items:center; gap:2px; margin-left:0.25rem; background:var(--bg-card-hover); border:1px solid var(--border-color); border-radius:4px; padding:2px 4px;">
                                     <button type="button" class="btn-board-size btn-board-size-dec" title="Decrease board size">−</button>
                                     <span id="trainBoardSizeLabel" class="board-size-display-val" style="font-size:0.75rem; color:var(--text-muted); font-family:monospace; min-width:44px; text-align:center;">---</span>
                                     <button type="button" class="btn-board-size btn-board-size-inc" title="Increase board size">+</button>
@@ -514,11 +532,11 @@
                         <div class="trainer-session-strip card-panel" style="margin-bottom:0;">
                             <div style="display:flex; align-items:center; gap:0.6rem; flex:1; min-width:200px;">
                                 <div style="display:flex; align-items:center; gap:0.35rem; white-space:nowrap;">
-                                    <span style="font-size:0.82rem; font-weight:700; color:#fff;">🎯 Session:</span>
-                                    <span id="trainSessionMoveLabel" style="font-size:0.82rem; font-weight:800; color:#38bdf8;">Move 1 of 20</span>
+                                    <span style="font-size:0.82rem; font-weight:700; color:var(--text-primary);">🎯 Session:</span>
+                                    <span id="trainSessionMoveLabel" style="font-size:0.82rem; font-weight:800; color:var(--accent-secondary);">Move 1 of 20</span>
                                 </div>
-                                <div style="flex:1; max-width:180px; height:7px; border-radius:4px; background:rgba(30, 41, 59, 0.9); border:1px solid rgba(51, 65, 85, 0.6); overflow:hidden;">
-                                    <div id="trainSessionProgressBar" style="width:5%; height:100%; background:linear-gradient(90deg, #38bdf8, #818cf8); transition:width 0.3s ease;"></div>
+                                <div style="flex:1; max-width:180px; height:7px; border-radius:4px; background:var(--bg-dark); border:1px solid var(--border-color); overflow:hidden;">
+                                    <div id="trainSessionProgressBar" style="width:5%; height:100%; background:linear-gradient(90deg, var(--accent-secondary), var(--accent-primary)); transition:width 0.3s ease;"></div>
                                 </div>
                             </div>
                             <div style="display:flex; align-items:center; gap:0.85rem;">
@@ -532,27 +550,27 @@
                         </div>
 
                         <!-- Game Deviation Interactive Context Banner (Visible when practicing real game deviations) -->
-                        <div id="trainDeviationBanner" class="card-panel" style="display:none; margin-bottom:0; padding:0.65rem 0.85rem; background:rgba(15,23,42,0.85); border:1px solid rgba(239,68,68,0.35); border-left:4px solid #ef4444; border-radius:8px;">
+                        <div id="trainDeviationBanner" class="card-panel" style="display:none; margin-bottom:0; padding:0.65rem 0.85rem; border:1px solid rgba(160,44,44,0.35); border-left:4px solid var(--accent-primary); border-radius:8px;">
                             <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
                                 <div style="display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap;">
                                     <span style="font-size:1.15rem;">⚠️</span>
                                     <div>
-                                        <div style="font-weight:700; font-size:0.88rem; color:#fff; display:flex; align-items:center; gap:0.4rem; flex-wrap:wrap;">
+                                        <div style="font-weight:700; font-size:0.88rem; color:var(--text-primary); display:flex; align-items:center; gap:0.4rem; flex-wrap:wrap;">
                                             <span>vs <span id="devBannerOpponent">Opponent</span></span>
                                             <span id="devBannerRating" style="color:var(--text-muted); font-size:0.75rem; font-weight:normal;"></span>
-                                            <span id="devBannerSpeed" class="badge-pill" style="font-size:0.65rem; text-transform:uppercase; background:rgba(56,189,248,0.15); color:#38bdf8;">RAPID</span>
+                                            <span id="devBannerSpeed" class="badge-pill" style="font-size:0.65rem; text-transform:uppercase;">RAPID</span>
                                             <span id="devBannerResult" class="game-outcome-pill loss" style="font-size:0.65rem;">LOSS</span>
                                         </div>
                                         <div style="font-size:0.74rem; color:var(--text-secondary); margin-top:1px;">
-                                            Departed on <strong style="color:#f8fafc;">Move <span id="devBannerMoveNum">1</span></strong> <span id="devBannerDate" style="color:var(--text-muted); font-size:0.72rem;"></span>
+                                            Departed on <strong>Move <span id="devBannerMoveNum">1</span></strong> <span id="devBannerDate" style="color:var(--text-muted); font-size:0.72rem;"></span>
                                         </div>
                                     </div>
                                     <div style="display:flex; align-items:center; gap:0.35rem; margin-left:0.25rem;">
-                                        <span class="badge-pill" style="background:rgba(239,68,68,0.18); border:1px solid rgba(239,68,68,0.4); color:#f87171; font-size:0.74rem; padding:0.18rem 0.5rem; font-weight:700;">
+                                        <span class="badge-pill" style="color:var(--accent-crimson); font-size:0.74rem; padding:0.18rem 0.5rem; font-weight:700;">
                                             In game: <span id="devBannerPlayedSan">...</span>
                                         </span>
                                         <span style="color:var(--text-muted); font-size:0.75rem;">➔</span>
-                                        <span class="badge-pill" style="background:rgba(34,197,94,0.15); border:1px solid rgba(34,197,94,0.35); color:#4ade80; font-size:0.74rem; padding:0.18rem 0.5rem; font-weight:700;">
+                                        <span class="badge-pill" style="color:var(--accent-emerald); font-size:0.74rem; padding:0.18rem 0.5rem; font-weight:700;">
                                             Prepared: <span id="devBannerPreparedSan">???</span>
                                         </span>
                                     </div>
@@ -562,9 +580,9 @@
                                     <a id="devBannerGameLink" href="#" target="_blank" rel="noopener noreferrer" class="btn-secondary" style="font-size:0.72rem; padding:0.2rem 0.5rem; text-decoration:none;" title="Open game on Lichess">
                                         ↗ Lichess
                                     </a>
-                                    <div style="display:inline-flex; align-items:center; gap:0.25rem; background:rgba(30,41,59,0.85); border:1px solid var(--border-color); border-radius:6px; padding:2px 5px;">
+                                    <div style="display:inline-flex; align-items:center; gap:0.25rem; background:var(--bg-card-hover); border:1px solid var(--border-color); border-radius:6px; padding:2px 5px;">
                                         <button id="btnDevPrev" class="btn-secondary" style="font-size:0.72rem; padding:0.15rem 0.4rem; border:none; cursor:pointer;" title="Previous deviation">◀ Prev</button>
-                                        <span id="devBannerCount" style="font-size:0.75rem; font-weight:700; color:#38bdf8; min-width:70px; text-align:center;">1 of 50</span>
+                                        <span id="devBannerCount" style="font-size:0.75rem; font-weight:700; color:var(--accent-secondary); min-width:70px; text-align:center;">1 of 50</span>
                                         <button id="btnDevNext" class="btn-secondary" style="font-size:0.72rem; padding:0.15rem 0.4rem; border:none; cursor:pointer;" title="Next deviation">Next ▶</button>
                                     </div>
                                 </div>
@@ -573,8 +591,8 @@
 
                         <!-- AGENTS.md 8.5: constant-height status strip, permanently in flow.
                              `visibility` (not `display`) so the sidebar below never reflows. -->
-                        <div id="trainFocusBanner" style="visibility:hidden; display:flex; min-height:34px; box-sizing:border-box; background:rgba(56, 189, 248, 0.12); border:1px solid rgba(56, 189, 248, 0.3); border-radius:6px; padding:0.4rem 0.75rem; justify-content:space-between; align-items:center;">
-                            <span style="font-size:0.8rem; color:#38bdf8; font-weight:600;">
+                        <div id="trainFocusBanner" style="visibility:hidden; display:flex; min-height:34px; box-sizing:border-box; border-radius:6px; padding:0.4rem 0.75rem; justify-content:space-between; align-items:center;">
+                            <span style="font-size:0.8rem; color:var(--accent-secondary); font-weight:600;">
                                 🎯 Focus: <span id="trainFocusName">Opening Name</span>
                             </span>
                             <button id="btnClearTrainFocus" class="btn-secondary" style="font-size:0.72rem; padding:0.15rem 0.45rem;">
@@ -590,11 +608,11 @@
                                 </div>
                                 <!-- AGENTS.md 8.4: fixed 132px box + visibility, so the wrapping
                                      drill header cannot reflow when the badge appears. -->
-                                <span id="trainImportantBadge" style="visibility:hidden; display:inline-flex; min-width:132px; justify-content:center; background:rgba(245, 158, 11, 0.15); border:1px solid rgba(245, 158, 11, 0.4); color:#fbbf24; padding:0.25rem 0.6rem; border-radius:4px; font-weight:700; font-size:0.75rem; align-items:center; gap:0.3rem;">⭐ Key Priority Move</span>
+                                <span id="trainImportantBadge" style="visibility:hidden; display:inline-flex; min-width:132px; justify-content:center; color:var(--accent-amber); padding:0.25rem 0.6rem; border-radius:4px; font-weight:700; font-size:0.75rem; align-items:center; gap:0.3rem;">⭐ Key Priority Move</span>
                             </div>
                         </div>
 
-                        <div id="trainPrompt" style="background:rgba(12, 14, 19, 0.75); padding:0.7rem 0.9rem; border-radius:6px; border-left:4px solid var(--accent-primary);">
+                        <div id="trainPrompt" style="padding:0.7rem 0.9rem; border-radius:6px; border-left:4px solid var(--accent-primary);">
                             <div style="font-weight:600; font-size:0.95rem; margin-bottom:0.15rem;">
                                 Your turn as <span id="trainColorSpan" style="text-transform:capitalize;">White</span>
                             </div>
@@ -606,7 +624,7 @@
                         <!-- Move Notes & Ideas Callout in Trainer -->
                         <!-- AGENTS.md 8.5 + 8.2: constant height box, text clamped (full note in `title`).
                              `visibility` not `display`, so the feedback box below never moves. -->
-                        <div id="trainNoteBox" style="visibility:hidden; min-height:54px; max-height:54px; overflow:hidden; background:rgba(24, 28, 38, 0.85); border:1px solid rgba(212, 168, 83, 0.25); border-left:3px solid var(--accent-primary); padding:0.45rem 0.75rem; border-radius:6px; font-size:0.82rem; color:var(--text-primary);">
+                        <div id="trainNoteBox" style="visibility:hidden; min-height:54px; max-height:54px; overflow:hidden; border-left:3px solid var(--accent-primary); padding:0.45rem 0.75rem; border-radius:6px; font-size:0.82rem; color:var(--text-primary);">
                             <div style="font-size:0.68rem; color:var(--accent-primary); font-weight:700; text-transform:uppercase; margin-bottom:0.15rem;">📝 Move Note / Idea:</div>
                             <div id="trainNoteContent" style="display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; max-width:100%; white-space:normal; overflow:hidden; text-overflow:ellipsis; line-height:1.3;"></div>
                         </div>
@@ -617,12 +635,12 @@
                         <div class="trainer-mastery-card card-panel" style="margin-bottom:0; padding:0.75rem 1rem;">
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem; flex-wrap:wrap; gap:0.4rem;">
                                 <div style="display:flex; align-items:center; gap:0.45rem;">
-                                    <span style="font-weight:700; font-size:0.88rem; color:#fff;">Repertoire Mastery</span>
-                                    <span id="trainScopeBadge" style="font-size:0.72rem; color:#38bdf8; background:rgba(56, 189, 248, 0.12); border:1px solid rgba(56, 189, 248, 0.3); padding:0.1rem 0.45rem; border-radius:4px; font-weight:600;">All Studies</span>
+                                    <span style="font-weight:700; font-size:0.88rem; color:var(--text-primary);">Repertoire Mastery</span>
+                                    <span id="trainScopeBadge" style="font-size:0.72rem; color:var(--accent-secondary); padding:0.1rem 0.45rem; border-radius:4px; font-weight:600;">All Studies</span>
                                 </div>
                                 <div style="display:flex; align-items:center; gap:0.6rem; font-size:0.8rem;">
                                     <span style="color:var(--text-muted);">Mastered:</span>
-                                    <span id="trainMasteredHeadline" style="font-weight:800; font-size:0.95rem; color:#4ade80;">0%</span>
+                                    <span id="trainMasteredHeadline" style="font-weight:800; font-size:0.95rem; color:var(--accent-emerald);">0%</span>
                                 </div>
                             </div>
 
@@ -637,21 +655,21 @@
                             <div class="mastery-legend-row" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; font-size:0.75rem;">
                                 <div style="display:flex; align-items:center; gap:0.8rem; flex-wrap:wrap;">
                                     <div style="display:flex; align-items:center; gap:0.3rem;" title="Mastered: Correct on spaced repetition with zero errors">
-                                        <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#22c55e;"></span>
-                                        <span style="color:#f8fafc; font-weight:600;">Mastered:</span>
-                                        <span id="trainMasteredCount" style="color:#4ade80; font-weight:700;">0</span>
+                                        <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--accent-emerald);"></span>
+                                        <span style="color:var(--text-secondary); font-weight:600;">Mastered:</span>
+                                        <span id="trainMasteredCount" style="color:var(--accent-emerald); font-weight:700;">0</span>
                                         <span id="trainMasteredPct" style="color:var(--text-muted);">(0%)</span>
                                     </div>
                                     <div style="display:flex; align-items:center; gap:0.3rem;" title="Learning: Move played correctly but still in spaced repetition process">
-                                        <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#f59e0b;"></span>
-                                        <span style="color:#f8fafc; font-weight:600;">Learning:</span>
-                                        <span id="trainLearningCount" style="color:#fbbf24; font-weight:700;">0</span>
+                                        <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--accent-amber);"></span>
+                                        <span style="color:var(--text-secondary); font-weight:600;">Learning:</span>
+                                        <span id="trainLearningCount" style="color:var(--accent-amber); font-weight:700;">0</span>
                                         <span id="trainLearningPct" style="color:var(--text-muted);">(0%)</span>
                                     </div>
                                     <div style="display:flex; align-items:center; gap:0.3rem;" title="Unlearned: Not yet trained or not mastered">
-                                        <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#64748b;"></span>
-                                        <span style="color:#f8fafc; font-weight:600;">Unlearned:</span>
-                                        <span id="trainUnlearnedCount" style="color:#94a3b8; font-weight:700;">0</span>
+                                        <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--text-muted);"></span>
+                                        <span style="color:var(--text-secondary); font-weight:600;">Unlearned:</span>
+                                        <span id="trainUnlearnedCount" style="color:var(--text-muted); font-weight:700;">0</span>
                                         <span id="trainUnlearnedPct" style="color:var(--text-muted);">(100%)</span>
                                     </div>
                                 </div>
@@ -674,25 +692,25 @@
                 <div id="trainSessionCompleteModal" class="modal-overlay" style="display:none;">
                     <div class="card-panel" style="max-width:440px; width:90%; padding:1.75rem; text-align:center; background:#0f172a; border:2px solid #38bdf8; border-radius:12px; box-shadow:0 12px 36px rgba(0,0,0,0.8);">
                         <div id="modalSessionIcon" style="font-size:2.5rem; margin-bottom:0.5rem;">🎉</div>
-                        <h3 id="modalSessionTitle" style="font-size:1.35rem; color:#fff; margin-bottom:0.35rem;">20-Move Session Complete!</h3>
+                        <h3 id="modalSessionTitle" style="font-size:1.35rem; color:var(--text-primary); margin-bottom:0.35rem;">20-Move Session Complete!</h3>
                         <p id="modalSessionSubtitle" style="font-size:0.88rem; color:var(--text-secondary); margin-bottom:1.25rem;">
                             Great work! You've completed your 20-move opening training session.
                         </p>
                         <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:1.5rem; text-align:left;">
-                            <div style="background:rgba(30, 41, 59, 0.6); border:1px solid #334155; border-radius:8px; padding:0.75rem;">
+                            <div style="background:var(--bg-card-hover); border:1px solid var(--border-color); border-radius:8px; padding:0.75rem;">
                                 <div style="font-size:0.72rem; color:var(--text-muted); text-transform:uppercase;">Session Accuracy</div>
-                                <div id="modalSessionAccuracy" style="font-size:1.35rem; font-weight:800; color:#38bdf8;">100%</div>
+                                <div id="modalSessionAccuracy" style="font-size:1.35rem; font-weight:800; color:var(--accent-secondary);">100%</div>
                             </div>
-                            <div style="background:rgba(30, 41, 59, 0.6); border:1px solid #334155; border-radius:8px; padding:0.75rem;">
+                            <div style="background:var(--bg-card-hover); border:1px solid var(--border-color); border-radius:8px; padding:0.75rem;">
                                 <div style="font-size:0.72rem; color:var(--text-muted); text-transform:uppercase;">Correct Moves</div>
-                                <div id="modalSessionScore" style="font-size:1.35rem; font-weight:800; color:#4ade80;">20 / 20</div>
+                                <div id="modalSessionScore" style="font-size:1.35rem; font-weight:800; color:var(--accent-emerald);">20 / 20</div>
                             </div>
                         </div>
-                        <div id="modalSessionReinforceBox" style="display:none; background:rgba(245, 158, 11, 0.12); border:1px solid #f59e0b; border-radius:8px; padding:0.75rem; margin-bottom:1.25rem; text-align:left; font-size:0.82rem; color:#fde68a;">
+                        <div id="modalSessionReinforceBox" style="display:none; background:rgba(169,118,11,0.08); border:1px solid rgba(169,118,11,0.4); border-radius:8px; padding:0.75rem; margin-bottom:1.25rem; text-align:left; font-size:0.82rem; color:#7a4f04;">
                             <span style="font-weight:700;">⚠️ Missed Moves:</span> You missed <strong id="modalSessionMissedCount">0</strong> moves. Reinforce them now to lock them into memory!
                         </div>
                         <div style="display:flex; flex-direction:column; gap:0.6rem;">
-                            <button id="btnModalReinforceSession" class="btn-primary" style="display:none; padding:0.65rem; font-size:0.95rem; font-weight:700; background:linear-gradient(135deg, #f59e0b, #d97706); border-color:#d97706;">
+                            <button id="btnModalReinforceSession" class="btn-primary" style="display:none; padding:0.65rem; font-size:0.95rem; font-weight:700;">
                                 🎯 Reinforce Missed Moves (<span id="modalBtnReinforceCount">0</span>) &rarr;
                             </button>
                             <button id="btnModalNextSession" class="btn-primary" style="padding:0.65rem; font-size:0.95rem; font-weight:700;">
@@ -709,32 +727,32 @@
             <!-- Game Deviations Section -->
             <div id="trainerDeviationsView" style="display:none; flex-direction:column; gap:1rem;">
                 <!-- Deviations Stats & Controls Bar -->
-                <div class="card-panel" style="padding:1rem; background:rgba(15,23,42,0.8); border:1px solid var(--border-color); border-radius:8px;">
+                <div class="card-panel" style="padding:1rem; border:1px solid var(--border-color); border-radius:8px;">
                     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
                         <div style="display:flex; align-items:center; gap:1.75rem; flex-wrap:wrap;">
                             <div>
                                 <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Analyzed Games</div>
-                                <div id="devStatTotalGames" style="font-size:1.35rem; font-weight:800; color:#fff;">--</div>
+                                <div id="devStatTotalGames" style="font-size:1.35rem; font-weight:800; color:var(--text-primary);">--</div>
                             </div>
                             <div>
                                 <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Repertoire Compliance</div>
-                                <div id="devStatCompliancePct" style="font-size:1.35rem; font-weight:800; color:#4ade80;">--%</div>
+                                <div id="devStatCompliancePct" style="font-size:1.35rem; font-weight:800; color:var(--accent-emerald);">--%</div>
                             </div>
                             <div>
                                 <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Games with Deviations</div>
-                                <div id="devStatTotalDeviations" style="font-size:1.35rem; font-weight:800; color:#f87171;">--</div>
+                                <div id="devStatTotalDeviations" style="font-size:1.35rem; font-weight:800; color:var(--accent-crimson);">--</div>
                             </div>
                         </div>
 
                         <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
                             <!-- Color filter pills -->
-                            <div class="filter-pill-group" style="display:flex; gap:0.2rem; background:rgba(30,41,59,0.8); padding:3px; border-radius:6px; border:1px solid var(--border-color);">
-                                <button class="filter-pill-btn active" id="btnFilterDevAll" data-filter="all" style="font-size:0.75rem; padding:0.25rem 0.6rem; border:none; border-radius:4px; background:#0284c7; color:#fff; cursor:pointer;">All</button>
+                            <div class="filter-pill-group" style="display:flex; gap:0.2rem; padding:3px; border-radius:6px; border:1px solid var(--border-color);">
+                                <button class="filter-pill-btn active" id="btnFilterDevAll" data-filter="all" style="font-size:0.75rem; padding:0.25rem 0.6rem; border:none; border-radius:4px; cursor:pointer;">All</button>
                                 <button class="filter-pill-btn" id="btnFilterDevWhite" data-filter="white" style="font-size:0.75rem; padding:0.25rem 0.6rem; border:none; border-radius:4px; background:transparent; color:var(--text-secondary); cursor:pointer;">White</button>
                                 <button class="filter-pill-btn" id="btnFilterDevBlack" data-filter="black" style="font-size:0.75rem; padding:0.25rem 0.6rem; border:none; border-radius:4px; background:transparent; color:var(--text-secondary); cursor:pointer;">Black</button>
                             </div>
                             <!-- Search -->
-                            <input type="text" id="inputDeviationsSearch" placeholder="Search opponent or opening..." style="background:rgba(15,23,42,0.9); border:1px solid var(--border-color); border-radius:5px; color:#f8fafc; font-size:0.8rem; padding:0.35rem 0.6rem; width:210px;" />
+                            <input type="text" id="inputDeviationsSearch" placeholder="Search opponent or opening..." style="border:1px solid var(--border-color); border-radius:5px; color:var(--text-primary); font-size:0.8rem; padding:0.35rem 0.6rem; width:210px;" />
                             <button id="btnRefreshDeviations" class="btn-secondary" style="font-size:0.78rem; padding:0.35rem 0.65rem;" title="Refresh game deviations">🔄 Refresh</button>
                         </div>
                     </div>
@@ -869,7 +887,7 @@
                             ◀ Back to Scout Results
                         </button>
                         <div>
-                            <div id="scoutStudioTitle" style="font-weight:700; font-size:1.05rem; color:#fff;">Learn the Caro-Kann Defense</div>
+                            <div id="scoutStudioTitle" style="font-weight:700; font-size:1.05rem; color:var(--text-primary);">Learn the Caro-Kann Defense</div>
                             <div style="font-size:0.78rem; color:var(--text-secondary); display:flex; align-items:center; gap:0.5rem;">
                                 <span id="scoutStudioChannel">GothamChess</span> • 
                                 <span id="scoutStudioDuration">09:26</span> • 
@@ -880,9 +898,9 @@
                     </div>
 
                     <div style="display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap;">
-                        <div class="study-selector-wrap scout-study-selector-wrap" style="display:flex; align-items:center; gap:0.5rem; background:rgba(30, 41, 59, 0.7); padding:0.3rem 0.6rem; border-radius:8px; border:1px solid #334155;">
-                            <span style="font-size:0.8rem; font-weight:700; color:#38bdf8;">STUDY:</span>
-                            <select id="scoutStudySelect" style="padding:0.25rem 0.5rem; border-radius:5px; background:#0f172a; color:#fff; border:1px solid #475569; font-size:0.85rem; max-width:200px;">
+                        <div class="study-selector-wrap scout-study-selector-wrap" style="display:flex; align-items:center; gap:0.5rem; padding:0.3rem 0.6rem; border-radius:8px;">
+                            <span style="font-size:0.8rem; font-weight:700; color:var(--accent-secondary);">STUDY:</span>
+                            <select id="scoutStudySelect" style="padding:0.25rem 0.5rem; border-radius:5px; font-size:0.85rem; max-width:200px;">
                                 <option value="">(All Studies)</option>
                             </select>
                             <button id="btnScoutNewStudy" type="button" class="btn-secondary" style="font-size:0.75rem; padding:0.25rem 0.5rem;" title="Create a new study">+ New</button>
@@ -916,7 +934,7 @@
                             <div class="scout-video-meta-bar">
                                 <div style="display:flex; align-items:center; gap:0.5rem;">
                                     <span class="scout-live-indicator" id="scoutLiveIndicator"></span>
-                                    <span id="scoutCurrentTimeDisplay" style="font-family:monospace; font-size:0.85rem; font-weight:600; color:#38bdf8;">00:00 / 00:00</span>
+                                    <span id="scoutCurrentTimeDisplay" style="font-family:monospace; font-size:0.85rem; font-weight:600; color:var(--accent-secondary);">00:00 / 00:00</span>
                                 </div>
                                 <div style="display:flex; align-items:center; gap:0.4rem;">
                                     <label for="scoutChapterSelect" style="font-size:0.75rem; color:var(--text-muted);">Chapter:</label>
@@ -943,7 +961,7 @@
                         <div class="scout-board-info-strip">
                             <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:nowrap; overflow:hidden;">
                                 <span id="scoutCurrentMoveNum" style="font-weight:700; color:var(--accent-primary); font-size:0.9rem; flex-shrink:0;">Start</span>
-                                <span id="scoutCurrentMoveSan" style="font-weight:700; color:#fff; font-size:1rem; flex-shrink:0;">1. ...</span>
+                                <span id="scoutCurrentMoveSan" style="font-weight:700; color:var(--text-primary); font-size:1rem; flex-shrink:0;">1. ...</span>
                                 <span id="scoutCurrentOpeningTag" style="font-size:0.75rem; color:var(--text-muted);">Starting Position</span>
                                 <span style="font-size:0.74rem; color:var(--text-secondary); font-weight:600; flex-shrink:0;">(<span id="scoutActiveLinePlyCount">0</span> plies)</span>
                             </div>
@@ -962,7 +980,7 @@
                             </div>
                             <div style="display:flex; gap:0.35rem; align-items:center;">
                                 <button id="btnScoutFlip" class="btn-secondary" title="Flip Board Orientation">Flip</button>
-                                <div class="board-size-control-group" style="display:inline-flex; align-items:center; gap:2px; background:rgba(19, 22, 31, 0.85); border:1px solid var(--border-color); border-radius:4px; padding:2px 4px;">
+                                <div class="board-size-control-group" style="display:inline-flex; align-items:center; gap:2px; background:var(--bg-card-hover); border:1px solid var(--border-color); border-radius:4px; padding:2px 4px;">
                                     <button type="button" class="btn-board-size btn-board-size-dec" title="Decrease board size">−</button>
                                     <span id="scoutBoardSizeLabel" class="board-size-display-val" style="font-size:0.75rem; color:var(--text-muted); font-family:monospace; min-width:44px; text-align:center;">---</span>
                                     <button type="button" class="btn-board-size btn-board-size-inc" title="Increase board size">+</button>
@@ -989,7 +1007,7 @@
                                         ⭐ Mark Important
                                     </button>
                                     <!-- AGENTS.md 8.4: fixed 150px box + `visibility` (NOT `display`). -->
-                                    <button id="btnScoutRemoveFromRep" class="btn-secondary btn-quick-rep" style="visibility:hidden; min-width:150px; color:#ef4444; border-color:rgba(239,68,68,0.35);" title="Remove this move and line from repertoire">
+                                    <button id="btnScoutRemoveFromRep" class="btn-secondary btn-quick-rep" style="visibility:hidden; min-width:150px; color:var(--accent-crimson); border-color:rgba(160,44,44,0.35);" title="Remove this move and line from repertoire">
                                         🗑️ Remove from Rep
                                     </button>
                                     <button id="btnScoutViewTree" class="btn-secondary btn-quick-rep" title="Explored lines in session tree">
@@ -1004,20 +1022,20 @@
                             </div>
 
                             <!-- Move Notes / Master Ideas Input -->
-                            <div id="scoutMoveNoteBar" class="scout-note-bar" style="margin-bottom:0.45rem; background:rgba(12, 14, 19, 0.7); border:1px solid var(--border-color); border-radius:6px; padding:0.35rem 0.55rem;">
+                            <div id="scoutMoveNoteBar" class="scout-note-bar" style="margin-bottom:0.45rem; padding:0.35rem 0.55rem;">
                                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.2rem;">
                                     <label for="scoutMoveComment" style="font-size:0.74rem; font-weight:600; color:var(--text-secondary); display:flex; align-items:center; gap:0.3rem;">
                                         <span>📝</span> <span id="scoutNoteMoveLabel">Move Note</span>:
                                     </label>
-                                    <span id="scoutCommentSaveStatus" style="font-size:0.7rem; color:#4ade80; opacity:0; transition:opacity 0.2s ease;">Saved ✓</span>
+                                    <span id="scoutCommentSaveStatus" style="font-size:0.7rem; color:var(--accent-emerald); opacity:0; transition:opacity 0.2s ease;">Saved ✓</span>
                                 </div>
-                                <textarea id="scoutMoveComment" placeholder="Write thoughts, master explanations, or video advice for this move..." rows="1" style="width:100%; box-sizing:border-box; background:rgba(24, 28, 38, 0.75); border:1px solid var(--border-color); border-radius:5px; color:var(--text-primary); font-size:0.78rem; padding:0.25rem 0.5rem; resize:vertical; font-family:inherit; min-height:26px; line-height:1.3;"></textarea>
+                                <textarea id="scoutMoveComment" placeholder="Write thoughts, master explanations, or video advice for this move..." rows="1" style="width:100%; box-sizing:border-box; color:var(--text-primary); font-size:0.78rem; padding:0.25rem 0.5rem; resize:vertical; font-family:inherit; min-height:26px; line-height:1.3;"></textarea>
                             </div>
 
                             <div class="scout-tree-header">
                                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.4rem;">
                                     <div style="display:flex; align-items:center; gap:0.4rem;">
-                                        <span style="font-weight:700; color:#fff; font-size:0.86rem;">🌳 Tree of Explored Lines</span>
+                                        <span style="font-weight:700; color:var(--text-primary); font-size:0.86rem;">🌳 Tree of Explored Lines</span>
                                         <span id="scoutTreeCountBadge" class="badge-pill" style="background:var(--bg-panel); color:var(--accent-primary); border:1px solid var(--border-color); font-size:0.7rem; padding:0.1rem 0.4rem;">0 Lines</span>
                                     </div>
                                     <div style="display:flex; gap:0.3rem; align-items:center;">
@@ -1085,7 +1103,7 @@
 
                     <div>
                         <label style="display:block; margin-bottom:0.4rem; font-weight:600;">Game Speeds to Sync &amp; Review:</label>
-                        <div style="display:flex; gap:0.85rem; flex-wrap:wrap; font-size:0.85rem; color:#f8fafc; padding:0.25rem 0;">
+                        <div style="display:flex; gap:0.85rem; flex-wrap:wrap; font-size:0.85rem; color:var(--text-secondary); padding:0.25rem 0;">
                             <label style="display:inline-flex; align-items:center; gap:0.35rem; cursor:pointer;">
                                 <input type="checkbox" id="syncSpeedBullet" value="bullet" checked style="accent-color:var(--accent-primary);"> Bullet
                             </label>

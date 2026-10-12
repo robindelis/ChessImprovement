@@ -1701,6 +1701,10 @@ class RepertoireBuilder {
             pctEl.textContent = `${cov}%`;
             pctEl.title = `${cov}% of opponent reply weight covered`;
         }
+        const railCov = document.getElementById('railCoverageVal');
+        if (railCov) {
+            railCov.textContent = `${cov}%`;
+        }
         if (fillEl) {
             fillEl.style.width = `${cov}%`;
             if (cov >= 70) {

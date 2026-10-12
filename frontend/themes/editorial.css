@@ -241,6 +241,10 @@ select:focus, input:focus, textarea:focus {
 ::placeholder { color: var(--text-muted); font-style: italic; }
 
 /* ============================ TABLES (DATA FEED) ========================== */
+.explorer-table {
+    width: 100% !important;
+    table-layout: fixed !important;
+}
 .explorer-table th, .data-table th, .repertoire-sidebar-card .explorer-table th {
     background: var(--bg-dark) !important;
     color: var(--text-secondary) !important;
@@ -249,20 +253,53 @@ select:focus, input:focus, textarea:focus {
     text-transform: uppercase;
     letter-spacing: 0.08em;
     font-size: 0.66rem;
+    padding: 0.55rem 0.5rem;
 }
-.explorer-table td, .data-table td { border-bottom: 1px solid var(--border-color) !important; }
+.explorer-table td, .data-table td {
+    border-bottom: 1px solid var(--border-color) !important;
+    padding: 0.55rem 0.5rem;
+}
+.explorer-table th:nth-child(1), .explorer-table td:nth-child(1) { width: 12% !important; min-width: 62px !important; max-width: none !important; }
+.explorer-table th:nth-child(2), .explorer-table td:nth-child(2) { width: 24% !important; min-width: 110px !important; }
+.explorer-table th:nth-child(3), .explorer-table td:nth-child(3) { width: 26% !important; min-width: 120px !important; }
+.explorer-table th:nth-child(4), .explorer-table td:nth-child(4) { width: 19% !important; min-width: 105px !important; }
+.explorer-table th:nth-child(5), .explorer-table td:nth-child(5) { width: 9% !important; min-width: 55px !important; max-width: none !important; }
+.explorer-table th:nth-child(6), .explorer-table td:nth-child(6) { width: 10% !important; min-width: 75px !important; text-align: right; }
+
 .explorer-row:hover, .game-card:hover { background: var(--bg-card-hover) !important; }
 .sortable-th.active-sort { color: var(--accent-primary) !important; }
-.explorer-move-san, .gap-san { color: var(--text-primary); text-shadow: none; }
-.pop-bar-track { background: var(--bg-dark) !important; }
+.explorer-move-san, .gap-san { color: var(--text-primary); text-shadow: none; font-weight: 700; }
+.pop-bar-track { background: var(--bg-dark) !important; border: 1px solid rgba(120, 100, 60, 0.2); }
 .pop-bar-fill { background: var(--accent-secondary) !important; }
-.winrate-bar-wrap { border: 1px solid var(--border-color); }
-.wr-white { background: #fbf7ec; color: #1f1b14; }
-.wr-draw { background: #b7ab90; color: #1f1b14; }
-.wr-black { background: #241f18; color: #f2ecdf; border: 1px solid #241f18; }
-.eval-badge.plus { color: var(--accent-emerald); border-color: rgba(47,125,79,.4); background: rgba(47,125,79,.08); }
-.eval-badge.minus { color: var(--accent-crimson); border-color: rgba(178,48,48,.4); background: rgba(178,48,48,.08); }
-.eval-badge.zero { color: var(--text-secondary); border-color: var(--border-color); }
+.winrate-bar-wrap {
+    height: 18px !important;
+    line-height: 18px !important;
+    font-size: 0.68rem !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 3px !important;
+    overflow: hidden !important;
+    background: var(--bg-dark) !important;
+}
+.wr-white {
+    background: #ffffff !important;
+    color: #1f1b14 !important;
+    border-right: 1px solid rgba(120, 100, 60, 0.35) !important;
+    font-weight: 600 !important;
+}
+.wr-draw {
+    background: #c5b9a0 !important;
+    color: #1f1b14 !important;
+    border-right: 1px solid rgba(120, 100, 60, 0.35) !important;
+    font-weight: 600 !important;
+}
+.wr-black {
+    background: #241f18 !important;
+    color: #f2ecdf !important;
+    font-weight: 600 !important;
+}
+.eval-badge.plus { color: var(--accent-emerald); border-color: rgba(30,87,52,.45); background: rgba(30,87,52,.09); font-weight: 700; }
+.eval-badge.minus { color: var(--accent-crimson); border-color: rgba(158,36,36,.45); background: rgba(158,36,36,.09); font-weight: 700; }
+.eval-badge.zero { color: var(--text-secondary); border-color: var(--border-color); font-weight: 700; }
 
 /* ================================ BOARD =================================== */
 .chess-board-wrapper {
@@ -620,3 +657,183 @@ select:focus, input:focus, textarea:focus {
     color: #5c3c02 !important;
     box-shadow: 0 1px 4px rgba(169, 118, 11, 0.22);
 }
+
+/* =============================================================================
+   SCOUT STRATEGIC PLAN PANEL & HIGH-CONTRAST BADGES (WCAG AAA)
+   ========================================================================== */
+.scout-plan-panel {
+    background: #f7f2e4 !important;
+    border: 1px solid #c9bda4 !important;
+    border-radius: 6px !important;
+    box-shadow: 0 1px 3px rgba(80, 60, 30, 0.05) !important;
+    margin-bottom: 0.6rem !important;
+}
+.scout-plan-summary {
+    color: var(--accent-secondary) !important;
+    font-family: var(--font-serif) !important;
+    font-weight: 700 !important;
+    font-size: 0.88rem !important;
+    padding: 0.5rem 0.75rem !important;
+}
+.scout-plan-summary:hover {
+    color: var(--accent-primary) !important;
+}
+.scout-plan-note {
+    color: #7a4f04 !important;
+    font-family: var(--font-serif) !important;
+    font-weight: 600 !important;
+    font-size: 0.76rem !important;
+    margin-bottom: 0.4rem !important;
+}
+.scout-plan-row {
+    border-top: 1px solid rgba(120, 100, 60, 0.15) !important;
+    padding: 0.35rem 0 !important;
+}
+.scout-plan-label {
+    color: var(--text-secondary) !important;
+    font-weight: 700 !important;
+    font-size: 0.72rem !important;
+}
+.scout-plan-text {
+    color: var(--text-primary) !important;
+    font-size: 0.82rem !important;
+}
+
+/* Perspective badges on warm paper */
+.scout-perspective--white {
+    color: #2b261d !important;
+    background: #ffffff !important;
+    border: 1px solid #c6b691 !important;
+    font-weight: 700 !important;
+}
+.scout-perspective--black {
+    color: #fdfaf2 !important;
+    background: #2a241b !important;
+    border: 1px solid #2a241b !important;
+    font-weight: 700 !important;
+}
+.scout-perspective--white--against {
+    color: #1a4680 !important;
+    background: rgba(26, 70, 128, 0.09) !important;
+    border: 1px solid rgba(26, 70, 128, 0.35) !important;
+    font-weight: 700 !important;
+}
+.scout-perspective--black--against {
+    color: #7a4f04 !important;
+    background: rgba(122, 79, 4, 0.09) !important;
+    border: 1px solid rgba(122, 79, 4, 0.35) !important;
+    font-weight: 700 !important;
+}
+.scout-perspective--unknown {
+    color: var(--text-secondary) !important;
+    background: var(--bg-card-hover) !important;
+    border: 1px solid var(--border-color) !important;
+}
+.scout-perspective--theory {
+    color: #1a4680 !important;
+    background: rgba(26, 70, 128, 0.08) !important;
+    border: 1px solid rgba(26, 70, 128, 0.32) !important;
+    font-weight: 700 !important;
+}
+
+/* Length tags on warm paper */
+.scout-length-tag--quick  { color: #1e5734 !important; font-weight: 700 !important; }
+.scout-length-tag--single { color: #1a4680 !important; font-weight: 700 !important; }
+.scout-length-tag--course { color: #5a2e82 !important; font-weight: 700 !important; }
+.scout-length-tag--long   { color: #7a4f04 !important; font-weight: 700 !important; }
+.scout-length-tag--theory { color: var(--text-muted) !important; font-weight: 700 !important; }
+
+/* Scout coverage action buttons */
+.scout-coverage-action {
+    color: #1a4680 !important;
+    background: rgba(26, 70, 128, 0.08) !important;
+    border: 1px solid rgba(26, 70, 128, 0.35) !important;
+    font-weight: 700 !important;
+    border-radius: 3px !important;
+}
+.scout-coverage-action:hover {
+    background: rgba(26, 70, 128, 0.18) !important;
+}
+
+/* =============================================================================
+   TRAINER FEEDBACK, REASONS & DEVIATION CARDS (WCAG AAA)
+   ========================================================================== */
+.feedback-box.correct {
+    background: #eef6f0 !important;
+    border: 1px solid #4a8d62 !important;
+    color: #1e5734 !important;
+}
+.feedback-box.blunder {
+    background: #faeaea !important;
+    border: 1px solid #c85d5d !important;
+    color: #9e2424 !important;
+}
+.feedback-box.good_alternative {
+    background: #edf3fa !important;
+    border: 1px solid #4f7ab3 !important;
+    color: #1a4680 !important;
+}
+.feedback-box.suboptimal {
+    background: #fcf6e8 !important;
+    border: 1px solid #c49a3c !important;
+    color: #7a4f04 !important;
+}
+
+.trainer-reason-badge.badge-frontier {
+    color: #1e5734 !important;
+    border: 1px solid rgba(30, 87, 52, 0.45) !important;
+    background: rgba(30, 87, 52, 0.09) !important;
+    font-weight: 700 !important;
+}
+.trainer-reason-badge.badge-due {
+    color: #7a4f04 !important;
+    border: 1px solid rgba(122, 79, 4, 0.45) !important;
+    background: rgba(122, 79, 4, 0.09) !important;
+    font-weight: 700 !important;
+}
+.trainer-reason-badge.badge-lapse {
+    color: #9e2424 !important;
+    border: 1px solid rgba(158, 36, 36, 0.45) !important;
+    background: rgba(158, 36, 36, 0.09) !important;
+    font-weight: 700 !important;
+}
+.trainer-reason-badge.badge-maintenance {
+    color: #1a4680 !important;
+    border: 1px solid rgba(26, 70, 128, 0.45) !important;
+    background: rgba(26, 70, 128, 0.09) !important;
+    font-weight: 700 !important;
+}
+
+/* Deviation Cards */
+.deviation-card {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 6px !important;
+}
+.deviation-card:hover {
+    border-color: var(--accent-primary) !important;
+    background: var(--bg-card-hover) !important;
+}
+.deviation-opponent {
+    color: var(--text-primary) !important;
+    font-family: var(--font-serif) !important;
+}
+.deviation-comparison-grid {
+    background: var(--bg-card-hover) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 4px !important;
+}
+.deviation-note-callout {
+    background: var(--bg-panel) !important;
+    border-left: 3px solid var(--accent-primary) !important;
+    color: var(--text-secondary) !important;
+}
+.deviation-box.played .deviation-box-label {
+    color: var(--accent-crimson) !important;
+    font-weight: 700 !important;
+}
+.deviation-box.prepared .deviation-box-label {
+    color: var(--accent-emerald) !important;
+    font-weight: 700 !important;
+}
+
