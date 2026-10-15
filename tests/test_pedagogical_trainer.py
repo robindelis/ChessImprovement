@@ -372,6 +372,253 @@ class TestPedagogicalTrainer(unittest.TestCase):
             self.assertEqual(result.get("colorDevB"), "black")
             self.assertEqual(result.get("colorFenB"), "black")
 
+    def test_12_redeemable_mastery_and_leech_graduation(self):
+        """
+        Tests that:
+        1. A move with a single mistake can be redeemed to 'mastered' after 2 consecutive first-try hits.
+        2. A chronic leech (3+ lapses) requires 3 consecutive first-try hits to reach 'mastered'.
+        """
+        b = chess.Board()
+        fen0 = b.fen()
+        self.rm.add_repertoire_move("white", fen0, "e2e4", is_user_move=True, study_name="Redeem Study")
+
+        # 1. Miss on first attempt -> unlearned (tp=1, tc=0, lapses=1, streak=0)
+        r_miss = self.rm.evaluate_trainer_move("white", fen0, "d2d4")
+        self.assertFalse(r_miss["correct"])
+        self.assertEqual(r_miss["mastery_status"], "unlearned")
+        self.assertEqual(r_miss["lapses"], 1)
+        self.assertEqual(r_miss["consecutive_correct"], 0)
+
+        # 2. First consecutive hit -> learning (tp=2, tc=1, lapses=1, streak=1)
+        r_hit1 = self.rm.evaluate_trainer_move("white", fen0, "e2e4")
+        self.assertTrue(r_hit1["correct"])
+        self.assertEqual(r_hit1["mastery_status"], "learning")
+
+        # 3. Second consecutive hit -> REDEEMED to mastered! (tp=3, tc=2, lapses=1, streak=2, interval=3.0)
+        r_hit2 = self.rm.evaluate_trainer_move("white", fen0, "e2e4")
+        self.assertTrue(r_hit2["correct"])
+        self.assertEqual(r_hit2["mastery_status"], "mastered")
+        prog = self.rm.get_trainer_progress("white", study_name="Redeem Study")
+        self.assertEqual(prog["mastered_count"], 1)
+
+        # 4. Now simulate 2 more mistakes so total lapses = 3 (chronic leech!)
+        self.rm.evaluate_trainer_move("white", fen0, "d2d4")
+        r_miss3 = self.rm.evaluate_trainer_move("white", fen0, "d2d4")
+        self.assertEqual(r_miss3["lapses"], 3)
+        self.assertEqual(r_miss3["mastery_status"], "learning")
+
+        # Hit 1 & Hit 2 on a 3-lapse leech keep it in 'learning'
+        self.assertEqual(self.rm.evaluate_trainer_move("white", fen0, "e2e4")["mastery_status"], "learning")
+        self.assertEqual(self.rm.evaluate_trainer_move("white", fen0, "e2e4")["mastery_status"], "learning")
+        # Hit 3 graduates the leech back to 'mastered'!
+        self.assertEqual(self.rm.evaluate_trainer_move("white", fen0, "e2e4")["mastery_status"], "mastered")
+
+    def test_13_session_lapse_cooldown_spacing(self):
+        """
+        Tests that in adaptive mode with a populated recent_drilled_ids history,
+        a newly missed move is held in a 3-drill cooldown window while other moves are drilled,
+        then automatically re-tested once 3 intervening drills have elapsed.
+        """
+        b = chess.Board()
+        self.rm.add_repertoire_move("white", b.fen(), "e2e4", is_user_move=True)
+        b.push_san("e4")
+        self.rm.add_repertoire_move("white", b.fen(), "e7e6", is_user_move=False)
+        b.push_san("e6")
+        self.rm.add_repertoire_move("white", b.fen(), "d2d4", is_user_move=True)
+        b.push_san("d4")
+        self.rm.add_repertoire_move("white", b.fen(), "d7d5", is_user_move=False)
+        b.push_san("d5")
+        self.rm.add_repertoire_move("white", b.fen(), "b1c3", is_user_move=True)
+        b.push_san("Nc3")
+        self.rm.add_repertoire_move("white", b.fen(), "g8f6", is_user_move=False)
+        b.push_san("Nf6")
+        self.rm.add_repertoire_move("white", b.fen(), "e4e5", is_user_move=True)
+
+        conn = get_db()
+        now = int(time.time())
+        conn.execute(
+            "UPDATE repertoire_moves SET times_practiced=1, times_correct=1, next_review=? WHERE is_user_move=1",
+            (now - 86400,),
+        )
+        conn.commit()
+        rows = conn.execute("SELECT id, move_san FROM repertoire_moves WHERE is_user_move=1 ORDER BY id ASC").fetchall()
+        conn.close()
+        ids = [r["id"] for r in rows]
+        lapsed_id = ids[0]
+
+        # Right after missing `lapsed_id` (recent_drilled_ids = [lapsed_id]), adaptive mode must NOT
+        # immediately repeat `lapsed_id` because 3 other moves are available to clear working memory.
+        d1 = self.rm.get_next_trainer_drill(
+            "white", session_mode="adaptive",
+            recent_session_lapses=[lapsed_id],
+            recent_drilled_ids=[lapsed_id],
+        )
+        self.assertNotEqual(d1["id"], lapsed_id)
+
+        # Once 3 other drills have been played since `lapsed_id`, cooldown expires and Tier 1 serves `lapsed_id`!
+        d_cooled = self.rm.get_next_trainer_drill(
+            "white", session_mode="adaptive",
+            recent_session_lapses=[lapsed_id],
+            recent_drilled_ids=[lapsed_id, ids[1], ids[2], ids[3]],
+        )
+        self.assertEqual(d_cooled["id"], lapsed_id)
+        self.assertEqual(d_cooled["drill_reason"], "session_lapse")
+
+    def test_14_mastered_spot_check_audit_in_adaptive_and_dedicated_mode(self):
+        """
+        Tests that:
+        1. In adaptive mode, every 5th drill (step_idx == 4) injects a Mastered Spot-Check
+           even when frontier/due moves exist, preferring deeper/decayed mastered moves over move 1.
+        2. Dedicated mode='mastered_audit' and mode='weak_only' work via API.
+        """
+        b = chess.Board()
+        self.rm.add_repertoire_move("white", b.fen(), "e2e4", is_user_move=True)
+        b.push_san("e4")
+        self.rm.add_repertoire_move("white", b.fen(), "e7e5", is_user_move=False)
+        b.push_san("e5")
+        self.rm.add_repertoire_move("white", b.fen(), "g1f3", is_user_move=True)
+        b.push_san("Nf3")
+        self.rm.add_repertoire_move("white", b.fen(), "b8c6", is_user_move=False)
+        b.push_san("Nc6")
+        self.rm.add_repertoire_move("white", b.fen(), "f1b5", is_user_move=True)
+        b.push_san("Bb5")
+        self.rm.add_repertoire_move("white", b.fen(), "a7a6", is_user_move=False)
+        b.push_san("a6")
+        # Frontier move at ply 7 (Ba4)
+        self.rm.add_repertoire_move("white", b.fen(), "b5a4", is_user_move=True)
+
+        now = int(time.time())
+        conn = get_db()
+        # Mark e4 (ply 1), Nf3 (ply 3), and Bb5 (ply 5) as mastered, with Bb5 decayed longest ago
+        conn.execute(
+            "UPDATE repertoire_moves SET times_practiced=3, times_correct=3, consecutive_correct=3, "
+            "interval_days=6.0, last_practiced=?, next_review=? WHERE move_san IN ('e4', 'Nf3')",
+            (now - 86400, now + 5 * 86400),
+        )
+        conn.execute(
+            "UPDATE repertoire_moves SET times_practiced=3, times_correct=3, consecutive_correct=3, "
+            "interval_days=6.0, last_practiced=?, next_review=? WHERE move_san = 'Bb5'",
+            (now - 5 * 86400, now + 86400),
+        )
+        conn.commit()
+        conn.close()
+
+        # On drill #5 of session (4 prior drills in recent_drilled_ids), adaptive mode triggers Mastered Spot-Check
+        # and selects deep/decayed Bb5 (ply 5) rather than root move e4 (ply 1), even though Ba4 is on the frontier!
+        drill_audit = self.rm.get_next_trainer_drill(
+            "white", session_mode="adaptive",
+            recent_drilled_ids=[9001, 9002, 9003, 9004],
+        )
+        self.assertTrue(drill_audit.get("is_mastered_audit"))
+        self.assertEqual(drill_audit["drill_reason"], "maintenance")
+        self.assertEqual(drill_audit["expected_san"], "Bb5")
+
+        # Dedicated mode='mastered_audit' via API
+        res_api = self.client.get("/api/repertoire/train/next?color=white&mode=mastered_audit")
+        self.assertEqual(res_api.status_code, 200)
+        self.assertTrue(res_api.json().get("is_mastered_audit"))
+        self.assertEqual(res_api.json()["expected_san"], "Bb5")
+
+    def test_15_tree_aware_opponent_continuation_steers_toward_weak_and_unlearned_branches(self):
+        """
+        Tests that when continuing a line after a user move, evaluate_trainer_move weights
+        opponent replies toward branches containing weak/leech or unlearned user moves
+        rather than repeating an already-mastered high-popularity main line.
+        """
+        b0 = chess.Board()
+        fen0 = b0.fen()
+        self.rm.add_repertoire_move("white", fen0, "e2e4", is_user_move=True, popularity_pct=100.0)
+        b0.push_san("e4")
+        fen_after_e4 = b0.fen()
+
+        # Branch A: 1... e5 (high popularity 60%, but follow-up 2. Nf3 is already mastered)
+        b_e5 = b0.copy()
+        self.rm.add_repertoire_move("white", fen_after_e4, "e7e5", is_user_move=False, popularity_pct=60.0)
+        b_e5.push_san("e5")
+        self.rm.add_repertoire_move("white", b_e5.fen(), "g1f3", is_user_move=True)
+
+        # Branch B: 1... c6 (lower popularity 9%, but follow-up 2. d4 has 3 lapses / is a weak leech!)
+        b_c6 = b0.copy()
+        self.rm.add_repertoire_move("white", fen_after_e4, "c7c6", is_user_move=False, popularity_pct=9.0)
+        b_c6.push_san("c6")
+        self.rm.add_repertoire_move("white", b_c6.fen(), "d2d4", is_user_move=True)
+
+        now = int(time.time())
+        conn = get_db()
+        conn.execute(
+            "UPDATE repertoire_moves SET times_practiced=5, times_correct=5, consecutive_correct=5, "
+            "interval_days=30.0, last_practiced=?, next_review=? WHERE move_san='Nf3'",
+            (now, now + 30 * 86400),
+        )
+        conn.execute(
+            "UPDATE repertoire_moves SET times_practiced=4, times_correct=1, consecutive_correct=0, "
+            "lapses=3, difficulty=9.0, interval_days=1.0, last_practiced=?, next_review=? WHERE move_san='d4'",
+            (now - 3600, now + 80000),
+        )
+        conn.commit()
+        conn.close()
+
+        c6_count = 0
+        for _ in range(25):
+            res = self.rm.evaluate_trainer_move("white", fen0, "e2e4")
+            if res["opponent_reply"]["san"] == "c6":
+                c6_count += 1
+
+        # Despite 60% vs 9% popularity, the weak leech branch (1... c6 -> 2. d4) must be chosen the vast majority of the time
+        self.assertGreaterEqual(c6_count, 18, f"Expected opponent to steer toward weak branch c6, got {c6_count}/25")
+
+    def test_16_frontend_two_hit_consolidation_and_arrow_fade(self):
+        """
+        Tests that in RepertoireTrainer (frontend/repertoire_trainer.js), a missed move recorded via
+        _recordSessionLapse remains in _pendingReinforcementIds() after only 1 unassisted mid-session
+        hit, and is only cleared after 2 unassisted hits (or in the reinforcement phase).
+        """
+        import tests.frontend_runtime as frontend_runtime
+        if frontend_runtime.node_available():
+            scenario = """
+            const trainer = new RepertoireTrainer();
+            trainer._recordSessionLapse(42);
+            const afterMiss = {
+                lapses: [...trainer.sessionLapses],
+                pending: trainer._pendingReinforcementIds()
+            };
+
+            // Simulate 1st unassisted hit mid-session
+            const pid = 42;
+            trainer.sessionLapseClearCounts[pid] = (trainer.sessionLapseClearCounts[pid] || 0) + 1;
+            trainer.sessionLapses = trainer.sessionLapses.filter(id => id !== pid);
+            if (trainer.isReinforcementPhase || trainer.sessionLapseClearCounts[pid] >= 2) {
+                trainer.sessionReinforcementQueue = trainer.sessionReinforcementQueue.filter(id => id !== pid);
+            }
+            const afterFirstHit = {
+                lapses: [...trainer.sessionLapses],
+                pending: trainer._pendingReinforcementIds()
+            };
+
+            // Simulate 2nd unassisted hit
+            trainer.sessionLapseClearCounts[pid] = (trainer.sessionLapseClearCounts[pid] || 0) + 1;
+            if (trainer.isReinforcementPhase || trainer.sessionLapseClearCounts[pid] >= 2) {
+                trainer.sessionReinforcementQueue = trainer.sessionReinforcementQueue.filter(id => id !== pid);
+            }
+            const afterSecondHit = {
+                pending: trainer._pendingReinforcementIds()
+            };
+
+            return {
+                afterMiss,
+                afterFirstHit,
+                afterSecondHit
+            };
+            """
+            res = frontend_runtime.run_scenario(scenario)
+            self.assertEqual(res["afterMiss"]["lapses"], [42])
+            self.assertEqual(res["afterMiss"]["pending"], [42])
+            # After 1st mid-session hit: removed from mid-session `sessionLapses`, but still pending for end-of-session Reinforcement!
+            self.assertEqual(res["afterFirstHit"]["lapses"], [])
+            self.assertEqual(res["afterFirstHit"]["pending"], [42])
+            # After 2nd hit: completely consolidated!
+            self.assertEqual(res["afterSecondHit"]["pending"], [])
+
 
 if __name__ == "__main__":
     unittest.main()

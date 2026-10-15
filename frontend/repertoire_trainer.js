@@ -34,7 +34,10 @@ class RepertoireTrainer {
         // Pedagogical Learning Curriculum State
         this.sessionMode = 'adaptive';
         this.sessionLapses = [];
+        this.sessionReinforcementQueue = [];
+        this.sessionLapseClearCounts = {};
         this.sessionDrilledIds = [];
+        this.solutionArrowFadeTimeout = null;
 
         // Reinforcement Round and Attempt Tracking State
         this.currentPositionHasMistake = false;
@@ -367,6 +370,8 @@ class RepertoireTrainer {
         this.sessionCorrect = 0;
         this.sessionMistakes = 0;
         this.sessionLapses = [];
+        this.sessionReinforcementQueue = [];
+        this.sessionLapseClearCounts = {};
         this.sessionDrilledIds = [];
         this.hasAnsweredCurrentPosition = false;
         this.currentPositionHasMistake = false;
@@ -386,6 +391,23 @@ class RepertoireTrainer {
         if (this.autoNextTimeout) { clearTimeout(this.autoNextTimeout); this.autoNextTimeout = null; }
         if (this.opponentReplyTimeout) { clearTimeout(this.opponentReplyTimeout); this.opponentReplyTimeout = null; }
         if (this.mistakeResetTimeout) { clearTimeout(this.mistakeResetTimeout); this.mistakeResetTimeout = null; }
+        if (this.solutionArrowFadeTimeout) { clearTimeout(this.solutionArrowFadeTimeout); this.solutionArrowFadeTimeout = null; }
+    }
+
+    _recordSessionLapse(id) {
+        if (!id) return;
+        if (!this.sessionLapses.includes(id)) {
+            this.sessionLapses.push(id);
+        }
+        if (!this.sessionReinforcementQueue.includes(id)) {
+            this.sessionReinforcementQueue.push(id);
+        }
+        this.sessionLapseClearCounts[id] = 0;
+    }
+
+    _pendingReinforcementIds() {
+        const merged = [...(this.sessionLapses || []), ...(this.sessionReinforcementQueue || [])];
+        return [...new Set(merged)];
     }
 
     /**
@@ -536,7 +558,7 @@ class RepertoireTrainer {
     }
 
     startReinforcementPhase() {
-        this.sessionLapses = [...new Set(this.sessionLapses || [])];
+        this.sessionLapses = this._pendingReinforcementIds();
         if (!this.sessionLapses.length) {
             this.isReinforcementPhase = false;
             this.onSessionComplete(false);
@@ -583,7 +605,7 @@ class RepertoireTrainer {
                 : "Great work! You've completed your 20-move opening training session.";
         }
 
-        const remainingLapses = this.sessionLapses ? this.sessionLapses.length : 0;
+        const remainingLapses = this._pendingReinforcementIds().length;
         if (reinforceBox) {
             reinforceBox.style.display = (!wasReinforced && remainingLapses > 0) ? 'block' : 'none';
         }
@@ -790,7 +812,7 @@ class RepertoireTrainer {
 
         // Check if standard 20-move session has reached completion target
         if (this.sessionMode !== 'deviations' && !this.isReinforcementPhase && this.sessionIndex >= this.sessionTarget) {
-            if (this.sessionLapses && this.sessionLapses.length > 0) {
+            if (this._pendingReinforcementIds().length > 0) {
                 this.startReinforcementPhase();
             } else {
                 this.onSessionComplete(false);
@@ -1059,17 +1081,28 @@ class RepertoireTrainer {
                 badgeEl.textContent = `🌱 New Move (Move ${moveNum})`;
                 badgeEl.title = 'Learnable frontier: progressive depth root-to-leaf';
             } else if (reason === 'due_review') {
-                badgeEl.className = 'trainer-reason-badge badge-due';
-                badgeEl.textContent = '⏰ Due Review';
-                badgeEl.title = 'Spaced repetition: memory retention review due';
+                if (this.currentDrill?.is_leech) {
+                    badgeEl.className = 'trainer-reason-badge badge-lapse';
+                    badgeEl.textContent = '🩸 Weak Spot / Leech';
+                    badgeEl.title = 'Consolidating a problem position with multiple past mistakes';
+                } else {
+                    badgeEl.className = 'trainer-reason-badge badge-due';
+                    badgeEl.textContent = '⏰ Due Review';
+                    badgeEl.title = 'FSRS spaced repetition: memory retention review due';
+                }
             } else if (reason === 'session_lapse') {
                 badgeEl.className = 'trainer-reason-badge badge-lapse';
                 badgeEl.textContent = '🔁 Retry Mistake';
-                badgeEl.title = 'Intra-session buffer: re-testing a recent mistake';
-            } else if (reason === 'maintenance') {
+                badgeEl.title = 'Intra-session consolidation: re-testing a missed move after cooldown';
+            } else if (reason === 'maintenance' || reason === 'mastery_audit') {
                 badgeEl.className = 'trainer-reason-badge badge-maintenance';
-                badgeEl.textContent = '🔄 Retention';
-                badgeEl.title = 'Retention practice: refreshing mastered lines';
+                if (this.currentDrill?.is_mastered_audit || reason === 'mastery_audit') {
+                    badgeEl.textContent = '🛡️ Mastered Spot-Check';
+                    badgeEl.title = 'Spot-checking a mastered position to catch hidden forgetting gaps';
+                } else {
+                    badgeEl.textContent = '🔄 Retention';
+                    badgeEl.title = 'Retention practice: refreshing mastered lines';
+                }
             } else {
                 badgeEl.className = 'trainer-reason-badge badge-maintenance';
                 badgeEl.textContent = '🎯 Practice';
@@ -1123,8 +1156,8 @@ class RepertoireTrainer {
         }
 
         this.currentPositionUsedHint = true;
-        if (this.currentDrill && this.currentDrill.id && !this.sessionLapses.includes(this.currentDrill.id)) {
-            this.sessionLapses.push(this.currentDrill.id);
+        if (this.currentDrill && this.currentDrill.id) {
+            this._recordSessionLapse(this.currentDrill.id);
         }
 
         this.board.clearArrows();
@@ -1238,7 +1271,7 @@ class RepertoireTrainer {
 
         // Check if regular 20-move session is complete
         if (!this.isReinforcementPhase && this.sessionIndex >= this.sessionTarget) {
-            if (this.sessionLapses && this.sessionLapses.length > 0) {
+            if (this._pendingReinforcementIds().length > 0) {
                 this.startReinforcementPhase();
             } else {
                 this.onSessionComplete(false);
@@ -1293,9 +1326,22 @@ class RepertoireTrainer {
                     this.correctCount++;
                     this.updateStats();
 
-                    // If this move was previously a lapse in this session, resolve it now
-                    if (data.prepared_id && this.sessionLapses.includes(data.prepared_id)) {
-                        this.sessionLapses = this.sessionLapses.filter(id => id !== data.prepared_id);
+                    // 2-Hit Consolidation Rule:
+                    // A missed move is cleared from the mid-session retry queue (`sessionLapses`) on
+                    // its first unassisted recall, but remains in `sessionReinforcementQueue` for the
+                    // end-of-session Reinforcement Round unless recalled twice unassisted.
+                    if (data.prepared_id) {
+                        const pid = data.prepared_id;
+                        const wasLapse = this.sessionLapses.includes(pid) || this.sessionReinforcementQueue.includes(pid);
+                        if (wasLapse) {
+                            this.sessionLapseClearCounts[pid] = (this.sessionLapseClearCounts[pid] || 0) + 1;
+                        }
+                        if (this.sessionLapses.includes(pid)) {
+                            this.sessionLapses = this.sessionLapses.filter(id => id !== pid);
+                        }
+                        if (this.isReinforcementPhase || (this.sessionLapseClearCounts[pid] || 0) >= 2) {
+                            this.sessionReinforcementQueue = this.sessionReinforcementQueue.filter(id => id !== pid);
+                        }
                     }
 
                     // Track drilled move in session
@@ -1393,8 +1439,8 @@ class RepertoireTrainer {
                     // Correct on retry or with hint assistance:
                     // Does NOT count as a first-try win; streak and correct stats are not incremented.
                     // Keep in session lapses so the move is properly reinforced.
-                    if (data.prepared_id && !this.sessionLapses.includes(data.prepared_id)) {
-                        this.sessionLapses.push(data.prepared_id);
+                    if (data.prepared_id) {
+                        this._recordSessionLapse(data.prepared_id);
                     }
                     if (data.prepared_id && !this.sessionDrilledIds.includes(data.prepared_id)) {
                         this.sessionDrilledIds.push(data.prepared_id);
@@ -1583,8 +1629,8 @@ class RepertoireTrainer {
                 this.currentPositionHasMistake = true;
 
                 // Add to intra-session blunder buffer for re-drilling
-                if (data.prepared_id && !this.sessionLapses.includes(data.prepared_id)) {
-                    this.sessionLapses.push(data.prepared_id);
+                if (data.prepared_id) {
+                    this._recordSessionLapse(data.prepared_id);
                 }
 
                 if (!this.hasAnsweredCurrentPosition) {
@@ -1619,7 +1665,8 @@ class RepertoireTrainer {
 
                 this.loadMasteryProgress();
 
-                // Reset board back to current position so user can immediately retry with correct move
+                // Reset board back to current position so user can immediately retry with correct move,
+                // then fade the solution arrow after 950ms so the user executes from memory.
                 this.mistakeResetTimeout = setTimeout(() => {
                     // CODE-07: never repaint a drill that is no longer on screen.
                     if (drillToken !== this.drillToken) return;
@@ -1630,6 +1677,13 @@ class RepertoireTrainer {
                     if (data.expected_uci) {
                         this.board.clearArrows();
                         this.board.addArrow(data.expected_uci.slice(0, 2), data.expected_uci.slice(2, 4), '#22c55e');
+                        this.solutionArrowFadeTimeout = setTimeout(() => {
+                            if (drillToken !== this.drillToken) return;
+                            this.board.clearArrows();
+                            if (this.savedPlanArrows && this.savedPlanArrows.length) {
+                                this.board.setArrows(this.savedPlanArrows);
+                            }
+                        }, 950);
                     }
                 }, 800);
             }

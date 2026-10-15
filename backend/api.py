@@ -2093,11 +2093,13 @@ def evaluate_training_move(payload: MoveAttemptPayload):
         successes += 1
         status = "mastered" if successes >= 2 else "learning"
         interval = min(interval * ease, 3650.0) if successes > 1 else 1.0
+        ease = min(3.0, round(float(ease) + 0.1, 2))
         next_review = now + int(interval * 86400)
         feedback_type = "correct"
         feedback_msg = f"Best Move! {user_san} is the top engine choice."
     elif is_original_blunder:
         interval = 1.0
+        ease = max(1.3, round(float(ease) - 0.25, 2))
         next_review = now + 86400
         feedback_type = "blunder"
         feedback_msg = f"Game Move: {user_san}?! (-{blunder['cpl_loss']} cp). Refutation line playing below."
@@ -2128,6 +2130,7 @@ def evaluate_training_move(payload: MoveAttemptPayload):
                 feedback_type = "suboptimal"
                 feedback_msg = f"{user_san} is suboptimal (-{cpl_diff} cp). Engine top choice: {blunder['best_san']}."
                 interval = 1.0
+                ease = max(1.3, round(float(ease) - 0.15, 2))
                 next_review = now + 86400
         except EngineBusy:
             # Hand-off FIXER-C section 6.2: the shared Stockfish pool is
@@ -2160,6 +2163,7 @@ def evaluate_training_move(payload: MoveAttemptPayload):
         last_attempt_date = excluded.last_attempt_date,
         next_review_date = excluded.next_review_date,
         interval_days = excluded.interval_days,
+        ease_factor = excluded.ease_factor,
         status = excluded.status
     """, (payload.blunder_id, attempts, successes, now, next_review, max(1.0, min(float(interval), 3650.0)), ease, status))
     conn.commit()
@@ -2323,7 +2327,7 @@ def delete_repertoire_move(payload: DeleteMovePayload):
 def get_next_repertoire_drill(
     color: Literal["white", "black", "mixed", "both", "all"] = Query("mixed"),
     opening: Optional[str] = Query(None),
-    mode: Literal["adaptive", "due_only", "frontier_only", "full", "lapses_only", "deviations"] = Query("adaptive"),
+    mode: Literal["adaptive", "due_only", "frontier_only", "weak_only", "mastered_audit", "full", "lapses_only", "deviations"] = Query("adaptive"),
     lapses: Optional[str] = Query(None),
     recent_ids: Optional[str] = Query(None),
     index: Optional[int] = Query(None, ge=0, le=10000),

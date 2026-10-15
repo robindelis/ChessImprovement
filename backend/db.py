@@ -671,6 +671,9 @@ def _init_db_body(conn, purge_orphans: bool = False):
         next_review INTEGER DEFAULT 0,
         interval_days REAL DEFAULT 1.0,
         created_at INTEGER,
+        consecutive_correct INTEGER DEFAULT 0,
+        lapses INTEGER DEFAULT 0,
+        difficulty REAL DEFAULT 5.0,
         UNIQUE(repertoire, parent_fen, move_uci)
     )
     """)
@@ -680,6 +683,9 @@ def _init_db_body(conn, purge_orphans: bool = False):
     _add_column_if_missing(cursor, "repertoire_moves", "comment", "TEXT DEFAULT ''")
     _add_column_if_missing(cursor, "repertoire_moves", "arrows", "TEXT DEFAULT ''")
     _add_column_if_missing(cursor, "repertoire_moves", "study_name", "TEXT DEFAULT ''")
+    _add_column_if_missing(cursor, "repertoire_moves", "consecutive_correct", "INTEGER DEFAULT 0")
+    _add_column_if_missing(cursor, "repertoire_moves", "lapses", "INTEGER DEFAULT 0")
+    _add_column_if_missing(cursor, "repertoire_moves", "difficulty", "REAL DEFAULT 5.0")
 
     # Repertoire Studies (Named study collections like "Caro-Kann Fantasy Variation")
     cursor.execute("""

@@ -92,6 +92,147 @@ def classify_line_position(reached_by_user_move: bool, has_prepared_reply: bool)
     # THE BUG: the opponent moved and the user has not prepared a reply. A gap, not an end.
     return LINE_POSITION_AWAITING_REPLY
 
+
+# --------------------------------------------------------------------------- #
+# FSRS-5 / DSR Memory Model & Redeemable Mastery (Trainer Engine)
+# --------------------------------------------------------------------------- #
+
+#: FSRS-4.5 / FSRS-5 power-law forgetting curve constants:
+#:   R(t, S) = (1 + FSRS_FACTOR * (t / S)) ** FSRS_DECAY
+#: By construction, when elapsed days t == stability S, R(S, S) = 0.90 (90% recall target).
+FSRS_FACTOR = 19.0 / 81.0
+FSRS_DECAY = -0.5
+FSRS_DEFAULT_DIFFICULTY = 5.0
+FSRS_MIN_DIFFICULTY = 1.0
+FSRS_MAX_DIFFICULTY = 10.0
+
+#: Minimum number of intervening drills before an in-session mistake is re-tested in
+#: `adaptive` mode, preventing 2-second visual echo memory from masquerading as learning.
+SESSION_LAPSE_COOLDOWN_DRILLS = 3
+
+#: Cadence for injecting a "Mastered Spot-Check" (audit) drill during an `adaptive`
+#: session when mastered positions exist (every 5th drill = ~20% of a 20-move session).
+MASTERED_AUDIT_CADENCE = 5
+
+
+def compute_fsrs_retrievability(
+    last_practiced: Any,
+    stability_days: Any,
+    now: Optional[int] = None,
+) -> float:
+    """Computes current recall probability R(t, S) in [0.0, 1.0] using the FSRS power forgetting curve."""
+    try:
+        lp = int(last_practiced or 0)
+    except (TypeError, ValueError):
+        lp = 0
+    if lp <= 0:
+        return 0.0
+    if now is None:
+        now = int(time.time())
+    elapsed_days = max(0.0, (now - lp) / 86400.0)
+    try:
+        s = max(0.1, float(stability_days or 1.0))
+    except (TypeError, ValueError):
+        s = 1.0
+    r = (1.0 + FSRS_FACTOR * (elapsed_days / s)) ** FSRS_DECAY
+    return max(0.01, min(1.0, float(r)))
+
+
+def infer_move_memory_state(move: Dict[str, Any], now: Optional[int] = None) -> Dict[str, Any]:
+    """Normalises a `repertoire_moves` row into FSRS DSR memory variables + streak/leech state.
+
+    Compatible with both newly-trained rows (which populate `consecutive_correct`, `lapses`,
+    `difficulty`) and legacy rows or raw SQL test fixtures that only set `times_practiced` and
+    `times_correct`.
+    """
+    try:
+        tp = max(0, int(move.get("times_practiced") or 0))
+    except (TypeError, ValueError):
+        tp = 0
+    try:
+        tc = max(0, int(move.get("times_correct") or 0))
+    except (TypeError, ValueError):
+        tc = 0
+    try:
+        raw_lapses = max(0, int(move.get("lapses") or 0))
+    except (TypeError, ValueError):
+        raw_lapses = 0
+    lapses = max(raw_lapses, max(0, tp - tc))
+
+    try:
+        raw_streak = max(0, int(move.get("consecutive_correct") or 0))
+    except (TypeError, ValueError):
+        raw_streak = 0
+    if raw_streak > 0:
+        streak = raw_streak
+    elif tp > 0 and tp == tc and lapses == 0:
+        streak = tc
+    else:
+        streak = 0
+
+    raw_diff = move.get("difficulty")
+    try:
+        difficulty = float(raw_diff) if raw_diff is not None else FSRS_DEFAULT_DIFFICULTY
+    except (TypeError, ValueError):
+        difficulty = FSRS_DEFAULT_DIFFICULTY
+    if (raw_diff is None or difficulty == FSRS_DEFAULT_DIFFICULTY) and lapses > 0 and raw_lapses == 0:
+        difficulty = min(FSRS_MAX_DIFFICULTY, FSRS_DEFAULT_DIFFICULTY + 1.2 * lapses)
+    difficulty = max(FSRS_MIN_DIFFICULTY, min(FSRS_MAX_DIFFICULTY, difficulty))
+
+    try:
+        stability = max(0.1, float(move.get("interval_days") or 1.0))
+    except (TypeError, ValueError):
+        stability = 1.0
+
+    last_prac = move.get("last_practiced") or 0
+    retrievability = compute_fsrs_retrievability(last_prac, stability, now=now) if tp > 0 else 0.0
+    required_streak = 3 if lapses >= 3 else 2
+    is_leech = bool(lapses >= 2 and streak < required_streak)
+    is_weak = bool((lapses > 0 and streak < required_streak) or (tp > 0 and tc == 0))
+
+    return {
+        "tp": tp,
+        "tc": tc,
+        "lapses": lapses,
+        "streak": streak,
+        "difficulty": difficulty,
+        "stability": stability,
+        "retrievability": retrievability,
+        "required_streak": required_streak,
+        "is_leech": is_leech,
+        "is_weak": is_weak,
+    }
+
+
+def classify_move_mastery(move: Dict[str, Any]) -> str:
+    """Classifies a user move into `'mastered'`, `'learning'`, or `'unlearned'`.
+
+    Fixes the legacy `tc == tp` permanent lock:
+      * A move with zero lapses (`lapses == 0`) is `'mastered'` once `tc >= 2`.
+      * A move that was previously missed (`lapses > 0`) can be **redeemed** to `'mastered'`
+        once the user achieves `consecutive_correct >= 2` (or `>= 3` for a chronic leech with
+        `lapses >= 3`) and `interval_days >= 3.0`.
+      * Any move with `tc > 0` that has not yet met the mastery threshold (including a
+        mastered move that was just missed, resetting `consecutive_correct` to 0 and
+        `interval_days` to 1.0) is `'learning'`.
+      * Otherwise (`tc == 0`), it is `'unlearned'`.
+    """
+    state = infer_move_memory_state(move)
+    tp = state["tp"]
+    tc = state["tc"]
+    lapses = state["lapses"]
+    streak = state["streak"]
+    stability = state["stability"]
+    required_streak = state["required_streak"]
+
+    if lapses == 0 and tc >= 2 and tc == tp:
+        return "mastered"
+    if lapses > 0 and tc >= 2 and streak >= required_streak and stability >= 3.0:
+        return "mastered"
+    if tc > 0:
+        return "learning"
+    return "unlearned"
+
 # --------------------------------------------------------------------------- #
 # External-data hardening (audit SYNC-17 / SYNC-20 / SYNC-21 / ABUSE-17)
 # --------------------------------------------------------------------------- #
@@ -3739,6 +3880,7 @@ class RepertoireManager:
                 cursor.execute("""
                 SELECT rm.id, rm.parent_fen, rm.fen, rm.move_uci, rm.move_san, rm.times_practiced, rm.times_correct,
                        rm.last_practiced, rm.next_review, rm.interval_days, rm.study_name,
+                       rm.consecutive_correct, rm.lapses, rm.difficulty,
                        COALESCE(rs.name, rm.study_name, '') as resolved_study
                 FROM repertoire_moves rm
                 LEFT JOIN study_moves sm ON sm.repertoire = rm.repertoire AND sm.parent_fen = rm.parent_fen AND sm.move_uci = rm.move_uci
@@ -3753,6 +3895,7 @@ class RepertoireManager:
                 cursor.execute("""
                 SELECT rm.id, rm.parent_fen, rm.fen, rm.move_uci, rm.move_san, rm.times_practiced, rm.times_correct,
                        rm.last_practiced, rm.next_review, rm.interval_days, rm.study_name,
+                       rm.consecutive_correct, rm.lapses, rm.difficulty,
                        COALESCE(rs.name, rm.study_name, '') as resolved_study
                 FROM repertoire_moves rm
                 LEFT JOIN study_moves sm ON sm.repertoire = rm.repertoire AND sm.parent_fen = rm.parent_fen AND sm.move_uci = rm.move_uci
@@ -3789,17 +3932,7 @@ class RepertoireManager:
         all_user_moves = list(unique_user_moves.values())
 
         def categorize_move(m):
-            tp = m.get("times_practiced") or 0
-            tc = m.get("times_correct") or 0
-            # Fully mastered: no errors ever on spaced repetition with at least 2 correct reviews
-            if tc >= 2 and tc == tp:
-                return "mastered"
-            # Partially mastered: played correctly at least once, but not yet at end of spaced repetition process
-            elif tc > 0:
-                return "learning"
-            # Unlearned: not trained yet or not mastered at all
-            else:
-                return "unlearned"
+            return classify_move_mastery(m)
 
         def _moves_key(m):
             return (" ".join((m["parent_fen"] or "").split()[:3]), m["move_uci"])
@@ -3978,12 +4111,27 @@ class RepertoireManager:
                 if m["is_user_move"] == 1:
                     ancestor_user_moves = [p for p in path_moves if p.get("is_user_move") == 1]
                     prereqs_met = all((p.get("times_correct") or 0) >= 1 for p in ancestor_user_moves)
-                    tp = m.get("times_practiced") or 0
-                    tc = m.get("times_correct") or 0
+                    mem = infer_move_memory_state(m, now=now)
+                    tp = mem["tp"]
+                    tc = mem["tc"]
                     next_rev = m.get("next_review") or 0
-                    interv = max(1.0, float(m.get("interval_days") or 1.0))
+                    interv = max(1.0, mem["stability"])
                     is_due = (tp > 0 and next_rev > 0 and next_rev <= now)
                     urgency = (now - next_rev) / (interv * 86400.0) if is_due else 0.0
+                    mastery = classify_move_mastery(m)
+                    is_frontier = (tp == 0 and prereqs_met)
+                    node_depth = depth + 1
+
+                    if mem["is_weak"]:
+                        node_weakness = 8.0 + mem["lapses"] * 1.5 + mem["difficulty"] * 0.3 + (1.0 - mem["retrievability"]) * 2.0
+                    elif is_due:
+                        node_weakness = 5.0 + min(6.0, urgency * 2.0) + (1.0 - mem["retrievability"]) * 3.0 + (mem["difficulty"] - 5.0) * 0.25
+                    elif is_frontier:
+                        node_weakness = 4.0 + min(2.0, float(m.get("popularity_pct") or 0.0) / 25.0) + (1.5 if m.get("is_important") else 0.0)
+                    elif mastery == "learning":
+                        node_weakness = 2.5 + (1.0 - mem["retrievability"]) * 3.0
+                    else:
+                        node_weakness = 0.5 + (1.0 - mem["retrievability"]) * 2.5 + min(1.6, node_depth * 0.1)
 
                     norm_parent = normalize_fen(m["parent_fen"])
                     parent_3 = " ".join(norm_parent.split()[:3])
@@ -3999,14 +4147,24 @@ class RepertoireManager:
                     else:
                         graph[m["id"]] = {
                             "move": m,
-                            "ply_depth": depth + 1,
+                            "ply_depth": node_depth,
                             "path_san": path_san,
                             "path_formatted": self.format_pgn_moves(path_san),
                             "ancestors": [p["id"] for p in ancestor_user_moves],
                             "prerequisites_met": prereqs_met,
-                            "is_frontier": (tp == 0 and prereqs_met),
+                            "is_frontier": is_frontier,
                             "is_due": is_due,
                             "urgency": urgency,
+                            "mastery_status": mastery,
+                            "retrievability": mem["retrievability"],
+                            "difficulty": mem["difficulty"],
+                            "stability": mem["stability"],
+                            "lapses": mem["lapses"],
+                            "streak": mem["streak"],
+                            "is_leech": mem["is_leech"],
+                            "is_weak": mem["is_weak"],
+                            "node_weakness": node_weakness,
+                            "subtree_weakness": node_weakness,
                             "studies": m_studies,
                             "effective_study": m_studies[0] if m_studies else fallback
                         }
@@ -4018,12 +4176,26 @@ class RepertoireManager:
         # Catch any disconnected user moves
         for m in all_moves:
             if m["is_user_move"] == 1 and m["id"] not in graph:
-                tp = m.get("times_practiced") or 0
-                tc = m.get("times_correct") or 0
+                mem = infer_move_memory_state(m, now=now)
+                tp = mem["tp"]
+                tc = mem["tc"]
                 next_rev = m.get("next_review") or 0
-                interv = max(1.0, float(m.get("interval_days") or 1.0))
+                interv = max(1.0, mem["stability"])
                 is_due = (tp > 0 and next_rev > 0 and next_rev <= now)
                 urgency = (now - next_rev) / (interv * 86400.0) if is_due else 0.0
+                mastery = classify_move_mastery(m)
+                is_frontier = (tp == 0)
+                if mem["is_weak"]:
+                    node_weakness = 8.0 + mem["lapses"] * 1.5 + mem["difficulty"] * 0.3 + (1.0 - mem["retrievability"]) * 2.0
+                elif is_due:
+                    node_weakness = 5.0 + min(6.0, urgency * 2.0) + (1.0 - mem["retrievability"]) * 3.0 + (mem["difficulty"] - 5.0) * 0.25
+                elif is_frontier:
+                    node_weakness = 4.0 + min(2.0, float(m.get("popularity_pct") or 0.0) / 25.0)
+                elif mastery == "learning":
+                    node_weakness = 2.5 + (1.0 - mem["retrievability"]) * 3.0
+                else:
+                    node_weakness = 0.5 + (1.0 - mem["retrievability"]) * 2.5 + 1.0
+
                 norm_parent = normalize_fen(m["parent_fen"])
                 parent_3 = " ".join(norm_parent.split()[:3])
                 m_studies = list(study_map.get((norm_parent, m["move_uci"])) or study_map.get((parent_3, m["move_uci"])) or [])
@@ -4038,12 +4210,35 @@ class RepertoireManager:
                     "path_formatted": "",
                     "ancestors": [],
                     "prerequisites_met": True,
-                    "is_frontier": (tp == 0),
+                    "is_frontier": is_frontier,
                     "is_due": is_due,
                     "urgency": urgency,
+                    "mastery_status": mastery,
+                    "retrievability": mem["retrievability"],
+                    "difficulty": mem["difficulty"],
+                    "stability": mem["stability"],
+                    "lapses": mem["lapses"],
+                    "streak": mem["streak"],
+                    "is_leech": mem["is_leech"],
+                    "is_weak": mem["is_weak"],
+                    "node_weakness": node_weakness,
+                    "subtree_weakness": node_weakness,
                     "studies": m_studies,
                     "effective_study": m_studies[0] if m_studies else fallback
                 }
+
+        # Tree-aware backpropagation: propagate each descendant's weakness up to its ancestors
+        # so shallow entry moves know which branches hold downstream mistakes, due cards or gaps.
+        for node in graph.values():
+            nw = node["node_weakness"]
+            ancs = node.get("ancestors") or []
+            total_ancs = len(ancs)
+            for idx, anc_id in enumerate(ancs):
+                if anc_id in graph:
+                    dist = max(1, total_ancs - idx)
+                    discounted = nw * (0.92 ** dist)
+                    if discounted > graph[anc_id]["subtree_weakness"]:
+                        graph[anc_id]["subtree_weakness"] = discounted
 
         return graph
 
@@ -4087,8 +4282,11 @@ class RepertoireManager:
             # Both have real moves: check priority
             reason_priority = {
                 "session_lapse": 4,
+                "leech_repair": 3,
                 "due_review": 3,
                 "frontier_new": 2,
+                "mastery_audit": 1,
+                "maintenance": 1,
                 "mastery_refresh": 1
             }
             p_w = reason_priority.get(drill_w.get("drill_reason", ""), 0)
@@ -4118,11 +4316,14 @@ class RepertoireManager:
         recent_drilled_ids: Optional[List[int]] = None
     ) -> Optional[Dict]:
         """
-        Pedagogically selects the optimal move to drill:
-        1. In-Session Lapses (re-test mistakes made 2-5 moves ago)
-        2. Spaced Repetition Due Reviews (Ebbinghaus urgency)
-        3. Learnable Frontier Moves (shallowest depth first)
-        4. Mastery / Retention Refresh (least recently reviewed)
+        Hybrid FSRS + Tree-Aware + Mistake-Consolidation + Mastered-Audit drill selector:
+        1. Cooldown-Ready In-Session Lapses (re-test session mistakes after 3-drill spacing lag)
+        2. Mastered Spot-Check Audit (~20% cadence in adaptive sessions or in mastered_audit mode,
+           targeting deep critical mastered positions with lowest FSRS retrievability)
+        3. Weak / Leech Consolidation & FSRS Due Reviews (urgency + retrievability decay + difficulty)
+        4. Learnable Frontier Moves (progressive depth + subtree weakness priority)
+        5. Learning Consolidation (1-hit moves needing a 2nd recall to graduate to mastered)
+        6. Maintenance / Retention Refresh (alternating subtree-guided line walks and deep spot-checks)
         """
         repertoire = (repertoire or "").lower()
         if repertoire not in ("white", "black"):
@@ -4135,12 +4336,14 @@ class RepertoireManager:
         if not graph:
             return None
 
-        # Queue Summary
+        # Queue Summary (using redeemable mastery classification)
         due_nodes = [node for node in graph.values() if node["is_due"]]
         frontier_nodes = [node for node in graph.values() if node["is_frontier"]]
-        mastered_nodes = [node for node in graph.values() if (node["move"].get("times_correct") or 0) >= 2 and node["move"].get("times_correct") == node["move"].get("times_practiced")]
-        learning_nodes = [node for node in graph.values() if (node["move"].get("times_correct") or 0) > 0 and not ((node["move"].get("times_correct") or 0) >= 2 and node["move"].get("times_correct") == node["move"].get("times_practiced"))]
-        unlearned_nodes = [node for node in graph.values() if (node["move"].get("times_correct") or 0) == 0]
+        mastered_nodes = [node for node in graph.values() if node["mastery_status"] == "mastered"]
+        learning_nodes = [node for node in graph.values() if node["mastery_status"] == "learning"]
+        unlearned_nodes = [node for node in graph.values() if node["mastery_status"] == "unlearned"]
+        weak_nodes = [node for node in graph.values() if node["is_weak"]]
+        leech_nodes = [node for node in graph.values() if node["is_leech"]]
 
         queue_summary = {
             "due_count": len(due_nodes),
@@ -4148,13 +4351,37 @@ class RepertoireManager:
             "mastered_count": len(mastered_nodes),
             "learning_count": len(learning_nodes),
             "unlearned_count": len(unlearned_nodes),
+            "weak_count": len(weak_nodes),
+            "leech_count": len(leech_nodes),
             "total_moves": len(graph)
         }
 
-        recent_ids_set = set(recent_drilled_ids or [])
+        recent_list = list(recent_drilled_ids or [])
+        recent_ids_set = set(recent_list)
+        step_idx = len(recent_list)
         chosen_node = None
         chosen_study = None
         drill_reason = "frontier_new"
+        is_mastered_audit = False
+
+        def _resolve_study(node):
+            if target_study:
+                return target_study
+            if node.get("studies"):
+                return node["studies"][0]
+            return node.get("effective_study")
+
+        def _audit_score(n):
+            """Scores a mastered position for cold spot-checking:
+            Prioritises memory decay (1 - R), deeper branching positions (ply >= 3) over move 1,
+            historical difficulty/lapses, and importance."""
+            decay = 1.0 - float(n.get("retrievability") or 0.0)
+            depth = min(14, int(n.get("ply_depth") or 1))
+            depth_bonus = (depth * 0.15) if depth >= 3 else 0.05
+            history_risk = float(n.get("lapses") or 0) * 0.6 + (float(n.get("difficulty") or 5.0) - 5.0) * 0.2
+            imp = 0.5 if n["move"].get("is_important") else 0.0
+            last_p = int(n["move"].get("last_practiced") or 0)
+            return (round(decay * 4.0 + depth_bonus + history_risk + imp, 4), -last_p, -int(n["move"]["id"]))
 
         # Collect distinct studies represented in this repertoire graph
         all_studies = []
@@ -4168,7 +4395,7 @@ class RepertoireManager:
 
         # Track study history from recent drills (most recent to least recent)
         recent_study_history = []
-        for mid in reversed(recent_drilled_ids or []):
+        for mid in reversed(recent_list):
             if mid in graph:
                 for st in graph[mid].get("studies", []):
                     if st and st not in recent_study_history:
@@ -4183,39 +4410,50 @@ class RepertoireManager:
         if not candidate_studies:
             candidate_studies = all_studies[:]
 
-        # --- TIER 1: In-Session Lapses (Re-test blunders made earlier in current session) ---
+        # --- TIER 1: In-Session Lapses (with 3-Drill Cooldown Spacing) ---
         if recent_session_lapses:
             valid_lapses = [mid for mid in recent_session_lapses if mid in graph]
             if valid_lapses:
-                # TRAINER-07: the old condition was `mid not in recent_ids_set or
-                # len(valid_lapses) == 1`. The frontend pushes EVERY lapse id into
-                # `recentDrilledIds`, so with two or more lapses in a session (the exact
-                # population this tier exists for) the condition was false for all of them and
-                # Tier 1 was skipped entirely - mistakes were never re-tested. The rule is now
-                # "prefer a lapse that is not in the most recent drill window; if every lapse is
-                # in it, re-test the OLDEST one", which always fires while a lapse exists.
                 def _lapse_rank(mid):
-                    # -1 = not in the recent drill window at all (highest priority), otherwise
-                    # the index in `recent_drilled_ids` (earlier = older mistake).
                     if not recent_ids_set or mid not in recent_ids_set:
                         return -1
-                    try:
-                        return list(recent_drilled_ids or []).index(mid)
-                    except ValueError:
-                        return -1
+                    for idx in range(len(recent_list) - 1, -1, -1):
+                        if recent_list[idx] == mid:
+                            return idx
+                    return -1
 
-                ordered = sorted(
-                    valid_lapses,
-                    key=lambda mid: (0 if _lapse_rank(mid) < 0 else 1, _lapse_rank(mid), mid),
-                )
-                chosen_node = graph[ordered[0]]
-                drill_reason = "session_lapse"
-                if target_study:
-                    chosen_study = target_study
-                elif chosen_node.get("studies"):
-                    chosen_study = chosen_node["studies"][0]
+                if session_mode == "lapses_only" or not recent_list:
+                    eligible_lapses = valid_lapses
                 else:
-                    chosen_study = chosen_node.get("effective_study")
+                    cooldown_window = set(recent_list[-SESSION_LAPSE_COOLDOWN_DRILLS:])
+                    cooled = [mid for mid in valid_lapses if mid not in cooldown_window]
+                    other_available = any(
+                        nid not in cooldown_window
+                        and nid not in valid_lapses
+                        and (
+                            graph[nid]["is_due"]
+                            or graph[nid]["is_frontier"]
+                            or graph[nid]["is_weak"]
+                            or graph[nid]["mastery_status"] in ("learning", "mastered")
+                        )
+                        for nid in graph
+                    )
+                    if cooled:
+                        eligible_lapses = cooled
+                    elif not other_available:
+                        eligible_lapses = valid_lapses
+                    else:
+                        # Hold lapse in cooldown buffer while 1-3 other moves are drilled first
+                        eligible_lapses = []
+
+                if eligible_lapses:
+                    ordered = sorted(
+                        eligible_lapses,
+                        key=lambda mid: (0 if _lapse_rank(mid) < 0 else 1, _lapse_rank(mid), mid),
+                    )
+                    chosen_node = graph[ordered[0]]
+                    drill_reason = "session_lapse"
+                    chosen_study = _resolve_study(chosen_node)
 
         if session_mode == "lapses_only":
             if not chosen_node:
@@ -4226,30 +4464,85 @@ class RepertoireManager:
                     "message": "All missed moves reinforced! 🎉"
                 }
 
-        # --- TIER 2: Spaced Repetition Due Reviews (Ebbinghaus Urgency) ---
+        # --- Dedicated Mode: Weak & Leeches Only ---
+        if not chosen_node and session_mode == "weak_only":
+            avail_weak = [n for n in weak_nodes if n["move"]["id"] not in recent_ids_set] or weak_nodes
+            if not avail_weak:
+                avail_weak = [n for n in due_nodes if n["move"]["id"] not in recent_ids_set] or due_nodes
+            if avail_weak:
+                avail_weak.sort(
+                    key=lambda n: (
+                        n["lapses"],
+                        n["difficulty"],
+                        1.0 - n["retrievability"],
+                        int(n["move"].get("is_important") or 0),
+                    ),
+                    reverse=True,
+                )
+                chosen_node = avail_weak[0]
+                drill_reason = "due_review"
+                chosen_study = _resolve_study(chosen_node)
+            else:
+                return {
+                    "repertoire": repertoire,
+                    "all_due_completed": True,
+                    "queue_summary": queue_summary,
+                    "message": "All weak spots and leeches consolidated! 🎉"
+                }
+
+        # --- Dedicated Mode: Mastered Spot-Check Audit ---
+        if not chosen_node and session_mode == "mastered_audit":
+            avail_mast = [n for n in mastered_nodes if n["move"]["id"] not in recent_ids_set] or mastered_nodes
+            if not avail_mast:
+                avail_mast = [n for n in learning_nodes if n["move"]["id"] not in recent_ids_set] or list(graph.values())
+            avail_mast.sort(key=_audit_score, reverse=True)
+            chosen_node = avail_mast[0]
+            drill_reason = "maintenance"
+            is_mastered_audit = True
+            chosen_study = _resolve_study(chosen_node)
+
+        # --- TIER 1.5 (Adaptive): Mastered Spot-Check Quota (~20% of session) ---
+        # Periodically spot-checks previously mastered positions (preferring deep positions with
+        # decayed retrievability) even while due or frontier moves exist.
+        if (
+            not chosen_node
+            and session_mode == "adaptive"
+            and mastered_nodes
+            and step_idx > 0
+            and (step_idx + 1) % MASTERED_AUDIT_CADENCE == 0
+        ):
+            avail_audit = [n for n in mastered_nodes if n["move"]["id"] not in recent_ids_set] or mastered_nodes
+            avail_audit.sort(key=_audit_score, reverse=True)
+            chosen_node = avail_audit[0]
+            drill_reason = "maintenance"
+            is_mastered_audit = True
+            chosen_study = _resolve_study(chosen_node)
+
+        # --- TIER 2: Spaced Repetition Due Reviews (FSRS Retrievability + Ebbinghaus Urgency) ---
         if not chosen_node and session_mode in ("adaptive", "due_only"):
             available_due = [node for node in due_nodes if node["move"]["id"] not in recent_ids_set]
-            if not available_due and due_nodes:
+            if not available_due and due_nodes and session_mode == "due_only":
+                available_due = due_nodes
+            elif not available_due and due_nodes and not frontier_nodes and not weak_nodes:
                 available_due = due_nodes
 
             if available_due:
-                # TRAINER-08: `-is_important` is only correct for an ASCENDING sort. This line
-                # combined it with `reverse=True` (which exists to prioritise the highest
-                # urgency), so for equal urgency the tuple `(1.0, 0)` sorted before
-                # `(1.0, -1)` and a "Mark Important" card was picked 0/12 times. The negation is
-                # dropped and the sort reversed, which is exactly Tier 3's (correct) shape.
                 available_due.sort(
-                    key=lambda n: (n["urgency"], int(n["move"].get("is_important") or 0)),
+                    key=lambda n: (
+                        round(
+                            n["urgency"]
+                            + (1.0 - n["retrievability"]) * 0.5
+                            + n["lapses"] * 0.35
+                            + (n["difficulty"] - 5.0) * 0.05,
+                            4,
+                        ),
+                        int(n["move"].get("is_important") or 0),
+                    ),
                     reverse=True
                 )
                 chosen_node = available_due[0]
                 drill_reason = "due_review"
-                if target_study:
-                    chosen_study = target_study
-                elif chosen_node.get("studies"):
-                    chosen_study = chosen_node["studies"][0]
-                else:
-                    chosen_study = chosen_node.get("effective_study")
+                chosen_study = _resolve_study(chosen_node)
             elif session_mode == "due_only":
                 return {
                     "repertoire": repertoire,
@@ -4258,10 +4551,34 @@ class RepertoireManager:
                     "message": "All reviews are up to date! 🎉"
                 }
 
-        # --- TIER 3: Learnable Frontier Moves (Root-to-Leaf Progressive Depth) ---
+        # --- TIER 2.5 (Adaptive): Weak / Leech Recovery Interleaving ---
+        # Consolidates positions with past mistakes (`is_weak`) that aren't strictly past their
+        # 24h `next_review` timestamp yet, interleaving them with frontier moves.
+        if not chosen_node and session_mode == "adaptive":
+            avail_weak = [
+                n for n in weak_nodes
+                if not n["is_due"] and n["move"]["id"] not in recent_ids_set
+            ]
+            if avail_weak and (not frontier_nodes or (step_idx > 0 and step_idx % 2 == 1)):
+                avail_weak.sort(
+                    key=lambda n: (
+                        n["lapses"],
+                        n["difficulty"],
+                        1.0 - n["retrievability"],
+                        int(n["move"].get("is_important") or 0),
+                    ),
+                    reverse=True,
+                )
+                chosen_node = avail_weak[0]
+                drill_reason = "due_review"
+                chosen_study = _resolve_study(chosen_node)
+
+        # --- TIER 3: Learnable Frontier Moves (Root-to-Leaf Progressive Depth + Subtree Weakness) ---
         if not chosen_node and session_mode in ("adaptive", "frontier_only"):
             available_frontier = [node for node in frontier_nodes if node["move"]["id"] not in recent_ids_set]
-            if not available_frontier and frontier_nodes:
+            if not available_frontier and frontier_nodes and session_mode == "frontier_only":
+                available_frontier = frontier_nodes
+            elif not available_frontier and frontier_nodes and not learning_nodes and not mastered_nodes:
                 available_frontier = frontier_nodes
 
             if available_frontier:
@@ -4269,25 +4586,31 @@ class RepertoireManager:
                     for cand_st in candidate_studies:
                         matching_frontier = [n for n in available_frontier if cand_st in n.get("studies", []) or n.get("effective_study") == cand_st]
                         if matching_frontier:
-                            # Tier 3 gets the `is_important` tie-break right (ascending sort +
-                            # negation); the `int(... or 0)` additionally makes a SQL NULL in that
-                            # column safe (TRAINER-15 suspicion 2).
-                            matching_frontier.sort(key=lambda n: (n["ply_depth"], -int(n["move"].get("is_important") or 0), -float(n["move"].get("popularity_pct") or 0.0)))
+                            matching_frontier.sort(
+                                key=lambda n: (
+                                    n["ply_depth"],
+                                    -int(n["move"].get("is_important") or 0),
+                                    -float(n["move"].get("popularity_pct") or 0.0),
+                                    -round(n["subtree_weakness"], 3),
+                                )
+                            )
                             chosen_node = matching_frontier[0]
                             chosen_study = cand_st
                             drill_reason = "frontier_new"
                             break
 
                 if not chosen_node:
-                    available_frontier.sort(key=lambda n: (n["ply_depth"], -int(n["move"].get("is_important") or 0), -float(n["move"].get("popularity_pct") or 0.0)))
+                    available_frontier.sort(
+                        key=lambda n: (
+                            n["ply_depth"],
+                            -int(n["move"].get("is_important") or 0),
+                            -float(n["move"].get("popularity_pct") or 0.0),
+                            -round(n["subtree_weakness"], 3),
+                        )
+                    )
                     chosen_node = available_frontier[0]
                     drill_reason = "frontier_new"
-                    if target_study:
-                        chosen_study = target_study
-                    elif chosen_node.get("studies"):
-                        chosen_study = chosen_node["studies"][0]
-                    else:
-                        chosen_study = chosen_node.get("effective_study")
+                    chosen_study = _resolve_study(chosen_node)
             elif session_mode == "frontier_only":
                 return {
                     "repertoire": repertoire,
@@ -4296,10 +4619,30 @@ class RepertoireManager:
                     "message": "All repertoire lines have been learned! 🎉"
                 }
 
-        # --- TIER 4: Maintenance / Retention Refresh ---
+        # --- TIER 3.5 (Adaptive): Learning Consolidation ---
+        # Consolidates partially learned moves (`mastery_status == 'learning'`) that haven't
+        # been drilled in this session so they can graduate to `'mastered'`.
+        if not chosen_node and session_mode == "adaptive" and learning_nodes:
+            avail_learning = [n for n in learning_nodes if n["move"]["id"] not in recent_ids_set]
+            if avail_learning:
+                avail_learning.sort(
+                    key=lambda n: (
+                        n["lapses"],
+                        n["difficulty"],
+                        1.0 - n["retrievability"],
+                        int(n["move"].get("is_important") or 0),
+                        n["ply_depth"],
+                        -(n["move"].get("last_practiced") or 0),
+                    ),
+                    reverse=True,
+                )
+                chosen_node = avail_learning[0]
+                drill_reason = "due_review"
+                chosen_study = _resolve_study(chosen_node)
+
+        # --- TIER 4: Maintenance / Mastered Verification ---
         if not chosen_node:
             drill_reason = "maintenance"
-            # 1. Determine which study to drill next (fair round-robin across candidate studies)
             if target_study:
                 chosen_study = target_study
             elif candidate_studies:
@@ -4307,16 +4650,30 @@ class RepertoireManager:
             else:
                 chosen_study = all_studies[0] if all_studies else None
 
-            # 2. Filter nodes belonging to this study
             study_nodes = []
             if chosen_study:
                 study_nodes = [n for n in graph.values() if chosen_study in n.get("studies", []) or n.get("effective_study") == chosen_study]
             if not study_nodes:
                 study_nodes = list(graph.values())
 
-            # 3. In Maintenance, prioritize starting from root (shallowest ply_depth, e.g. 1. e4 for White)
-            # This allows the user to practice the full line sequence from move 1 for this study!
-            study_nodes.sort(key=lambda n: (n["ply_depth"], n["move"].get("last_practiced") or 0))
+            unseen_study_nodes = [n for n in study_nodes if n["move"]["id"] not in recent_ids_set]
+            if unseen_study_nodes:
+                study_nodes = unseen_study_nodes
+
+            # Alternate between:
+            # - starting from shallow positions of the highest-weakness/decay subtree (even step_idx), and
+            # - jumping directly to deep mastered positions via `_audit_score` (odd step_idx)
+            if step_idx > 0 and step_idx % 2 == 1:
+                study_nodes.sort(key=_audit_score, reverse=True)
+                is_mastered_audit = True
+            else:
+                study_nodes.sort(
+                    key=lambda n: (
+                        n["ply_depth"],
+                        -round(n["subtree_weakness"], 3),
+                        n["move"].get("last_practiced") or 0,
+                    )
+                )
             chosen_node = study_nodes[0]
 
         chosen = chosen_node["move"]
@@ -4364,12 +4721,7 @@ class RepertoireManager:
 
         tp = chosen.get("times_practiced") or 0
         tc = chosen.get("times_correct") or 0
-        if tc >= 2 and tc == tp:
-            mastery = "mastered"
-        elif tc > 0:
-            mastery = "learning"
-        else:
-            mastery = "unlearned"
+        mastery = classify_move_mastery(chosen)
 
         return {
             "id": chosen["id"],
@@ -4387,6 +4739,12 @@ class RepertoireManager:
             "mastery_status": mastery,
             "times_practiced": tp,
             "times_correct": tc,
+            "consecutive_correct": chosen_node["streak"],
+            "lapses": chosen_node["lapses"],
+            "difficulty": chosen_node["difficulty"],
+            "retrievability": round(chosen_node["retrievability"], 3),
+            "is_leech": chosen_node["is_leech"],
+            "is_mastered_audit": is_mastered_audit,
             "path_san": chosen_node["path_san"],
             "path_formatted": chosen_node["path_formatted"],
             "drill_reason": drill_reason,
@@ -4532,38 +4890,47 @@ class RepertoireManager:
             is_match = (attempted_uci == expected_uci)
             now = int(time.time())
 
-            try:
-                prev_tp = max(0, int(prepared.get("times_practiced") or 0))
-            except (ValueError, TypeError):
-                prev_tp = 0
-
-            try:
-                prev_tc = max(0, int(prepared.get("times_correct") or 0))
-            except (ValueError, TypeError):
-                prev_tc = 0
-
-            try:
-                prev_interval = max(1.0, float(prepared.get("interval_days") or 1.0))
-            except (ValueError, TypeError):
-                prev_interval = 1.0
+            mem_state = infer_move_memory_state(prepared, now=now)
+            prev_tp = mem_state["tp"]
+            prev_tc = mem_state["tc"]
+            prev_lapses = mem_state["lapses"]
+            prev_streak = mem_state["streak"]
+            prev_diff = mem_state["difficulty"]
+            prev_interval = max(1.0, mem_state["stability"])
+            last_prac = max(0, int(prepared.get("last_practiced") or 0))
 
             if not is_match:
                 new_tp = min(9223372036854775807, prev_tp + 1)
                 new_tc = prev_tc
-                # On mistake: reset interval back to 1 day. `times_correct` is untouched, so a
-                # card can no longer reach `tc == tp` while graded mistakes were lost.
+                new_lapses = min(9223372036854775807, prev_lapses + 1)
+                new_streak = 0
+                new_diff = min(FSRS_MAX_DIFFICULTY, round(prev_diff + 1.5, 2))
+                # On mistake: reset interval back to 1 day, reset consecutive_correct to 0,
+                # increment lapses and raise difficulty so the card is prioritized for consolidation.
                 cursor.execute("""
                 UPDATE repertoire_moves
                 SET times_practiced = ?,
                     interval_days = 1.0,
                     last_practiced = ?,
-                    next_review = ?
+                    next_review = ?,
+                    consecutive_correct = 0,
+                    lapses = ?,
+                    difficulty = ?
                 WHERE id = ?
-                """, (new_tp, now, now + 86400, prepared["id"]))
+                """, (new_tp, now, now + 86400, new_lapses, new_diff, prepared["id"]))
                 conn.commit()
                 in_txn = False
 
-                mastery = "learning" if new_tc > 0 else "unlearned"
+                updated_row = dict(prepared)
+                updated_row.update({
+                    "times_practiced": new_tp,
+                    "times_correct": new_tc,
+                    "interval_days": 1.0,
+                    "consecutive_correct": 0,
+                    "lapses": new_lapses,
+                    "difficulty": new_diff,
+                })
+                mastery = classify_move_mastery(updated_row)
                 return {
                     "correct": False,
                     "is_retry": bool(is_retry),
@@ -4574,6 +4941,9 @@ class RepertoireManager:
                     "mastery_status": mastery,
                     "times_practiced": new_tp,
                     "times_correct": new_tc,
+                    "consecutive_correct": 0,
+                    "lapses": new_lapses,
+                    "difficulty": new_diff,
                     "message": f"Not in your repertoire. Your prepared move is {expected_san}."
                 }
 
@@ -4583,23 +4953,33 @@ class RepertoireManager:
                 # It is NOT a win: do NOT increment times_correct, do NOT advance spaced repetition interval!
                 new_tp = prev_tp
                 new_tc = prev_tc
+                new_lapses = prev_lapses
+                new_streak = prev_streak
+                new_diff = prev_diff
                 conn.commit()
                 in_txn = False
-                if new_tc >= 2 and new_tc == new_tp:
-                    mastery = "mastered"
-                elif new_tc > 0:
-                    mastery = "learning"
-                else:
-                    mastery = "unlearned"
+                mastery = classify_move_mastery(prepared)
             else:
                 new_tp = min(9223372036854775807, prev_tp + 1)
                 new_tc = min(9223372036854775807, prev_tc + 1)
-                if prev_tc == 0:
+                new_lapses = prev_lapses
+                new_streak = min(9223372036854775807, prev_streak + 1)
+
+                r_now = compute_fsrs_retrievability(last_prac, prev_interval, now=now) if last_prac > 0 else 1.0
+                diff_delta = 0.35 + 0.25 * (1.0 - r_now)
+                new_diff = max(FSRS_MIN_DIFFICULTY, round(prev_diff - diff_delta, 2))
+
+                if new_streak == 1:
                     new_interval = 1.0
-                elif prev_tc == 1:
-                    new_interval = 3.0
+                elif new_streak == 2:
+                    # Chronic leech (3+ lapses) grows more conservatively on streak 2
+                    new_interval = 2.0 if new_lapses >= 3 else 3.0
                 else:
-                    new_interval = min(3650.0, max(3.0, round(prev_interval * 2.2, 1)))
+                    # FSRS-inspired stability expansion: scales by difficulty and spacing bonus
+                    eff_diff = FSRS_DEFAULT_DIFFICULTY if (new_lapses == 0 and new_streak <= 3) else new_diff
+                    diff_factor = max(1.4, min(2.8, 2.2 - 0.12 * (eff_diff - 5.0)))
+                    spacing_bonus = 1.0 if (new_lapses == 0 and new_streak <= 3) else (1.0 + 0.5 * (1.0 - r_now))
+                    new_interval = min(3650.0, max(3.0, round(prev_interval * diff_factor * spacing_bonus, 1)))
 
                 max_future_seconds = int(3650.0 * 86400)
                 review_delta = min(max_future_seconds, int(new_interval * 86400))
@@ -4611,14 +4991,27 @@ class RepertoireManager:
                     times_correct = ?,
                     interval_days = ?,
                     last_practiced = ?,
-                    next_review = ?
+                    next_review = ?,
+                    consecutive_correct = ?,
+                    lapses = ?,
+                    difficulty = ?
                 WHERE id = ?
-                """, (new_tp, new_tc, new_interval, now, next_review_ts, prepared["id"]))
+                """, (new_tp, new_tc, new_interval, now, next_review_ts, new_streak, new_lapses, new_diff, prepared["id"]))
                 conn.commit()
                 in_txn = False
 
-                # Mastery: no errors ever on spaced repetition with at least 2 correct reviews
-                mastery = "mastered" if (new_tc >= 2 and new_tc == new_tp) else "learning"
+                updated_row = dict(prepared)
+                updated_row.update({
+                    "times_practiced": new_tp,
+                    "times_correct": new_tc,
+                    "interval_days": new_interval,
+                    "last_practiced": now,
+                    "next_review": next_review_ts,
+                    "consecutive_correct": new_streak,
+                    "lapses": new_lapses,
+                    "difficulty": new_diff,
+                })
+                mastery = classify_move_mastery(updated_row)
 
             # Find opponent replies from tree, strictly prioritizing active study!
             #
@@ -4720,7 +5113,51 @@ class RepertoireManager:
                         unanswered_branch_sans.append(opp.get("move_san") or opp.get("move_uci") or "?")
 
                 if replies_with_followup:
-                    weights = [max(1.0, float(r[0].get("popularity_pct") or 0.0)) for r in replies_with_followup]
+                    def _branch_pedagogical_weight(opp_row: Dict[str, Any], user_followup: Dict[str, Any]) -> float:
+                        """Tree-aware continuation weighting: steers opponent replies toward
+                        unlearned, due, or high-mistake (leech) branches instead of repeating
+                        already-mastered main lines purely by Lichess popularity."""
+                        f_mem = infer_move_memory_state(user_followup, now=now)
+                        f_mast = classify_move_mastery(user_followup)
+                        f_next_rev = int(user_followup.get("next_review") or 0)
+                        f_is_due = (f_mem["tp"] > 0 and f_next_rev > 0 and f_next_rev <= now)
+
+                        if f_mem["is_weak"]:
+                            ped_mult = 20.0 + f_mem["lapses"] * 5.0
+                        elif f_mem["tc"] == 0:
+                            ped_mult = 15.0
+                        elif f_is_due:
+                            ped_mult = 12.0
+                        elif f_mast != "mastered":
+                            ped_mult = 6.0
+                        else:
+                            ped_mult = 1.0 + 4.0 * (1.0 - f_mem["retrievability"])
+
+                        # Look 1 user-move deeper in this branch so deeper gaps also pull steering
+                        deep_fen = user_followup.get("fen") or ""
+                        if deep_fen:
+                            deep_3 = " ".join(deep_fen.split()[:3])
+                            cursor.execute("""
+                            SELECT u.* FROM repertoire_moves o
+                            JOIN repertoire_moves u ON u.repertoire = o.repertoire
+                              AND (u.parent_fen = o.fen OR u.parent_fen LIKE substr(o.fen, 1, length(o.fen) - 4) || '%')
+                            WHERE o.repertoire = ? AND o.is_user_move = 0 AND u.is_user_move = 1
+                              AND (o.parent_fen = ? OR o.parent_fen = ? OR o.parent_fen LIKE ?)
+                            LIMIT 6
+                            """, (repertoire, deep_fen, deep_3, f"{deep_3} %"))
+                            for d_row in cursor.fetchall():
+                                d_dict = dict(d_row)
+                                d_mem = infer_move_memory_state(d_dict, now=now)
+                                if d_mem["is_weak"]:
+                                    ped_mult = max(ped_mult, 18.0 + d_mem["lapses"] * 4.0)
+                                elif d_mem["tc"] == 0:
+                                    ped_mult = max(ped_mult, 12.0)
+
+                        pop_factor = math.sqrt(max(1.0, float(opp_row.get("popularity_pct") or 1.0)))
+                        imp_bonus = 1.5 if user_followup.get("is_important") else 1.0
+                        return max(0.5, pop_factor * ped_mult * imp_bonus)
+
+                    weights = [_branch_pedagogical_weight(r[0], r[1]) for r in replies_with_followup]
                     chosen_pair = random.choices(replies_with_followup, weights=weights, k=1)[0]
                     opponent_reply = chosen_pair[0]
                     next_prep = chosen_pair[1]
