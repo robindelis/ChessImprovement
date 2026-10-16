@@ -514,6 +514,9 @@
                             <div style="display:flex; gap:0.4rem;">
                                 <button id="btnTrainHint" class="btn-secondary">Show Hint</button>
                                 <button id="btnTrainToggleArrows" class="btn-secondary" style="visibility:hidden; min-width:96px;" title="Toggle plan arrows on board">🎯 Arrows</button>
+                                <button id="btnTrainReplay" class="btn-secondary"
+                                        style="visibility:hidden; min-width:118px; justify-content:center;"
+                                        title="Replay the moves that led to this position at 650 ms per move (Space)">▶ Replay Line</button>
                             </div>
                             <div style="display:flex; gap:0.5rem; align-items:center;">
                                 <button id="btnTrainFlip" class="btn-secondary">Flip</button>
@@ -525,6 +528,25 @@
                                     <button type="button" class="btn-board-size btn-board-size-fit" title="Fit board to available screen space">⛶ Fit</button>
                                 </div>
                             </div>
+                        </div>
+
+                        <!-- Line replay transport. AGENTS.md §8.4/§8.5: the bar is always in flow at a fixed
+                             height and is revealed with `visibility` (never `display`), so the layout below it
+                             cannot move when the replay starts or ends. -->
+                        <div id="trainReplayBar" style="visibility:hidden; max-height:34px; min-height:34px; box-sizing:border-box; display:flex; align-items:center; gap:0.35rem; flex-wrap:nowrap; overflow:hidden; margin-top:0.3rem;">
+                            <button id="btnTrainReplayStart" class="btn-secondary" style="font-size:0.72rem; padding:0.18rem 0.45rem;" title="Jump to the start of the line (Home / ↑ / k)">⏮ Start</button>
+                            <button id="btnTrainReplayPrev"  class="btn-secondary" style="font-size:0.72rem; padding:0.18rem 0.45rem;" title="Previous move (← / h)">◀ Back</button>
+                            <button id="btnTrainReplayNext"  class="btn-secondary" style="font-size:0.72rem; padding:0.18rem 0.45rem;" title="Next move (→ / l)">Next ▶</button>
+                            <button id="btnTrainReplayExit"  class="btn-secondary" style="font-size:0.72rem; padding:0.18rem 0.45rem;" title="Exit replay and return to the drill position (Esc / End / ↓ / j)">✕ Exit</button>
+                            <span id="trainReplayStatus" style="font-size:0.74rem; font-weight:600; color:var(--accent-secondary); min-width:130px; text-align:center;" title="Where the replay currently is in the line">Paused 0 / 0</span>
+                            <span class="board-kbd-hint-row" style="font-size:0.68rem; color:var(--text-muted); display:flex; gap:0.55rem; flex-wrap:nowrap; margin-left:auto;">
+                                <span><kbd>&larr;</kbd>/<kbd>h</kbd> Back</span>
+                                <span><kbd>&rarr;</kbd>/<kbd>l</kbd> Next</span>
+                                <span><kbd>Space</kbd> Pause</span>
+                                <span><kbd>Esc</kbd> Exit</span>
+                                <span><kbd>r</kbd> Retry</span>
+                                <span><kbd>i</kbd> Hint</span>
+                            </span>
                         </div>
                     </div>
 
@@ -1359,7 +1381,7 @@
 
     <script src="https://www.youtube.com/iframe_api"></script>
     <script src="/repertoire_builder.js?v=20260926_1"></script>
-    <script src="/repertoire_trainer.js?v=20260925_13"></script>
+    <script src="/repertoire_trainer.js?v=20261016_1"></script>
     <script src="/scout.js?v=20261012_1"></script>
     <script src="/app.js?v=20260925_13"></script>
 </body>

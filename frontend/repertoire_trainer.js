@@ -53,6 +53,15 @@ class RepertoireTrainer {
         this.activeDrillDeviation = null;
         this.currentDeviationIndex = 0;
         this.totalDeviationsCount = 0;
+
+        // Line Replay / line-history navigation (see handleTrainerKey + startReplay)
+        this.lineSteps = [];         // [{ fen, from, to, san }] — 0 = line start, last = drill position
+        this.lineIndex = 0;          // step currently shown on the board
+        this.replayMode = false;     // replay bar active: the board shows the line, not the drill
+        this.replayPlaying = false;  // the auto-play timer is ticking
+        this.replayTimer = null;
+        this.replayDelayMs = 650;    // owner decision: ~650 ms per move
+        this.replaySavedWaiting = false;  // isWaitingForUser parked while replayMode is on
     }
 
     init() {
@@ -187,6 +196,18 @@ class RepertoireTrainer {
             });
         }
 
+        // Line replay controls (auto-visible only once a drill with a path is on screen)
+        const btnReplay = document.getElementById('btnTrainReplay');
+        if (btnReplay) btnReplay.addEventListener('click', () => this.startReplay());
+        const btnReplayStart = document.getElementById('btnTrainReplayStart');
+        if (btnReplayStart) btnReplayStart.addEventListener('click', () => this.replayJumpTo(0));
+        const btnReplayPrev = document.getElementById('btnTrainReplayPrev');
+        if (btnReplayPrev) btnReplayPrev.addEventListener('click', () => this.replayStep(-1));
+        const btnReplayNext = document.getElementById('btnTrainReplayNext');
+        if (btnReplayNext) btnReplayNext.addEventListener('click', () => this.replayStep(1));
+        const btnReplayExit = document.getElementById('btnTrainReplayExit');
+        if (btnReplayExit) btnReplayExit.addEventListener('click', () => this.exitReplay());
+
         // Session controls
         const btnRestartSession = document.getElementById('btnTrainRestartSession');
         if (btnRestartSession) {
@@ -216,10 +237,11 @@ class RepertoireTrainer {
             });
         }
 
-        // Keyboard shortcuts (h / l, arrows)
+        // Keyboard shortcuts: line navigation (arrows + vim h/l/j/k), replay transport,
+        // and the drill actions. CODE-22-style guard: leave browser/OS shortcuts alone.
         window.addEventListener('keydown', (e) => {
-            const tag = e.target.tagName?.toLowerCase();
-            if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable) {
+            const tag = e.target?.tagName?.toLowerCase();
+            if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target?.isContentEditable) {
                 return;
             }
 
@@ -228,13 +250,9 @@ class RepertoireTrainer {
                 return;
             }
 
-            if (e.key === 'ArrowLeft' || e.key === 'h' || e.key === 'H') {
-                e.preventDefault();
-                this.retryCurrentPosition();
-            } else if (e.key === 'ArrowRight' || e.key === 'l' || e.key === 'L') {
-                e.preventDefault();
-                this.showHint();
-            }
+            if (e.ctrlKey || e.metaKey || e.altKey) return;   // never swallow Ctrl+R / Ctrl+L / …
+
+            this.handleTrainerKey(e);
         });
 
         this.updateSessionUI();
@@ -392,6 +410,7 @@ class RepertoireTrainer {
         if (this.opponentReplyTimeout) { clearTimeout(this.opponentReplyTimeout); this.opponentReplyTimeout = null; }
         if (this.mistakeResetTimeout) { clearTimeout(this.mistakeResetTimeout); this.mistakeResetTimeout = null; }
         if (this.solutionArrowFadeTimeout) { clearTimeout(this.solutionArrowFadeTimeout); this.solutionArrowFadeTimeout = null; }
+        this._stopReplayTimer();
     }
 
     _recordSessionLapse(id) {
@@ -825,6 +844,7 @@ class RepertoireTrainer {
         // its token is now stale.
         this.drillToken++;
         this._clearDrillTimers();
+        this._resetLineReplay();
         const drillToken = this.drillToken;
 
         // Reset waiting state & clear stale drill immediately so hints/actions cannot use old move!
@@ -944,6 +964,12 @@ class RepertoireTrainer {
             if (data.last_move && data.last_move.from && data.last_move.to) {
                 this.board.setLastMove(data.last_move.from, data.last_move.to);
             }
+
+            // The replay needs a full SAN path; deviation drills ship it as `move_history_sans`.
+            data.path_san = (Array.isArray(data.path_san) && data.path_san.length)
+                ? data.path_san.slice()
+                : (Array.isArray(data.move_history_sans) ? data.move_history_sans.slice() : []);
+            this._loadLineSteps();
 
             // Update Breadcrumb & Pedagogical Badge (0px CLS)
             this.updateBreadcrumb(data.path_formatted, data.drill_reason, data.ply_depth);
@@ -1122,6 +1148,8 @@ class RepertoireTrainer {
     }
 
     showHint() {
+        // `i` / the button always act on the LIVE drill position, never on a scrubbed board.
+        if (this.replayMode) this.exitReplay();
         if (!this.isWaitingForUser || !this.currentDrill || !this.currentDrill.expected_uci) {
             window.showToast?.('No prepared move in this position to hint.', '#94a3b8', 2200);
             return;
@@ -1175,6 +1203,8 @@ class RepertoireTrainer {
     }
 
     retryCurrentPosition() {
+        // `r` / the button always act on the LIVE drill position, never on a scrubbed board.
+        if (this.replayMode) this.exitReplay();
         if (!this.currentFen || !this.currentDrill || !this.currentDrill.expected_uci) return;
         this.board.loadFEN(this.currentFen);
         this.board.clearArrows();
@@ -1186,6 +1216,357 @@ class RepertoireTrainer {
 
         const feedback = document.getElementById('trainFeedback');
         if (feedback) feedback.style.display = 'none';
+    }
+
+    // ================================================================== //
+    //  Line Replay — "where did this drill position come from?"          //
+    //                                                                    //
+    //  The drill payloads carry the SAN path that led to the position    //
+    //  (`path_san`, or `move_history_sans` for deviation drills), so the  //
+    //  whole history can be replayed locally, with no backend call.       //
+    // ================================================================== //
+
+    /** 4-token FEN key, the repo's canonical comparison form (AGENTS.md §4). */
+    _fen4(fen) {
+        return String(fen || '').trim().split(/\s+/).slice(0, 4).join(' ');
+    }
+
+    /**
+     * The single mapping for the Trainer's keyboard. Kept as a method (not an inline
+     * closure) so `tests/frontend_harness.js` can drive the real mapping without a DOM.
+     * ←/h = back, →/l = forward, ↑/k/Home = start, ↓/j/End = end, Space = play/pause,
+     * Esc = leave the replay, r = Try Again, i = Show Hint.
+     */
+    handleTrainerKey(e) {
+        const key = e && e.key;
+        if (!key) return false;
+        if (key === 'ArrowLeft' || key === 'h' || key === 'H') {
+            // A held key must not spam the "nothing to replay" toast.
+            if (e.repeat && !this.replayMode && this.lineSteps.length < 2) return false;
+            e.preventDefault();
+            this.replayStep(-1);
+            return true;
+        }
+        if (key === 'ArrowRight' || key === 'l' || key === 'L') {
+            e.preventDefault();
+            this.replayStep(1);
+            return true;
+        }
+        if (key === 'ArrowUp' || key === 'k' || key === 'K' || key === 'Home') {
+            e.preventDefault();
+            this.replayJumpTo(0);
+            return true;
+        }
+        if (key === 'ArrowDown' || key === 'j' || key === 'J' || key === 'End') {
+            e.preventDefault();
+            this.replayJumpToEnd();
+            return true;
+        }
+        if (key === ' ' || key === 'Spacebar') {
+            const tag = (e.target && e.target.tagName) ? String(e.target.tagName).toLowerCase() : '';
+            if (tag === 'button' || tag === 'a') return false;   // let the focused control activate
+            if (e.repeat) return false;                          // one toggle per press, never on auto-repeat
+            e.preventDefault();
+            this.toggleReplayPlayback();
+            return true;
+        }
+        if (key === 'Escape') {
+            if (!this.replayMode) return false;
+            e.preventDefault();
+            this.exitReplay();
+            return true;
+        }
+        if (key === 'r' || key === 'R') { e.preventDefault(); this.retryCurrentPosition(); return true; }
+        if (key === 'i' || key === 'I') { e.preventDefault(); this.showHint(); return true; }
+        return false;
+    }
+
+    /**
+     * Rebuilds the SAN path of the current drill into concrete board steps.
+     * Returns null when there is nothing honest to replay: no path recorded, a SAN
+     * the shipped chess.js cannot play, or a path that does not land exactly on the
+     * drill's `parent_fen` (the last check is what keeps the feature truthful for
+     * hand-written payloads).
+     */
+    _buildLineSteps(drill) {
+        if (!drill) return null;
+        const sans = (Array.isArray(drill.path_san) && drill.path_san.length)
+            ? drill.path_san.slice()
+            : (Array.isArray(drill.move_history_sans) ? drill.move_history_sans.slice() : []);
+        if (!sans.length) return null;
+        let chess;
+        try { chess = new Chess(); } catch (err) { return null; }
+        const steps = [{ fen: chess.fen(), from: null, to: null, san: null }];
+        for (const san of sans) {
+            let mv = null;
+            try { mv = chess.move(String(san)); } catch (err) { mv = null; }
+            if (!mv) return null;
+            steps.push({ fen: chess.fen(), from: mv.from, to: mv.to, san: mv.san || String(san) });
+        }
+        const target = this._fen4(drill.parent_fen || this.currentFen || '');
+        if (target && this._fen4(steps[steps.length - 1].fen) !== target) return null;
+        return steps;
+    }
+
+    /** (Re)loads the timeline from the drill on screen. Never runs mid-replay. */
+    _loadLineSteps() {
+        if (this.replayMode) return;
+        this.lineSteps = this._buildLineSteps(this.currentDrill) || [];
+        this.lineIndex = Math.max(0, this.lineSteps.length - 1);
+        this._renderReplayBar();
+    }
+
+    /** Hard reset — every drill change goes through here. */
+    _resetLineReplay() {
+        this._stopReplayTimer();
+        this.replayPlaying = false;
+        this.replayMode = false;
+        this.lineSteps = [];
+        this.lineIndex = 0;
+        this.replaySavedWaiting = false;
+        if (this.board && this.board.options) this.board.options.interactive = true;
+        this._renderReplayBar();
+    }
+
+    _stopReplayTimer() {
+        if (this.replayTimer) { clearTimeout(this.replayTimer); this.replayTimer = null; }
+    }
+
+    /**
+     * AGENTS.md §8.4: the `▶ Replay Line` button and the transport bar keep their
+     * boxes and are revealed with `visibility` (+ `disabled`), never `display`, so
+     * nothing below the board reflows when the replay starts or stops.
+     */
+    _renderReplayBar() {
+        const steps = this.lineSteps || [];
+        const canReplay = steps.length >= 2;
+        const lastIndex = Math.max(0, steps.length - 1);
+        const atStart = this.lineIndex <= 0;
+        const atEnd = this.lineIndex >= lastIndex;
+
+        const btnReplay = document.getElementById('btnTrainReplay');
+        if (btnReplay) {
+            btnReplay.style.visibility = canReplay ? 'visible' : 'hidden';
+            btnReplay.disabled = !canReplay;
+            btnReplay.textContent = this.replayPlaying ? '⏸ Pause' : (this.replayMode ? '▶ Resume' : '▶ Replay Line');
+            btnReplay.title = this.replayPlaying
+                ? 'Pause the line replay (Space)'
+                : (this.replayMode
+                    ? 'Resume the line replay from the start (Space)'
+                    : 'Replay the moves that led to this position at 650 ms per move (Space)');
+        }
+
+        const bar = document.getElementById('trainReplayBar');
+        if (bar) {
+            bar.style.visibility = this.replayMode ? 'visible' : 'hidden';
+            bar.style.opacity = this.replayMode ? '1' : '0';
+        }
+
+        const btnStart = document.getElementById('btnTrainReplayStart');
+        if (btnStart) btnStart.disabled = !this.replayMode || atStart;
+        const btnPrev = document.getElementById('btnTrainReplayPrev');
+        if (btnPrev) btnPrev.disabled = !this.replayMode || atStart;
+        const btnNext = document.getElementById('btnTrainReplayNext');
+        if (btnNext) btnNext.disabled = !this.replayMode || atEnd;
+        const btnExit = document.getElementById('btnTrainReplayExit');
+        if (btnExit) btnExit.disabled = !this.replayMode;
+
+        const status = document.getElementById('trainReplayStatus');
+        if (status) {
+            const mode = this.replayPlaying ? 'Playing' : 'Paused';
+            status.textContent = `${mode} ${this.lineIndex} / ${lastIndex}`;
+            status.title = canReplay
+                ? `Line replay: move ${this.lineIndex} of ${lastIndex} — 650 ms per move`
+                : 'Line replay: no recorded move path for this position';
+        }
+    }
+
+    /** Puts the board on one step of the line (clamped) and repaints the transport bar. */
+    _gotoLineStep(index) {
+        const steps = this.lineSteps || [];
+        if (!steps.length) return;
+        const clamped = Math.max(0, Math.min(steps.length - 1, index));
+        this.lineIndex = clamped;
+        const step = steps[clamped];
+        if (this.board) {
+            this.board.loadFEN(step.fen);
+            if (step.from && step.to) {
+                this.board.setLastMove(step.from, step.to);
+            } else {
+                this.board.setLastMove(null, null);
+            }
+        }
+        this._renderReplayBar();
+    }
+
+    /**
+     * Enters replay mode: the board stops accepting moves and the drill's wait
+     * state is parked in `replaySavedWaiting` until `exitReplay()`.
+     *
+     * Refuses while a continuation is in flight: an opponent reply landing on a
+     * scrubbed board would overwrite `currentFen` with a position of the replay
+     * (CODE-07 family bug).
+     */
+    _enterReplayMode() {
+        if (!this.currentDrill || this.opponentReplyTimeout || this.autoNextTimeout) return false;
+        if (!this.replayMode) {
+            this.replaySavedWaiting = !!this.isWaitingForUser;
+            this.isWaitingForUser = false;
+            if (this.mistakeResetTimeout) { clearTimeout(this.mistakeResetTimeout); this.mistakeResetTimeout = null; }
+            if (this.solutionArrowFadeTimeout) { clearTimeout(this.solutionArrowFadeTimeout); this.solutionArrowFadeTimeout = null; }
+            this.replayMode = true;
+        }
+        if (this.board && this.board.options) this.board.options.interactive = false;
+        this._renderReplayBar();
+        return true;
+    }
+
+    /**
+     * `▶ Replay Line` / Space: plays the line that led to the drill position from
+     * the start, at `replayDelayMs` per move. Already replaying? Then the button is
+     * a pause/resume control.
+     */
+    startReplay() {
+        if (this.replayMode) { this.toggleReplayPlayback(); return; }
+        const steps = this._buildLineSteps(this.currentDrill);
+        if (!steps || steps.length < 2) {
+            window.showToast?.('No recorded move path for this position — replay is unavailable.', '#94a3b8', 2600);
+            return;
+        }
+        if (!this._enterReplayMode()) {
+            window.showToast?.('Wait for the opponent move to finish, then replay.', '#94a3b8', 2200);
+            return;
+        }
+        this.lineSteps = steps;
+        this.lineIndex = 0;
+        this._gotoLineStep(0);
+        this.replayPlaying = true;
+        this._renderReplayBar();
+        this._scheduleReplayTick();
+    }
+
+    /**
+     * Space: start / pause / resume. Pressing play while parked on the last step
+     * (the automatic replay stops there, owner decision) plays the line again.
+     */
+    toggleReplayPlayback() {
+        if (!this.replayMode) { this.startReplay(); return; }
+        if (this.replayPlaying) { this.pauseReplay(); return; }
+        const lastIndex = Math.max(0, (this.lineSteps || []).length - 1);
+        if (lastIndex > 0 && this.lineIndex >= lastIndex) {
+            this._gotoLineStep(0);
+        }
+        this.replayPlaying = true;
+        this._renderReplayBar();
+        this._scheduleReplayTick();
+    }
+
+    pauseReplay() {
+        this._stopReplayTimer();
+        this.replayPlaying = false;
+        this._renderReplayBar();
+    }
+
+    /**
+     * Arrows + h/l. Stepping always pauses the automatic play (owner: "pause the
+     * automatic play and go back and forth").
+     *
+     * With no replay active a *backward* step enters the replay one ply back (the
+     * owner's decision), while a forward step is a no-op because the board is
+     * already on the live drill position.
+     */
+    replayStep(delta) {
+        const steps = this.lineSteps || [];
+        if (!this.replayMode) {
+            if (delta > 0) return;
+            if (steps.length < 2) {
+                window.showToast?.('No recorded move path for this position to step through.', '#94a3b8', 2200);
+                return;
+            }
+            if (!this._enterReplayMode()) return;
+            this._stopReplayTimer();
+            this.replayPlaying = false;
+            this._gotoLineStep(steps.length - 2);
+            return;
+        }
+        this._stopReplayTimer();
+        this.replayPlaying = false;
+        this._gotoLineStep(this.lineIndex + delta);
+    }
+
+    /** ⏮ Start / ↑ / k / Home — jumps to the first position of the line. */
+    replayJumpTo(index) {
+        if (!this.replayMode) {
+            if ((this.lineSteps || []).length < 2) return;
+            if (!this._enterReplayMode()) return;
+        }
+        this._stopReplayTimer();
+        this.replayPlaying = false;
+        this._gotoLineStep(index);
+    }
+
+    /** ⏭ / ↓ / j / End / ✕ Exit — back to the live drill position. */
+    replayJumpToEnd() {
+        this.exitReplay();
+    }
+
+    /**
+     * Leaves replay mode. `this.currentFen` was never written while scrubbing, so
+     * the board is restored from it — with the drill's last-move highlight and its
+     * saved plan arrows — and the position becomes answerable again.
+     */
+    exitReplay() {
+        if (!this.replayMode) return;
+        this._stopReplayTimer();
+        this.replayPlaying = false;
+        this.replayMode = false;
+        this.lineIndex = Math.max(0, (this.lineSteps || []).length - 1);
+        if (this.board) {
+            if (this.currentFen) this.board.loadFEN(this.currentFen);
+            this.board.clearArrows();
+            const lm = this.currentDrill && this.currentDrill.last_move;
+            if (lm && lm.from && lm.to) {
+                this.board.setLastMove(lm.from, lm.to);
+            } else {
+                this.board.setLastMove(null, null);
+            }
+            if (this.savedPlanArrows && this.savedPlanArrows.length) {
+                this.board.setArrows(this.savedPlanArrows);
+            }
+            if (this.board.options) this.board.options.interactive = true;
+        }
+        this.isWaitingForUser = this.replaySavedWaiting;
+        this.replaySavedWaiting = false;
+        this.updateHintButtonState(this.isWaitingForUser);
+        this._renderReplayBar();
+    }
+
+    /**
+     * The 650 ms auto-play chain. CODE-07: the tick carries the `drillToken` it was
+     * scheduled under, so a drill replacement stops it without ever touching the
+     * board of the new drill.
+     */
+    _scheduleReplayTick() {
+        const token = this.drillToken;
+        this._stopReplayTimer();
+        this.replayTimer = setTimeout(() => {
+            this.replayTimer = null;
+            if (token !== this.drillToken) return;                 // the drill changed under us
+            if (!this.replayMode || !this.replayPlaying) return;   // paused or left in the meantime
+            const lastIndex = Math.max(0, (this.lineSteps || []).length - 1);
+            if (this.lineIndex < lastIndex) {
+                this._gotoLineStep(this.lineIndex + 1);
+            }
+            if (this.lineIndex >= lastIndex) {
+                // Owner decision: the automatic replay stays parked on the drill
+                // position; Esc / ↓ / j / End / ✕ Exit hand the board back.
+                this.replayPlaying = false;
+                this._renderReplayBar();
+                window.showToast?.('Replay finished — Space to play it again, Esc to go back to the drill.', '#94a3b8', 2600);
+                return;
+            }
+            this._scheduleReplayTick();
+        }, this.replayDelayMs);
     }
 
     updateStats() {
@@ -1287,6 +1668,8 @@ class RepertoireTrainer {
         if (!this.isWaitingForUser || !this.currentFen) return;
 
         const attemptedUci = from + to + (promo || '');
+        // SAN of the move the user actually played (needed to extend the replay path).
+        const attemptSan = (moveRes && typeof moveRes.san === 'string') ? moveRes.san : null;
         const feedback = document.getElementById('trainFeedback');
         // CODE-07: this attempt belongs to the drill that is on screen *now*.
         const drillToken = this.drillToken;
@@ -1529,11 +1912,21 @@ class RepertoireTrainer {
                                 }
 
                                 const prevPath = this.currentDrill.path_formatted || '';
-                                const userSan = data.your_san || attemptedUci;
+                                const userSan = data.your_san || attemptSan || attemptedUci;
                                 const oppSan = opp.san;
                                 const updatedPath = prevPath ? `${prevPath} ${userSan} ${oppSan}` : `${userSan} ${oppSan}`;
                                 this.currentDrill.path_formatted = updatedPath;
                                 this.updateBreadcrumb(updatedPath, this.currentDrill.drill_reason, (this.currentDrill.ply_depth || 1) + 2);
+
+                                // Keep the replay timeline truthful for the deeper position. The drill's
+                                // `parent_fen` is a snapshot of the position it was fetched for, so it has
+                                // to follow the board: `_buildLineSteps()` validates the rebuilt path
+                                // against it and would otherwise discard a perfectly good timeline.
+                                if (Array.isArray(this.currentDrill.path_san)) {
+                                    this.currentDrill.path_san.push(userSan, oppSan);
+                                    if (this.currentFen) this.currentDrill.parent_fen = this.currentFen;
+                                    this._loadLineSteps();
+                                }
                             }
 
                             // Ready for user's next move in the continuing line
