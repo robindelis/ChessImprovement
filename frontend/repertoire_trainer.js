@@ -1413,27 +1413,72 @@ class RepertoireTrainer {
         }
     }
 
+    /**
+     * Synchronises board interactivity and `isWaitingForUser` with the current
+     * replay state:
+     *   - While actively auto-playing (`replayPlaying`) or scrubbed to an earlier
+     *     ply (`lineIndex < lastIndex`), the board is locked so the user cannot
+     *     grade a move on an intermediate position.
+     *   - Whenever the replay has arrived at the drill position (`!replayPlaying`
+     *     and `lineIndex >= lastIndex`) — or when replay mode is off — the board
+     *     is unlocked and `isWaitingForUser` is restored so the user can play their
+     *     move immediately without having to dismiss the replay bar first.
+     */
+    _syncReplayInteractivity() {
+        const shouldWait = Boolean(
+            this.replaySavedWaiting ||
+            (this.currentDrill && this.currentDrill.expected_uci && !this.opponentReplyTimeout && !this.autoNextTimeout)
+        );
+        if (!this.replayMode) {
+            if (this.board && this.board.options) this.board.options.interactive = true;
+            return;
+        }
+        const steps = this.lineSteps || [];
+        const lastIndex = Math.max(0, steps.length - 1);
+        const atLiveDrill = !this.replayPlaying && this.lineIndex >= lastIndex;
+        if (atLiveDrill) {
+            if (this.board && this.board.options) this.board.options.interactive = true;
+            this.isWaitingForUser = shouldWait;
+            this.updateHintButtonState(this.isWaitingForUser);
+        } else {
+            if (this.board && this.board.options) this.board.options.interactive = false;
+            this.isWaitingForUser = false;
+            this.updateHintButtonState(false);
+        }
+    }
+
     /** Puts the board on one step of the line (clamped) and repaints the transport bar. */
     _gotoLineStep(index) {
         const steps = this.lineSteps || [];
         if (!steps.length) return;
-        const clamped = Math.max(0, Math.min(steps.length - 1, index));
+        const lastIndex = steps.length - 1;
+        const clamped = Math.max(0, Math.min(lastIndex, index));
         this.lineIndex = clamped;
         const step = steps[clamped];
+        const atLiveDrill = !this.replayPlaying && clamped >= lastIndex;
         if (this.board) {
-            this.board.loadFEN(step.fen);
-            if (step.from && step.to) {
-                this.board.setLastMove(step.from, step.to);
+            const fenToLoad = (atLiveDrill && this.currentFen) ? this.currentFen : step.fen;
+            this.board.loadFEN(fenToLoad);
+            this.board.clearArrows();
+            const lm = (atLiveDrill && this.currentDrill && this.currentDrill.last_move)
+                ? this.currentDrill.last_move
+                : step;
+            if (lm && lm.from && lm.to) {
+                this.board.setLastMove(lm.from, lm.to);
             } else {
                 this.board.setLastMove(null, null);
             }
+            if (atLiveDrill && this.savedPlanArrows && this.savedPlanArrows.length) {
+                this.board.setArrows(this.savedPlanArrows);
+            }
         }
+        this._syncReplayInteractivity();
         this._renderReplayBar();
     }
 
     /**
-     * Enters replay mode: the board stops accepting moves and the drill's wait
-     * state is parked in `replaySavedWaiting` until `exitReplay()`.
+     * Enters replay mode: the board stops accepting moves while on earlier plies
+     * and the drill's wait state is parked in `replaySavedWaiting` until `exitReplay()`.
      *
      * Refuses while a continuation is in flight: an opponent reply landing on a
      * scrubbed board would overwrite `currentFen` with a position of the replay
@@ -1442,7 +1487,10 @@ class RepertoireTrainer {
     _enterReplayMode() {
         if (!this.currentDrill || this.opponentReplyTimeout || this.autoNextTimeout) return false;
         if (!this.replayMode) {
-            this.replaySavedWaiting = !!this.isWaitingForUser;
+            this.replaySavedWaiting = Boolean(
+                this.isWaitingForUser ||
+                (this.currentDrill && this.currentDrill.expected_uci)
+            );
             this.isWaitingForUser = false;
             if (this.mistakeResetTimeout) { clearTimeout(this.mistakeResetTimeout); this.mistakeResetTimeout = null; }
             if (this.solutionArrowFadeTimeout) { clearTimeout(this.solutionArrowFadeTimeout); this.solutionArrowFadeTimeout = null; }
@@ -1471,9 +1519,8 @@ class RepertoireTrainer {
         }
         this.lineSteps = steps;
         this.lineIndex = 0;
-        this._gotoLineStep(0);
         this.replayPlaying = true;
-        this._renderReplayBar();
+        this._gotoLineStep(0);
         this._scheduleReplayTick();
     }
 
@@ -1484,18 +1531,21 @@ class RepertoireTrainer {
     toggleReplayPlayback() {
         if (!this.replayMode) { this.startReplay(); return; }
         if (this.replayPlaying) { this.pauseReplay(); return; }
+        this.replayPlaying = true;
         const lastIndex = Math.max(0, (this.lineSteps || []).length - 1);
         if (lastIndex > 0 && this.lineIndex >= lastIndex) {
             this._gotoLineStep(0);
+        } else {
+            this._syncReplayInteractivity();
+            this._renderReplayBar();
         }
-        this.replayPlaying = true;
-        this._renderReplayBar();
         this._scheduleReplayTick();
     }
 
     pauseReplay() {
         this._stopReplayTimer();
         this.replayPlaying = false;
+        this._syncReplayInteractivity();
         this._renderReplayBar();
     }
 
@@ -1567,7 +1617,11 @@ class RepertoireTrainer {
             }
             if (this.board.options) this.board.options.interactive = true;
         }
-        this.isWaitingForUser = this.replaySavedWaiting;
+        const shouldWait = Boolean(
+            this.replaySavedWaiting ||
+            (this.currentDrill && this.currentDrill.expected_uci && !this.opponentReplyTimeout && !this.autoNextTimeout)
+        );
+        this.isWaitingForUser = shouldWait;
         this.replaySavedWaiting = false;
         this.updateHintButtonState(this.isWaitingForUser);
         this._renderReplayBar();
@@ -1586,15 +1640,15 @@ class RepertoireTrainer {
             if (token !== this.drillToken) return;                 // the drill changed under us
             if (!this.replayMode || !this.replayPlaying) return;   // paused or left in the meantime
             const lastIndex = Math.max(0, (this.lineSteps || []).length - 1);
-            if (this.lineIndex < lastIndex) {
-                this._gotoLineStep(this.lineIndex + 1);
-            }
-            if (this.lineIndex >= lastIndex) {
-                // Owner decision: the automatic replay stays parked on the drill
-                // position; Esc / ↓ / j / End / ✕ Exit hand the board back.
+            const nextIndex = Math.min(lastIndex, this.lineIndex + 1);
+            if (nextIndex >= lastIndex) {
+                // Arrived at the drill position: stop auto-play and unlock the board
+                // so the user can immediately play their move (or press ←/h to review).
                 this.replayPlaying = false;
-                this._renderReplayBar();
-                window.showToast?.('Replay finished — Space to play it again, Esc to go back to the drill.', '#94a3b8', 2600);
+            }
+            this._gotoLineStep(nextIndex);
+            if (this.lineIndex >= lastIndex) {
+                window.showToast?.('Replay finished — play your move, or press ←/h to review.', '#94a3b8', 2600);
                 return;
             }
             this._scheduleReplayTick();
@@ -1698,6 +1752,13 @@ class RepertoireTrainer {
 
     async onUserAttempt(from, to, promo, moveRes) {
         if (!this.isWaitingForUser || !this.currentFen) return;
+        if (this.replayMode) {
+            this._stopReplayTimer();
+            this.replayPlaying = false;
+            this.replayMode = false;
+            this.replaySavedWaiting = false;
+            this._renderReplayBar();
+        }
 
         const attemptedUci = from + to + (promo || '');
         // SAN of the move the user actually played (needed to extend the replay path).

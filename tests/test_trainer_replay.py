@@ -977,6 +977,10 @@ class TestReplayKeysAndBoard(_NodeScenarioMixin, unittest.TestCase):
 
     def test_a_forward_step_at_the_last_step_is_a_no_op(self):
         self.assertEqual(self.result["fwdAtEnd"]["snap"]["index"], 2)
+        self.assertTrue(self.result["fwdAtEnd"]["snap"]["interactive"],
+                        "arriving at the drill position must unlock the board so the user can play")
+        self.assertTrue(self.result["fwdAtEnd"]["snap"]["waiting"],
+                        "arriving at the drill position must restore isWaitingForUser")
         # Paused at the last step, resuming replays the line from the start.
         self.assertEqual(self.result["fwdAtEnd"]["btnTitle"],
                          "Replay the line again from the start (Space)")
