@@ -22,6 +22,15 @@ Why these tests live here
 
 Nothing here can skip silently: a missing/emptied frontend file is an
 `AssertionError`; only an absent `node` binary makes the runtime tests skip.
+
+Cross-engine FEN normalisation
+------------------------------
+The timeline validation compares a chess.js FEN (the rebuilt path) with a
+`parent_fen` produced by python-chess. The two libraries disagree about the
+en-passant field on every double pawn push (python-chess writes it only when a
+legal en-passant capture exists), so the validation uses 3-token keys. The
+regression tests below use *literal* python-chess-style FENs (en-passant `-`);
+building both sides with chess.js is what let the bug through the first time.
 """
 import os
 import re
@@ -67,9 +76,34 @@ def _keydown_block(source, anchor):
     raise AssertionError("no keydown handler containing %r" % (anchor,))
 
 
+def fen3(fen):
+    """3-token FEN key (placement + turn + castling) — see `_fen3()`.
+
+    The en-passant token is excluded on purpose: `parent_fen` is a python-chess FEN
+    and the replay timeline is rebuilt with chess.js, and the two libraries only
+    agree on the en-passant field when a legal en-passant capture exists.
+    """
+    return " ".join(str(fen).split()[:3])
+
+
 def fen4(fen):
-    """4-token FEN key — the repo's canonical comparison form (AGENTS.md §4)."""
+    """4-token FEN key (AGENTS.md §4) — only valid for *same-engine* comparisons."""
     return " ".join(str(fen).split()[:4])
+
+
+def backend_style_fen(fen):
+    """The same position as python-chess would write it: no en-passant square.
+
+    python-chess omits the en-passant target unless a legal en-passant capture
+    exists, chess.js writes it after every double pawn push. Every FEN in this
+    module that models a *backend* `parent_fen` goes through here (or is a literal
+    from the planner's cross-engine probe), so the tests cannot accidentally compare
+    chess.js with chess.js again.
+    """
+    parts = str(fen).split()
+    if len(parts) >= 4:
+        parts[3] = "-"
+    return " ".join(parts)
 
 
 # Ids the replay feature added. Every one of them is looked up with a literal
@@ -255,6 +289,18 @@ const FEN_START = (new Chess()).fen();
 const FEN_E4 = fenAfter(['e4']);
 const FEN_E4E5 = fenAfter(['e4', 'e5']);
 const FEN_E4E5NF3 = fenAfter(['e4', 'e5', 'Nf3']);
+const FEN_NF3D5 = fenAfter(['Nf3', 'd5']);
+const FEN_D4D5NF3 = fenAfter(['d4', 'd5', 'Nf3']);
+
+// A real Spanish line whose last move is the double pawn push ...b5.
+const SPANISH = ['e4', 'e5', 'Nf3', 'Nc6', 'Bb5', 'a6', 'Ba4', 'Nf6', 'O-O', 'Be7', 'Re1', 'b5'];
+const FEN_SPANISH = fenAfter(SPANISH);
+
+// Literal python-chess-style FENs (`ep = '-'`, the planner's cross-engine probe).
+const BACKEND_E4E5 = 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2';
+const BACKEND_E4C5 = 'rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2';
+const BACKEND_NF3D5 = 'rnbqkbnr/ppp1pppp/8/3p4/8/5N2/PPPPPPPP/RNBQKB1R w KQkq - 0 2';
+const BACKEND_SPANISH = 'r1bqk2r/2ppbppp/p1n2n2/1p2p3/B3P3/5N2/PPPP1PPP/RNBQR1K1 w kq - 0 7';
 
 function brief(steps) {
     if (!steps) return null;
@@ -263,18 +309,50 @@ function brief(steps) {
         first: steps[0],
         last: steps[steps.length - 1],
         sans: steps.map(function (s) { return s.san; }),
+        fen3Last: trainer._fen3(steps[steps.length - 1].fen),
         fen4Last: trainer._fen4(steps[steps.length - 1].fen)
     };
 }
+
+/* ------------------------------------------------------------------ *
+ * The two key forms, and the bug they document.
+ *
+ * `_fen3()` (placement + turn + castling) is the only key that may compare a
+ * chess.js FEN with a python-chess `parent_fen`: the en-passant token is written
+ * under a different rule by the two libraries, and a 4-token comparison therefore
+ * refused every drill whose last move was a double pawn push.
+ * ------------------------------------------------------------------ */
+const keyChess = trainer._fen4(FEN_E4E5);
+const keyBackend = trainer._fen4(BACKEND_E4E5);
+const key3Chess = trainer._fen3(FEN_E4E5);
+const key3Backend = trainer._fen3(BACKEND_E4E5);
 
 const valid = brief(trainer._buildLineSteps({ path_san: ['e4'], parent_fen: FEN_E4 }));
 const fallback = brief(trainer._buildLineSteps({ move_history_sans: ['e4', 'e5'], parent_fen: FEN_E4E5 }));
 const longer = brief(trainer._buildLineSteps({ path_san: ['e4', 'e5', 'Nf3'], parent_fen: FEN_E4E5NF3 }));
 const mismatch = brief(trainer._buildLineSteps({ path_san: ['e4'], parent_fen: FEN_E4E5 }));
+const mismatchOpening = brief(trainer._buildLineSteps({ path_san: ['e4', 'e5', 'Nf3'], parent_fen: FEN_D4D5NF3 }));
 const illegal = brief(trainer._buildLineSteps({ path_san: ['e4', 'e5', 'Kxe5'], parent_fen: FEN_E4E5 }));
 const emptyPath = brief(trainer._buildLineSteps({ path_san: [], move_history_sans: [], parent_fen: FEN_E4 }));
 const noPath = brief(trainer._buildLineSteps({ repertoire: 'white', parent_fen: FEN_E4 }));
 const noDrill = brief(trainer._buildLineSteps(null));
+
+/* CRoss-engine regression: python-chess-style `parent_fen` (en-passant `-`)
+ * against a path whose last move is a double pawn push. */
+const crossE4E5 = brief(trainer._buildLineSteps({
+    path_san: ['e4', 'e5'],
+    parent_fen: BACKEND_E4E5
+}));
+const crossE4C5 = brief(trainer._buildLineSteps({
+    path_san: ['e4', 'c5'],
+    parent_fen: BACKEND_E4C5
+}));
+const crossNf3D5 = brief(trainer._buildLineSteps({
+    path_san: ['Nf3', 'd5'],
+    parent_fen: BACKEND_NF3D5
+}));
+const crossNf3D5ChessJs = brief(trainer._buildLineSteps({ path_san: ['Nf3', 'd5'], parent_fen: FEN_NF3D5 }));
+const crossSpanish = brief(trainer._buildLineSteps({ path_san: SPANISH, parent_fen: BACKEND_SPANISH }));
 
 // `_loadLineSteps()` derives the timeline from the drill on screen…
 trainer.currentDrill = { path_san: ['e4', 'e5'], parent_fen: FEN_E4E5 };
@@ -294,14 +372,33 @@ return {
     fenE4: FEN_E4,
     fenE4E5: FEN_E4E5,
     fenE4E5Nf3: FEN_E4E5NF3,
+    fenNf3D5: FEN_NF3D5,
+    backendE4E5: BACKEND_E4E5,
+    backendE4C5: BACKEND_E4C5,
+    backendNf3D5: BACKEND_NF3D5,
+    backendChessJsE4E5: FEN_E4E5,
+    chessJsSpanish: FEN_SPANISH,
+    backendSpanish: BACKEND_SPANISH,
+    keys: {
+        fen3Chess: key3Chess,
+        fen3Backend: key3Backend,
+        fen4Chess: keyChess,
+        fen4Backend: keyBackend
+    },
     valid: valid,
     fallback: fallback,
     longer: longer,
     mismatch: mismatch,
+    mismatchOpening: mismatchOpening,
     illegal: illegal,
     emptyPath: emptyPath,
     noPath: noPath,
     noDrill: noDrill,
+    crossE4E5: crossE4E5,
+    crossE4C5: crossE4C5,
+    crossNf3D5: crossNf3D5,
+    crossNf3D5ChessJs: crossNf3D5ChessJs,
+    crossSpanish: crossSpanish,
     loaded: loaded,
     lockedMidReplay: lockedMidReplay
 };
@@ -374,7 +471,14 @@ function fenAfter(moves) {
 }
 
 const DRILL_FEN = fenAfter(['e4', 'e5']);
+const FEN_E4 = fenAfter(['e4']);
 const START_FEN = (new Chess()).fen();
+// The same position as the BACKEND sends it: python-chess writes the en-passant
+// square only when a legal en-passant capture exists, so it is `-` here while
+// chess.js writes `e6` (see `_fen3()`). This literal is what the shipped app
+// receives for a drill after 1.e4 e5 — and it is exactly what used to make the
+// replay go dark.
+const BACKEND_DRILL_FEN = 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2';
 
 function makeDrill(overrides) {
     return Object.assign({
@@ -554,14 +658,55 @@ t3.autoNextTimeout = null;
 const handledAfterContinuation = press(t3, 'h');
 const afterContinuation = snapshot(t3, b3);
 
+/* 12. Regression, end to end: a drill whose `parent_fen` comes from the BACKEND
+ *     (python-chess, en-passant `-`) and whose last move was a double pawn push
+ *     must still reveal the button and still step back with `h` — this is the
+ *     exact shape of the drill payload that used to leave the feature dark. */
+const T4 = makeTrainer();
+const t4 = T4.trainer;
+const b4 = T4.board;
+t4.currentDrill = makeDrill({ parent_fen: BACKEND_DRILL_FEN });
+t4.currentFen = BACKEND_DRILL_FEN;
+t4._loadLineSteps();
+const toastsBeforeCross = toasts.length;
+const crossDrill = {
+    snap: snapshot(t4, b4),
+    btnVisibility: replayBtnEl.style.visibility,
+    btnDisabled: replayBtnEl.disabled,
+    barVisibility: barEl.style.visibility,
+    status: statusEl.textContent
+};
+const handledCrossBack = press(t4, 'h');
+const crossBack = {
+    handled: handledCrossBack,
+    snap: snapshot(t4, b4),
+    newToasts: toasts.length - toastsBeforeCross
+};
+const handledCrossExit = press(t4, 'Escape');
+const crossExit = { handled: handledCrossExit, snap: snapshot(t4, b4) };
+
+/* `l` on that same drill (still no replay active) stays on the live position. */
+const T5 = makeTrainer();
+const t5 = T5.trainer;
+const b5 = T5.board;
+t5.currentDrill = makeDrill({ parent_fen: BACKEND_DRILL_FEN });
+t5.currentFen = BACKEND_DRILL_FEN;
+t5._loadLineSteps();
+const handledCrossForward = press(t5, 'l');
+const crossForward = { handled: handledCrossForward, snap: snapshot(t5, b5) };
+t5._stopReplayTimer();
+
 // Never leave a timer behind: a pending one would keep the node process alive.
 t._stopReplayTimer();
 t2._stopReplayTimer();
 t3._stopReplayTimer();
+t4._stopReplayTimer();
 
 return {
     startFen: START_FEN,
+    fenE4: FEN_E4,
     drillFen: DRILL_FEN,
+    backendDrillFen: BACKEND_DRILL_FEN,
     afterLoad: afterLoad,
     afterStart: afterStart,
     backH: backH,
@@ -600,6 +745,10 @@ return {
         handledAfter: handledAfterContinuation,
         snapAfter: afterContinuation
     },
+    crossDrill: crossDrill,
+    crossBack: crossBack,
+    crossExit: crossExit,
+    crossForward: crossForward,
     toasts: toasts
 };
 """
@@ -641,6 +790,15 @@ class TestReplayTimeline(_NodeScenarioMixin, unittest.TestCase):
 
     SCENARIO = _BUILD_LINE_STEPS_SCENARIO
 
+    # (timeline key, parent_fen key) — python-chess writes `ep = '-'` on all of them
+    # because no legal en-passant capture exists in the resulting position.
+    CROSS_ENGINE_CASES = (
+        ("crossE4E5", "backendE4E5"),
+        ("crossE4C5", "backendE4C5"),
+        ("crossNf3D5", "backendNf3D5"),
+        ("crossSpanish", "backendSpanish"),
+    )
+
     def test_a_valid_path_becomes_board_steps_and_lands_on_the_drill_position(self):
         valid = self.result["valid"]
         self.assertIsNotNone(valid, "_buildLineSteps() rejected a valid path_san")
@@ -650,25 +808,88 @@ class TestReplayTimeline(_NodeScenarioMixin, unittest.TestCase):
         self.assertEqual(valid["last"]["from"], "e2")
         self.assertEqual(valid["last"]["to"], "e4")
         self.assertEqual(valid["last"]["san"], "e4")
+        self.assertEqual(valid["fen3Last"], fen3(self.result["fenE4"]))
+        # Same-engine FENs (chess.js on both sides) still agree on 4 tokens, so the
+        # canonical AGENTS.md §4 key keeps working where it is applicable.
         self.assertEqual(valid["fen4Last"], fen4(self.result["fenE4"]))
+        self.assertEqual(valid["last"]["fen"], self.result["fenE4"],
+                         "the last step must be snapped to the drill's own FEN")
 
     def test_the_move_history_sans_fallback_covers_deviation_drills(self):
         fallback = self.result["fallback"]
         self.assertIsNotNone(fallback, "the move_history_sans alias was ignored")
         self.assertEqual(fallback["len"], 3)
         self.assertEqual(fallback["sans"], [None, "e4", "e5"])
-        self.assertEqual(fallback["fen4Last"], fen4(self.result["fenE4E5"]))
+        self.assertEqual(fallback["fen3Last"], fen3(self.result["fenE4E5"]))
 
     def test_a_longer_line_is_rebuilt_in_order(self):
         longer = self.result["longer"]
         self.assertIsNotNone(longer)
         self.assertEqual(longer["len"], 4)
         self.assertEqual(longer["sans"], [None, "e4", "e5", "Nf3"])
-        self.assertEqual(longer["fen4Last"], fen4(self.result["fenE4E5Nf3"]))
+        self.assertEqual(longer["fen3Last"], fen3(self.result["fenE4E5Nf3"]))
+
+    # ---- the en-passant bug (cross-engine comparison) ---------------- #
+
+    def test_the_validation_key_ignores_the_en_passant_token(self):
+        """`_fen3()` must compare placement + turn + castling only.
+
+        `parent_fen` is a python-chess FEN and the rebuilt steps are chess.js FENs;
+        after 1.e4 e5 the two disagree on the en-passant token (`-` vs `e6`), so a
+        4-token comparison discards every path ending in a double pawn push.
+        """
+        keys = self.result["keys"]
+        self.assertEqual(keys["fen3Chess"], keys["fen3Backend"],
+                         "_fen3() must ignore the en-passant token (chess.js e6 vs python-chess -)")
+        self.assertEqual(keys["fen3Backend"], fen3(self.result["backendE4E5"]),
+                         "the shipped _fen3() disagrees with the 3-token key definition")
+        self.assertNotEqual(keys["fen4Chess"], keys["fen4Backend"],
+                            "_fen4() DOES see the en-passant difference — this is the key that "
+                            "went dark; never use it to compare two engines' FENs")
+        self.assertEqual(len(keys["fen3Chess"].split()), 3)
+        self.assertEqual(len(keys["fen4Chess"].split()), 4)
+        # The literals really are this position, one en-passant token apart.
+        self.assertEqual(backend_style_fen(self.result["backendChessJsE4E5"]), self.result["backendE4E5"])
+
+    def test_a_path_ending_in_a_double_pawn_push_is_accepted_across_engines(self):
+        """Regression: python-chess `parent_fen` (`ep = '-'`) vs a chess.js path."""
+        for case_key, fen_key in self.CROSS_ENGINE_CASES:
+            case = self.result[case_key]
+            parent = self.result[fen_key]
+            self.assertEqual(parent.split()[3], "-", "%s: the fixture must be a python-chess FEN" % fen_key)
+            self.assertIsNotNone(
+                case,
+                "%s: the timeline was discarded over the en-passant token "
+                "(3 tokens must match, 4 do not)" % case_key)
+            self.assertEqual(case["fen3Last"], fen3(parent),
+                             "%s: the rebuilt path must land on the drill position" % case_key)
+            self.assertEqual(case["last"]["fen"], parent,
+                             "%s: the last step must be snapped to the drill's own FEN" % case_key)
+
+        # The same path against a chess.js-written parent_fen (the shape the first
+        # version of these tests used) must keep working.
+        chess_js_case = self.result["crossNf3D5ChessJs"]
+        self.assertIsNotNone(chess_js_case)
+        self.assertEqual(chess_js_case["fen3Last"], fen3(self.result["fenNf3D5"]))
+        self.assertEqual(chess_js_case["last"]["fen"], self.result["fenNf3D5"])
+
+    def test_the_spanish_case_is_the_cross_engine_probe_line(self):
+        """The long case is the planner's probe: 12 plies, last move ...b5 (double push)."""
+        self.assertEqual(
+            self.result["chessJsSpanish"],
+            "r1bqk2r/2ppbppp/p1n2n2/1p2p3/B3P3/5N2/PPPP1PPP/RNBQR1K1 w kq b6 0 7",
+            "the chess.js FEN of the probe line changed; re-derive BACKEND_SPANISH from it")
+        self.assertNotEqual(self.result["chessJsSpanish"], self.result["backendSpanish"])
+        self.assertEqual(backend_style_fen(self.result["chessJsSpanish"]), self.result["backendSpanish"])
+
+    # ---- refusals ---------------------------------------------------- #
 
     def test_a_path_that_does_not_land_on_parent_fen_is_refused(self):
         self.assertIsNone(self.result["mismatch"],
                           "a mismatching parent_fen must yield no timeline, not a wrong one")
+        self.assertIsNone(self.result["mismatchOpening"],
+                          "a different opening's position must be refused too (the 3-token key "
+                          "is not a rubber stamp)")
 
     def test_an_illegal_san_is_refused(self):
         self.assertIsNone(self.result["illegal"])
@@ -859,6 +1080,45 @@ class TestReplayKeysAndBoard(_NodeScenarioMixin, unittest.TestCase):
         self.assertTrue(cont["handledAfter"], "once the continuation is gone the replay works")
         self.assertTrue(after["mode"])
         self.assertEqual(after["index"], after["steps"] - 2)
+
+    # ---- the en-passant bug, end to end ------------------------------ #
+
+    def test_a_backend_parent_fen_after_a_double_pawn_push_still_replays(self):
+        """The visible half of the bug: the button must appear and `h` must step back.
+
+        The drill here is the shipped payload for 1.e4 e5: `parent_fen` written by
+        python-chess (`ep = '-'`) against a path rebuilt with chess.js (`ep = e6`).
+        Before the fix the timeline was discarded, the button stayed `hidden` and
+        `h` answered "No recorded move path for this position".
+        """
+        cross = self.result["crossDrill"]
+        self.assertEqual(cross["snap"]["steps"], 3,
+                         "the timeline was discarded over the en-passant token")
+        self.assertEqual(cross["snap"]["index"], 2)
+        self.assertEqual(cross["btnVisibility"], "visible", "the Replay button must be revealed")
+        self.assertFalse(cross["btnDisabled"])
+        self.assertEqual(cross["barVisibility"], "hidden")
+        self.assertEqual(cross["status"], "Paused 2 / 2")
+
+        back = self.result["crossBack"]
+        self.assertTrue(back["handled"])
+        self.assertEqual(back["newToasts"], 0,
+                         "`h` must not answer 'No recorded move path for this position'")
+        self.assertEqual(back["snap"]["index"], 1, "`h` must step one ply back")
+        self.assertTrue(back["snap"]["mode"])
+        self.assertFalse(back["snap"]["playing"])
+        self.assertEqual(back["snap"]["fen"], self.result["fenE4"],
+                         "one ply back from 1.e4 e5 is the position after 1.e4")
+        self.assertFalse(back["snap"]["interactive"])
+
+        # Escape hands the board back on the backend's own FEN.
+        self.assertTrue(self.result["crossExit"]["handled"])
+        self.assertEqual(self.result["crossExit"]["snap"]["fen"], self.result["backendDrillFen"])
+        self.assertTrue(self.result["crossExit"]["snap"]["interactive"])
+
+        # `l` with no replay active stays on the live position (nothing to go forward to).
+        self.assertFalse(self.result["crossForward"]["snap"]["mode"])
+        self.assertEqual(self.result["crossForward"]["snap"]["index"], 2)
 
 
 if __name__ == "__main__":

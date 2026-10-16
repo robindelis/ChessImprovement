@@ -1226,7 +1226,38 @@ class RepertoireTrainer {
     //  whole history can be replayed locally, with no backend call.       //
     // ================================================================== //
 
-    /** 4-token FEN key, the repo's canonical comparison form (AGENTS.md §4). */
+    /**
+     * 3-token FEN key — placement, side to move, castling rights. **This is the key
+     * every position comparison in this file must use.**
+     *
+     * The en-passant field is deliberately EXCLUDED because the two sides of the
+     * timeline validation come from *different* engines:
+     *
+     *   * `parent_fen` is produced by the backend with **python-chess**, which writes
+     *     the en-passant square only when a legal en-passant capture actually exists
+     *     (`-` after most double pawn pushes);
+     *   * the timeline is rebuilt here with **chess.js**, which writes the en-passant
+     *     square after *every* double pawn push (`e6`, `c6`, `b6`, …).
+     *
+     * A 4-token key would therefore refuse every drill whose last move was a double
+     * pawn push — 1.e4, 1...e5, 1...c5, 1...d5, …b5 — silently discarding the whole
+     * timeline and hiding the Replay button for a huge class of real positions.
+     * Do NOT re-tighten this to `_fen4()`.
+     */
+    _fen3(fen) {
+        return String(fen || '').trim().split(/\s+/).slice(0, 3).join(' ');
+    }
+
+    /**
+     * 4-token FEN key, the repo's canonical key form for payloads that come from ONE
+     * source (AGENTS.md §4 — used by the database and the builder's tree keys).
+     *
+     * **Never use this to compare two different engines' FENs** — in particular never
+     * to validate a chess.js FEN against a python-chess `parent_fen`: the en-passant
+     * token is not written under the same rule by the two libraries (see `_fen3()`),
+     * which is exactly how the line replay went dark for every drill whose last move
+     * was a double pawn push.
+     */
     _fen4(fen) {
         return String(fen || '').trim().split(/\s+/).slice(0, 4).join(' ');
     }
@@ -1284,9 +1315,15 @@ class RepertoireTrainer {
     /**
      * Rebuilds the SAN path of the current drill into concrete board steps.
      * Returns null when there is nothing honest to replay: no path recorded, a SAN
-     * the shipped chess.js cannot play, or a path that does not land exactly on the
-     * drill's `parent_fen` (the last check is what keeps the feature truthful for
+     * the shipped chess.js cannot play, or a path that does not land on the drill's
+     * `parent_fen` (the last check is what keeps the feature truthful for
      * hand-written payloads).
+     *
+     * The landing check compares **3-token** keys (`_fen3`, no en-passant token):
+     * `parent_fen` is a python-chess FEN and the rebuilt steps are chess.js FENs, and
+     * the two libraries disagree about the en-passant field on every double pawn push
+     * (see `_fen3()`). Any path that gets refused by a stricter key here is a path
+     * the engine itself would refuse, not a position mismatch.
      */
     _buildLineSteps(drill) {
         if (!drill) return null;
@@ -1303,8 +1340,13 @@ class RepertoireTrainer {
             if (!mv) return null;
             steps.push({ fen: chess.fen(), from: mv.from, to: mv.to, san: mv.san || String(san) });
         }
-        const target = this._fen4(drill.parent_fen || this.currentFen || '');
-        if (target && this._fen4(steps[steps.length - 1].fen) !== target) return null;
+        const targetFen = drill.parent_fen || this.currentFen || '';
+        const target = this._fen3(targetFen);
+        if (target && this._fen3(steps[steps.length - 1].fen) !== target) return null;
+        // Same position (the keys above proved it), but the two engines may spell the
+        // en-passant token differently: show the DRILL's own FEN on the last step so the
+        // board "paused at the end" of the replay is bit-identical to the live drill.
+        if (targetFen) steps[steps.length - 1].fen = String(targetFen);
         return steps;
     }
 
