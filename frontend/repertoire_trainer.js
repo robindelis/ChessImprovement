@@ -1235,31 +1235,19 @@ class RepertoireTrainer {
      *
      *   * `parent_fen` is produced by the backend with **python-chess**, which writes
      *     the en-passant square only when a legal en-passant capture actually exists
-     *     (`-` after most double pawn pushes);
+     *     (`-` after most double pawn pushes). The backend normalises exactly this way
+     *     for the same reason (`backend/repertoire.py` compares 3-token keys);
      *   * the timeline is rebuilt here with **chess.js**, which writes the en-passant
      *     square after *every* double pawn push (`e6`, `c6`, `b6`, …).
      *
-     * A 4-token key would therefore refuse every drill whose last move was a double
-     * pawn push — 1.e4, 1...e5, 1...c5, 1...d5, …b5 — silently discarding the whole
-     * timeline and hiding the Replay button for a huge class of real positions.
-     * Do NOT re-tighten this to `_fen4()`.
+     * A 4-token key (the DB's `normalize_fen`, AGENTS.md §4) would therefore refuse
+     * every drill whose last move was a double pawn push — 1.e4, 1...e5, 1...c5,
+     * 1...d5, …b5 — silently discarding the whole timeline and hiding the Replay
+     * button for a huge class of real positions. Do NOT tighten this back to 4 tokens:
+     * a 4-token key is only ever valid for FENs written by the SAME engine.
      */
     _fen3(fen) {
         return String(fen || '').trim().split(/\s+/).slice(0, 3).join(' ');
-    }
-
-    /**
-     * 4-token FEN key, the repo's canonical key form for payloads that come from ONE
-     * source (AGENTS.md §4 — used by the database and the builder's tree keys).
-     *
-     * **Never use this to compare two different engines' FENs** — in particular never
-     * to validate a chess.js FEN against a python-chess `parent_fen`: the en-passant
-     * token is not written under the same rule by the two libraries (see `_fen3()`),
-     * which is exactly how the line replay went dark for every drill whose last move
-     * was a double pawn push.
-     */
-    _fen4(fen) {
-        return String(fen || '').trim().split(/\s+/).slice(0, 4).join(' ');
     }
 
     /**
@@ -1394,7 +1382,9 @@ class RepertoireTrainer {
             btnReplay.title = this.replayPlaying
                 ? 'Pause the line replay (Space)'
                 : (this.replayMode
-                    ? 'Resume the line replay from the start (Space)'
+                    ? (atEnd
+                        ? 'Replay the line again from the start (Space)'
+                        : 'Resume the line replay (Space)')
                     : 'Replay the moves that led to this position at 650 ms per move (Space)');
         }
 

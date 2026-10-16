@@ -86,8 +86,13 @@ def fen3(fen):
     return " ".join(str(fen).split()[:3])
 
 
-def fen4(fen):
-    """4-token FEN key (AGENTS.md §4) — only valid for *same-engine* comparisons."""
+def db_style_fen_key(fen):
+    """The 4-token key the app writes into the DB (AGENTS.md §4, `normalize_fen`).
+
+    Only used here to *document the bug*: two engines' FENs disagree on this key
+    whenever the last move was a double pawn push, so it must never be used to
+    compare a chess.js FEN with a python-chess `parent_fen`.
+    """
     return " ".join(str(fen).split()[:4])
 
 
@@ -309,21 +314,18 @@ function brief(steps) {
         first: steps[0],
         last: steps[steps.length - 1],
         sans: steps.map(function (s) { return s.san; }),
-        fen3Last: trainer._fen3(steps[steps.length - 1].fen),
-        fen4Last: trainer._fen4(steps[steps.length - 1].fen)
+        fen3Last: trainer._fen3(steps[steps.length - 1].fen)
     };
 }
 
 /* ------------------------------------------------------------------ *
- * The two key forms, and the bug they document.
- *
  * `_fen3()` (placement + turn + castling) is the only key that may compare a
  * chess.js FEN with a python-chess `parent_fen`: the en-passant token is written
  * under a different rule by the two libraries, and a 4-token comparison therefore
- * refused every drill whose last move was a double pawn push.
+ * refused every drill whose last move was a double pawn push. The shipped file
+ * no longer has a 4-token helper at all — the DB key below is computed on the
+ * Python side, purely to document the difference.
  * ------------------------------------------------------------------ */
-const keyChess = trainer._fen4(FEN_E4E5);
-const keyBackend = trainer._fen4(BACKEND_E4E5);
 const key3Chess = trainer._fen3(FEN_E4E5);
 const key3Backend = trainer._fen3(BACKEND_E4E5);
 
@@ -381,9 +383,7 @@ return {
     backendSpanish: BACKEND_SPANISH,
     keys: {
         fen3Chess: key3Chess,
-        fen3Backend: key3Backend,
-        fen4Chess: keyChess,
-        fen4Backend: keyBackend
+        fen3Backend: key3Backend
     },
     valid: valid,
     fallback: fallback,
@@ -528,16 +528,19 @@ const afterStart = {
     snap: snapshot(t, b1),
     loads: T1.log.loadFEN.slice(),
     btnLabel: replayBtnEl.textContent,
+    btnTitle: replayBtnEl.title,
     barVisibility: barEl.style.visibility,
     status: statusEl.textContent
 };
 
-/* 3. Step parity: `h` and `ArrowLeft` (same index), `l` and `ArrowRight`. */
+/* 3. Step parity: `h` and `ArrowLeft` (same index), `l` and `ArrowRight`.
+ *    The captured title documents the truthful `▶ Resume` tooltip: paused
+ *    mid-line continues in place, paused at the end replays from the start. */
 function stepProbe(key, from) {
     t.pauseReplay();
     t.replayJumpTo(from);
     const handled = press(t, key);
-    return { handled: handled, snap: snapshot(t, b1) };
+    return { handled: handled, snap: snapshot(t, b1), btnTitle: replayBtnEl.title };
 }
 const backH = stepProbe('h', 2);
 const backArrow = stepProbe('ArrowLeft', 2);
@@ -547,7 +550,7 @@ const fwdArrow = stepProbe('ArrowRight', 0);
 // At the last step a forward step is a no-op (it can never leave the line).
 t.pauseReplay();
 t.replayJumpTo(2);
-const fwdAtEnd = (press(t, 'l'), snapshot(t, b1));
+const fwdAtEnd = (press(t, 'l'), { snap: snapshot(t, b1), btnTitle: replayBtnEl.title });
 
 /* 4. Jump keys: k / ArrowUp / Home → index 0; j / ArrowDown / End → live drill. */
 function jumpProbe(key) {
@@ -809,9 +812,6 @@ class TestReplayTimeline(_NodeScenarioMixin, unittest.TestCase):
         self.assertEqual(valid["last"]["to"], "e4")
         self.assertEqual(valid["last"]["san"], "e4")
         self.assertEqual(valid["fen3Last"], fen3(self.result["fenE4"]))
-        # Same-engine FENs (chess.js on both sides) still agree on 4 tokens, so the
-        # canonical AGENTS.md §4 key keeps working where it is applicable.
-        self.assertEqual(valid["fen4Last"], fen4(self.result["fenE4"]))
         self.assertEqual(valid["last"]["fen"], self.result["fenE4"],
                          "the last step must be snapped to the drill's own FEN")
 
@@ -843,13 +843,21 @@ class TestReplayTimeline(_NodeScenarioMixin, unittest.TestCase):
                          "_fen3() must ignore the en-passant token (chess.js e6 vs python-chess -)")
         self.assertEqual(keys["fen3Backend"], fen3(self.result["backendE4E5"]),
                          "the shipped _fen3() disagrees with the 3-token key definition")
-        self.assertNotEqual(keys["fen4Chess"], keys["fen4Backend"],
-                            "_fen4() DOES see the en-passant difference — this is the key that "
-                            "went dark; never use it to compare two engines' FENs")
-        self.assertEqual(len(keys["fen3Chess"].split()), 3)
-        self.assertEqual(len(keys["fen4Chess"].split()), 4)
+        self.assertEqual(len(keys["fen3Chess"].split()), 3,
+                         "the key must be exactly 3 tokens (no en-passant, no counters)")
+        # The DB key (AGENTS.md §4, `normalize_fen`) DOES see the difference — this is
+        # the comparison that went dark, and the shipped trainer no longer offers such
+        # a helper at all (`_fen3()` is the only FEN key in it).
+        self.assertNotEqual(db_style_fen_key(self.result["backendChessJsE4E5"]),
+                            db_style_fen_key(self.result["backendE4E5"]),
+                            "the two engines' FENs must differ on the 4-token key, or this "
+                            "regression test is no longer reproducing the bug")
         # The literals really are this position, one en-passant token apart.
         self.assertEqual(backend_style_fen(self.result["backendChessJsE4E5"]), self.result["backendE4E5"])
+        self.assertEqual(
+            db_style_fen_key(self.result["backendChessJsE4E5"]),
+            "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6",
+            "chess.js must write the en-passant square after 1.e4 e5")
 
     def test_a_path_ending_in_a_double_pawn_push_is_accepted_across_engines(self):
         """Regression: python-chess `parent_fen` (`ep = '-'`) vs a chess.js path."""
@@ -934,6 +942,7 @@ class TestReplayKeysAndBoard(_NodeScenarioMixin, unittest.TestCase):
                          "the first board load of a replay is the start of the line")
         self.assertEqual(after["barVisibility"], "visible")
         self.assertEqual(after["btnLabel"], "⏸ Pause")
+        self.assertEqual(after["btnTitle"], "Pause the line replay (Space)")
         self.assertEqual(after["status"], "Playing 0 / 2")
 
     # ---- h/l parity, executed --------------------------------------- #
@@ -958,6 +967,8 @@ class TestReplayKeysAndBoard(_NodeScenarioMixin, unittest.TestCase):
         self.assertEqual(fwd_l["snap"]["index"], 1)
         self.assertEqual(fwd_arrow["snap"], fwd_l["snap"],
                          "`l` and `ArrowRight` must produce the very same board state")
+        # Paused mid-line, "resume" continues in place — the title must say so.
+        self.assertEqual(fwd_l["btnTitle"], "Resume the line replay (Space)")
 
     def test_a_step_pauses_the_automatic_play(self):
         # `stepProbe` pauses first, so the step itself must leave playing false.
@@ -965,7 +976,10 @@ class TestReplayKeysAndBoard(_NodeScenarioMixin, unittest.TestCase):
         self.assertTrue(self.result["fwdL"]["snap"]["mode"], "stepping must not leave replay mode")
 
     def test_a_forward_step_at_the_last_step_is_a_no_op(self):
-        self.assertEqual(self.result["fwdAtEnd"]["index"], 2)
+        self.assertEqual(self.result["fwdAtEnd"]["snap"]["index"], 2)
+        # Paused at the last step, resuming replays the line from the start.
+        self.assertEqual(self.result["fwdAtEnd"]["btnTitle"],
+                         "Replay the line again from the start (Space)")
 
     # ---- jump keys --------------------------------------------------- #
 
