@@ -5,7 +5,7 @@
 
 ---
 
-![Chess Repertoire Studio Interface](docs/hero_screenshot.png)
+![Chess Repertoire Studio Interface](docs/hero_screenshot.webp)
 
 ---
 

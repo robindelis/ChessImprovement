@@ -35,9 +35,8 @@ bin/
 repertoire_imports/
 recovered/
 
-# Audit artefacts — reports/patches are local working notes
-audit/reports/*.tmp
-audit/scripts/__pycache__/
+# Audit artefacts
+audit/
 
 # OS / editor
 .DS_Store

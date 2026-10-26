@@ -38,8 +38,6 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FRONTEND_DIR = os.environ.get("FRONTEND_DIR") or os.path.join(REPO_ROOT, "frontend")
 
 JS_FILES = ("repertoire_builder.js", "board.js")
-PROBE = os.path.join(REPO_ROOT, "audit", "scripts", "FIXER-F_logic_probe.js")
-
 
 import functools
 
