@@ -1,4 +1,4 @@
-// Chess Opening Improvement Platform - Repertoire Trainer (Chessbook Style)
+// Repertoire Studio — FSRS-5 Active-Recall Repertoire Trainer
 class RepertoireTrainer {
     constructor() {
         this.activeColor = 'mixed';
@@ -12,26 +12,25 @@ class RepertoireTrainer {
         this.isInitialized = false;
         this.openingFilter = null;
 
-        // 20-Move Practice Session State (Chessbook style)
+        // 20-Move Practice Session State
         this.sessionTarget = 20;
         this.sessionIndex = 0;
         this.sessionCorrect = 0;
         this.sessionMistakes = 0;
         this.hasAnsweredCurrentPosition = false;
         this.autoNextTimeout = null;
-        // CODE-07: every deferred continuation of a drill is owned by a token.
-        // `drillToken` is bumped whenever the drill is replaced, so a 550ms
-        // opponent reply or an 800ms mistake reset can never touch the *next*
-        // drill's board.
         this.drillToken = 0;
         this.opponentReplyTimeout = null;
         this.mistakeResetTimeout = null;
-        // CODE-05: monotonic guards so a slow response can never overwrite a
-        // newer one (colour bleed between White/Black panels).
+        this.leadInTimeout = null;
         this.progressSeq = 0;
         this.openingsSeq = 0;
 
-        // Pedagogical Learning Curriculum State
+        // FSRS-5 Latency & Active-Recall State
+        this.drillReadyAt = 0;
+        this.pendingMoveNote = '';
+
+        // Pedagogical Curriculum State
         this.sessionMode = 'adaptive';
         this.sessionLapses = [];
         this.sessionReinforcementQueue = [];
@@ -39,7 +38,6 @@ class RepertoireTrainer {
         this.sessionDrilledIds = [];
         this.solutionArrowFadeTimeout = null;
 
-        // Reinforcement Round and Attempt Tracking State
         this.currentPositionHasMistake = false;
         this.currentPositionUsedHint = false;
         this.isReinforcementPhase = false;
@@ -54,14 +52,20 @@ class RepertoireTrainer {
         this.currentDeviationIndex = 0;
         this.totalDeviationsCount = 0;
 
-        // Line Replay / line-history navigation (see handleTrainerKey + startReplay)
-        this.lineSteps = [];         // [{ fen, from, to, san }] — 0 = line start, last = drill position
-        this.lineIndex = 0;          // step currently shown on the board
-        this.replayMode = false;     // replay bar active: the board shows the line, not the drill
-        this.replayPlaying = false;  // the auto-play timer is ticking
+        // Line Replay State
+        this.lineSteps = [];
+        this.lineIndex = 0;
+        this.replayMode = false;
+        this.replayPlaying = false;
         this.replayTimer = null;
-        this.replayDelayMs = 650;    // owner decision: ~650 ms per move
-        this.replaySavedWaiting = false;  // isWaitingForUser parked while replayMode is on
+        this.replayDelayMs = 650;
+        this.replaySavedWaiting = false;
+    }
+
+    _nowMs() {
+        return (typeof performance !== 'undefined' && typeof performance.now === 'function')
+            ? performance.now()
+            : Date.now();
     }
 
     init() {
@@ -76,19 +80,16 @@ class RepertoireTrainer {
             onMove: (from, to, promo, moveRes) => this.onUserAttempt(from, to, promo, moveRes)
         });
 
-        // Subtab toggle: Practice Drills vs Game Deviations
         const btnTabDrills = document.getElementById('btnTrainerTabDrills');
         const btnTabDeviations = document.getElementById('btnTrainerTabDeviations');
         if (btnTabDrills) btnTabDrills.addEventListener('click', () => this.switchTrainerTab('drills'));
         if (btnTabDeviations) btnTabDeviations.addEventListener('click', () => this.switchTrainerTab('deviations'));
 
-        // Deviation navigation controls
         const btnDevPrev = document.getElementById('btnDevPrev');
         const btnDevNext = document.getElementById('btnDevNext');
         if (btnDevPrev) btnDevPrev.addEventListener('click', () => this.prevDeviation());
         if (btnDevNext) btnDevNext.addEventListener('click', () => this.nextDeviation());
 
-        // Game Deviations filters & controls
         const devFilterBtns = [
             { id: 'btnFilterDevAll', filter: 'all' },
             { id: 'btnFilterDevWhite', filter: 'white' },
@@ -101,11 +102,7 @@ class RepertoireTrainer {
                     this.deviationsFilterColor = filter;
                     devFilterBtns.forEach(b => {
                         const el = document.getElementById(b.id);
-                        if (el) {
-                            el.classList.toggle('active', b.filter === filter);
-                            el.style.background = (b.filter === filter) ? '#0284c7' : 'transparent';
-                            el.style.color = (b.filter === filter) ? '#fff' : 'var(--text-secondary)';
-                        }
+                        if (el) el.classList.toggle('active', b.filter === filter);
                     });
                     this.loadGameDeviations();
                 });
@@ -123,7 +120,6 @@ class RepertoireTrainer {
             btnRefreshDev.addEventListener('click', () => this.loadGameDeviations());
         }
 
-        // Color toggle
         const btnMixed = document.getElementById('btnTrainMixed');
         const btnWhite = document.getElementById('btnTrainWhite');
         const btnBlack = document.getElementById('btnTrainBlack');
@@ -131,7 +127,6 @@ class RepertoireTrainer {
         if (btnWhite) btnWhite.addEventListener('click', () => this.switchColor('white'));
         if (btnBlack) btnBlack.addEventListener('click', () => this.switchColor('black'));
 
-        // Action buttons
         const btnNew = document.getElementById('btnTrainNewDrill');
         const btnHint = document.getElementById('btnTrainHint');
         const btnFlip = document.getElementById('btnTrainFlip');
@@ -173,17 +168,13 @@ class RepertoireTrainer {
                 const btnDeviations = document.getElementById('btnTrainerTabDeviations');
                 if (btnDrills) btnDrills.classList.toggle('active', !isDev);
                 if (btnDeviations) btnDeviations.classList.toggle('active', isDev);
-                if (isDev) {
-                    this.currentDeviationIndex = 0;
-                }
+                if (isDev) this.currentDeviationIndex = 0;
                 this.restartSession(false);
                 this.startNewDrill({ index: this.currentDeviationIndex });
             });
         }
         if (btnClearFocus) {
-            btnClearFocus.addEventListener('click', () => {
-                this.clearOpeningFocus();
-            });
+            btnClearFocus.addEventListener('click', () => this.clearOpeningFocus());
         }
         const btnToggleArrows = document.getElementById('btnTrainToggleArrows');
         if (btnToggleArrows) {
@@ -196,7 +187,6 @@ class RepertoireTrainer {
             });
         }
 
-        // Line replay controls (auto-visible only once a drill with a path is on screen)
         const btnReplay = document.getElementById('btnTrainReplay');
         if (btnReplay) btnReplay.addEventListener('click', () => this.startReplay());
         const btnReplayStart = document.getElementById('btnTrainReplayStart');
@@ -208,7 +198,6 @@ class RepertoireTrainer {
         const btnReplayExit = document.getElementById('btnTrainReplayExit');
         if (btnReplayExit) btnReplayExit.addEventListener('click', () => this.exitReplay());
 
-        // Session controls
         const btnRestartSession = document.getElementById('btnTrainRestartSession');
         if (btnRestartSession) {
             btnRestartSession.addEventListener('click', () => this.restartSession(true));
@@ -232,26 +221,19 @@ class RepertoireTrainer {
 
         const btnModalClose = document.getElementById('btnModalCloseSession');
         if (btnModalClose) {
-            btnModalClose.addEventListener('click', () => {
-                this.closeSessionModal();
-            });
+            btnModalClose.addEventListener('click', () => this.closeSessionModal());
         }
 
-        // Keyboard shortcuts: line navigation (arrows + vim h/l/j/k), replay transport,
-        // and the drill actions. CODE-22-style guard: leave browser/OS shortcuts alone.
         window.addEventListener('keydown', (e) => {
             const tag = e.target?.tagName?.toLowerCase();
             if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target?.isContentEditable) {
                 return;
             }
-
             const trainerView = document.getElementById('viewRepTrainer');
             if (!trainerView || !trainerView.classList.contains('active')) {
                 return;
             }
-
-            if (e.ctrlKey || e.metaKey || e.altKey) return;   // never swallow Ctrl+R / Ctrl+L / …
-
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
             this.handleTrainerKey(e);
         });
 
@@ -263,16 +245,15 @@ class RepertoireTrainer {
     async updateDeviationsCountBadge() {
         try {
             const colorParam = (this.activeColor === 'white' || this.activeColor === 'black') ? `?color=${this.activeColor}` : '';
-            const res = await fetch(`/api/repertoire/deviations${colorParam}&limit=1`);
+            const sep = colorParam ? '&' : '?';
+            const res = await fetch(`/api/repertoire/deviations${colorParam}${sep}limit=1`);
             if (res.ok) {
                 const data = await res.json();
                 const badge = document.getElementById('trainDeviationsBadge');
                 if (badge) badge.textContent = data.games_with_deviations || data.total_deviations || 0;
                 this.totalDeviationsCount = data.total_deviations || 0;
             }
-        } catch (e) {
-            // Background count fetch
-        }
+        } catch (_) {}
     }
 
     prevDeviation() {
@@ -301,31 +282,20 @@ class RepertoireTrainer {
         if (badge) badge.textContent = '0';
 
         const devBanner = document.getElementById('trainDeviationBanner');
-        if (devBanner) {
-            devBanner.style.display = 'none';
-        }
+        if (devBanner) devBanner.style.display = 'none';
         const sessionStrip = document.querySelector('.trainer-session-strip');
-        if (sessionStrip) {
-            sessionStrip.style.display = 'flex';
-        }
+        if (sessionStrip) sessionStrip.style.display = 'flex';
 
         const promptEl = document.getElementById('trainPrompt');
         if (promptEl) {
-            promptEl.innerHTML = `
-                <div style="font-weight:600; font-size:1.05rem; color:#4ade80; margin-bottom:0.25rem;">
-                    🎉 All Game Deviations Resolved!
-                </div>
-                <div style="color:var(--text-secondary); font-size:0.9rem;">
-                    No pending real game deviations remaining for ${this.activeColor === 'mixed' ? 'White & Black' : this.activeColor}.
-                </div>
-            `;
+            promptEl.innerHTML = `<div class="drill-prompt-headline text-emerald">All Game Deviations Resolved</div>`;
         }
 
         const feedback = document.getElementById('trainFeedback');
         if (feedback) {
             feedback.style.display = 'block';
             feedback.className = 'feedback-box correct';
-            feedback.textContent = '🎉 All game deviations have been corrected and cleared from your list!';
+            feedback.textContent = 'All game deviations resolved.';
         }
     }
 
@@ -404,12 +374,12 @@ class RepertoireTrainer {
         }
     }
 
-    /** CODE-07: cancel every pending continuation of the current drill. */
     _clearDrillTimers() {
         if (this.autoNextTimeout) { clearTimeout(this.autoNextTimeout); this.autoNextTimeout = null; }
         if (this.opponentReplyTimeout) { clearTimeout(this.opponentReplyTimeout); this.opponentReplyTimeout = null; }
         if (this.mistakeResetTimeout) { clearTimeout(this.mistakeResetTimeout); this.mistakeResetTimeout = null; }
         if (this.solutionArrowFadeTimeout) { clearTimeout(this.solutionArrowFadeTimeout); this.solutionArrowFadeTimeout = null; }
+        if (this.leadInTimeout) { clearTimeout(this.leadInTimeout); this.leadInTimeout = null; }
         this._stopReplayTimer();
     }
 
@@ -429,11 +399,6 @@ class RepertoireTrainer {
         return [...new Set(merged)];
     }
 
-    /**
-     * AGENTS.md §8.4: conditionally available UI in a toolbar / panel header must
-     * keep its box and switch `visibility` (+ `disabled`), never `display`, so
-     * the neighbouring controls never reflow when it appears or disappears.
-     */
     _setConditional(el, visible, displayMode = 'inline-flex') {
         if (!el) return;
         if (el.style.display !== displayMode) el.style.display = displayMode;
@@ -443,34 +408,6 @@ class RepertoireTrainer {
         el.setAttribute('aria-hidden', visible ? 'false' : 'true');
     }
 
-    /**
-     * AGENTS.md §8.1/§8.2/§8.5: the move-note callout reserves a constant height
-     * and toggles `visibility` instead of `display`, and its text is clamped with
-     * a full copy in `title`, so a long (or missing) note never shifts the
-     * feedback box below it.
-     *
-     * FIXER-H measured the 44px reservation as ~13px SHORT of its content: the
-     * `Move Note / Idea:` label and `#trainNoteContent` are two *block* children, so
-     * the box needed `0.6rem` padding x2 (19.2) + 2px border + label (~17.8) + one
-     * 1.45 line of note (~19.7) = ~58.7px, and the last ~13px of the note line was
-     * clipped. It was not fixable from `style.css` because this method writes
-     * `minHeight`/`maxHeight` **inline**, and an inline declaration beats the
-     * stylesheet.
-     *
-     * It is fixed here instead by putting the label on the note's own line (the
-     * AGENTS.md section 8.5 alternative), which is a *layout* change rather than a
-     * height change: `19.2 padding + 2 border + ~19.7 line = ~40.9px`, comfortably
-     * inside the 44px that `index.html` and `style.css` both already declare, so the
-     * reserved box, the stylesheet constant and this inline constant all still say 44
-     * and the first paint does not move. Raising the number instead would have needed
-     * `index.html` + `style.css` as well (files this patch does not own) and would have
-     * introduced a 14px reflow the first time the box was revealed.
-     *
-     * `display` therefore stays `block` (8.5 / the CODE-12.c contract), so the label is
-     * floated out of the flow and the note becomes an inline-block beside it, with its
-     * `max-width` reduced by the label's measured width so the note can never wrap onto
-     * a second line (a second line would exceed 44px and be clipped again).
-     */
     _updateNoteBox(comment) {
         const noteBox = document.getElementById('trainNoteBox');
         const noteContent = document.getElementById('trainNoteContent');
@@ -500,7 +437,7 @@ class RepertoireTrainer {
         const nameSpan = document.getElementById('trainFocusName');
         if (banner) {
             banner.style.display = 'flex';
-            banner.style.minHeight = '34px';
+            banner.style.minHeight = '32px';
             banner.style.boxSizing = 'border-box';
         }
         if (nameSpan && openingName) {
@@ -519,7 +456,7 @@ class RepertoireTrainer {
     _updateImportantBadge(isImportant) {
         const badgeEl = document.getElementById('trainImportantBadge');
         if (!badgeEl) return;
-        badgeEl.style.minWidth = '132px';
+        badgeEl.style.minWidth = '96px';
         badgeEl.style.justifyContent = 'center';
         this._setConditional(badgeEl, !!isImportant, 'inline-flex');
     }
@@ -539,16 +476,14 @@ class RepertoireTrainer {
             const remaining = this.sessionLapses.length;
             const cleared = Math.max(0, this.reinforcementTotal - remaining);
             if (moveLabel) {
-                moveLabel.textContent = `Reinforcing: ${remaining} left`;
-                moveLabel.title = `Reinforcing missed moves: ${cleared} of ${this.reinforcementTotal} cleared`;
+                moveLabel.textContent = `Reinforce: ${remaining} left`;
             }
             if (progBar) {
                 const pct = this.reinforcementTotal > 0 ? Math.round((cleared / this.reinforcementTotal) * 100) : 100;
                 progBar.style.width = `${Math.max(5, pct)}%`;
-                progBar.style.background = 'linear-gradient(90deg, #f59e0b, #22c55e)';
             }
             if (scoreEl) {
-                scoreEl.textContent = `${cleared} / ${this.reinforcementTotal} cleared`;
+                scoreEl.textContent = `${cleared} / ${this.reinforcementTotal}`;
             }
             if (accEl) {
                 const initialTotal = Math.max(1, this.sessionTarget);
@@ -558,13 +493,11 @@ class RepertoireTrainer {
         } else {
             const currentMoveNum = Math.min(this.sessionIndex + 1, this.sessionTarget);
             if (moveLabel) {
-                moveLabel.textContent = `Move ${currentMoveNum} of ${this.sessionTarget}`;
-                moveLabel.title = `Practice session progress: Move ${currentMoveNum} of ${this.sessionTarget}`;
+                moveLabel.textContent = `${currentMoveNum} / ${this.sessionTarget}`;
             }
             if (progBar) {
                 const pct = Math.min(100, Math.round((this.sessionIndex / this.sessionTarget) * 100));
                 progBar.style.width = `${Math.max(5, pct)}%`;
-                progBar.style.background = 'linear-gradient(90deg, #38bdf8, #818cf8)';
             }
             if (scoreEl) {
                 scoreEl.textContent = `${this.sessionCorrect} / ${this.sessionIndex}`;
@@ -588,12 +521,10 @@ class RepertoireTrainer {
         this._clearDrillTimers();
         this.closeSessionModal();
         const count = this.sessionLapses.length;
-        const noun = count === 1 ? 'missed move' : 'missed moves';
-        window.showToast?.(`🎯 Reinforcing ${count} ${noun}...`, '#f59e0b', 2800);
+        window.showToast?.(`Reinforcing ${count} ${count === 1 ? 'move' : 'moves'}...`, '#f59e0b', 2500);
         this.updateSessionUI();
         this.startNewDrill();
     }
-
 
     onSessionComplete(wasReinforced = false) {
         const modal = document.getElementById('trainSessionCompleteModal');
@@ -609,19 +540,15 @@ class RepertoireTrainer {
         if (modalAcc) modalAcc.textContent = `${acc}%`;
         if (modalScore) {
             modalScore.textContent = wasReinforced
-                ? `${this.sessionCorrect} / ${this.sessionTarget} (+${this.reinforcementTotal || 0} reinforced)`
+                ? `${this.sessionCorrect} / ${this.sessionTarget} (+${this.reinforcementTotal || 0})`
                 : `${this.sessionCorrect} / ${this.sessionIndex}`;
         }
 
         if (titleEl) {
-            titleEl.textContent = wasReinforced
-                ? '🏆 20-Move Session & Reinforcement Complete!'
-                : '🎉 20-Move Session Complete!';
+            titleEl.textContent = wasReinforced ? 'Session & Reinforcement Complete' : '20-Move Session Complete';
         }
         if (subtitleEl) {
-            subtitleEl.textContent = wasReinforced
-                ? 'Outstanding work! You completed your 20-move session and reinforced every move you missed.'
-                : "Great work! You've completed your 20-move opening training session.";
+            subtitleEl.textContent = '';
         }
 
         const remainingLapses = this._pendingReinforcementIds().length;
@@ -632,7 +559,7 @@ class RepertoireTrainer {
         if (missedCountSpan) missedCountSpan.textContent = remainingLapses;
 
         if (btnReinforce) {
-            btnReinforce.style.display = (!wasReinforced && remainingLapses > 0) ? 'block' : 'none';
+            btnReinforce.style.display = (!wasReinforced && remainingLapses > 0) ? 'inline-flex' : 'none';
             const btnCountSpan = document.getElementById('modalBtnReinforceCount');
             if (btnCountSpan) btnCountSpan.textContent = remainingLapses;
         }
@@ -642,30 +569,23 @@ class RepertoireTrainer {
     }
 
     async loadMasteryProgress() {
-        // CODE-05: capture the logical context (colour + focus) and a sequence
-        // number; a response that belongs to a superseded context is dropped
-        // instead of painting White's mastery over a Black drill.
         const seq = ++this.progressSeq;
         const color = this.activeColor;
         const study = this.openingFilter;
         try {
             let url = `/api/repertoire/train/progress?color=${color}`;
-            if (study) {
-                url += `&study=${encodeURIComponent(study)}`;
-            }
+            if (study) url += `&study=${encodeURIComponent(study)}`;
             const res = await fetch(url);
             if (seq !== this.progressSeq || color !== this.activeColor || study !== this.openingFilter) return null;
             if (!res.ok) return null;
             const data = await res.json();
             if (seq !== this.progressSeq || color !== this.activeColor || study !== this.openingFilter) return null;
 
-            // Scope badge & headline
             const scopeBadge = document.getElementById('trainScopeBadge');
             const headlineEl = document.getElementById('trainMasteredHeadline');
             if (scopeBadge) scopeBadge.textContent = this.openingFilter || 'All Studies';
             if (headlineEl) headlineEl.textContent = `${data.mastered_pct}%`;
 
-            // Segments
             const segMastered = document.getElementById('masterySegMastered');
             const segLearning = document.getElementById('masterySegLearning');
             const segUnlearned = document.getElementById('masterySegUnlearned');
@@ -680,10 +600,9 @@ class RepertoireTrainer {
             }
             if (segUnlearned) {
                 segUnlearned.style.width = `${data.unlearned_pct}%`;
-                segUnlearned.title = `Unlearned: ${data.unlearned_count} (${data.unlearned_pct}%)`;
+                segUnlearned.title = `New: ${data.unlearned_count} (${data.unlearned_pct}%)`;
             }
 
-            // Legend counts
             const elMastCount = document.getElementById('trainMasteredCount');
             const elMastPct = document.getElementById('trainMasteredPct');
             const elLearnCount = document.getElementById('trainLearningCount');
@@ -701,17 +620,12 @@ class RepertoireTrainer {
             if (elTotalMoves) elTotalMoves.textContent = data.total_moves;
 
             return data;
-        } catch (e) {
-            console.error('Error loading mastery progress:', e);
+        } catch (_) {
             return null;
         }
     }
 
     async loadOpeningsList(options = {}) {
-        // CODE-05: same generation guard as loadMasteryProgress, plus the
-        // duplicated `/train/progress` request is removed - `startNewDrill`
-        // passes the in-flight promise so one drill start costs 2 requests
-        // instead of 3.
         const seq = ++this.openingsSeq;
         const color = this.activeColor;
         const study = this.openingFilter;
@@ -731,24 +645,22 @@ class RepertoireTrainer {
 
             const studiesMasteryMap = {};
             if (progData && progData.studies) {
-                progData.studies.forEach(s => {
-                    studiesMasteryMap[s.name] = s;
-                });
+                progData.studies.forEach(s => { studiesMasteryMap[s.name] = s; });
             }
 
             const filterSelect = document.getElementById('trainOpeningFilter');
             if (!filterSelect) return;
 
-            const prevVal = this.openingFilter || filterSelect.value || "";
-            filterSelect.innerHTML = '<option value="">All Repertoire Studies (Mixed)</option>';
+            const prevVal = this.openingFilter || filterSelect.value || '';
+            filterSelect.innerHTML = '<option value="">All Studies</option>';
 
             if (data.recent_opening && data.recent_opening.name) {
                 const rec = data.recent_opening;
                 const recOpt = document.createElement('option');
                 recOpt.value = rec.name;
                 const sData = studiesMasteryMap[rec.name];
-                const mastText = sData ? ` • ${sData.mastered_pct}% mastered` : '';
-                recOpt.textContent = `🎯 Most Recent: ${rec.name}${mastText}`;
+                const mastText = sData ? ` · ${sData.mastered_pct}%` : '';
+                recOpt.textContent = `Recent: ${rec.name}${mastText}`;
                 filterSelect.appendChild(recOpt);
             }
 
@@ -759,8 +671,8 @@ class RepertoireTrainer {
                     const opt = document.createElement('option');
                     opt.value = op.opening_name;
                     const sData = studiesMasteryMap[op.opening_name];
-                    const mastText = sData ? ` • ${sData.mastered_pct}% mastered` : '';
-                    opt.textContent = `${op.opening_name} (${op.move_count} moves${mastText})`;
+                    const mastText = sData ? ` · ${sData.mastered_pct}%` : '';
+                    opt.textContent = `${op.opening_name} (${op.move_count}${mastText})`;
                     filterSelect.appendChild(opt);
                 }
             });
@@ -774,19 +686,17 @@ class RepertoireTrainer {
                         break;
                     }
                 }
-                if (!found && prevVal) {
+                if (!found) {
                     const opt = document.createElement('option');
                     opt.value = prevVal;
-                    opt.textContent = `🎯 ${prevVal}`;
+                    opt.textContent = prevVal;
                     filterSelect.appendChild(opt);
                     filterSelect.value = prevVal;
                 }
             } else {
-                filterSelect.value = "";
+                filterSelect.value = '';
             }
-        } catch (e) {
-            console.error('Error loading openings list for trainer:', e);
-        }
+        } catch (_) {}
     }
 
     setOpeningFocus(openingName, color = null) {
@@ -804,9 +714,7 @@ class RepertoireTrainer {
         }
         this.openingFilter = openingName;
         const filterSelect = document.getElementById('trainOpeningFilter');
-        if (filterSelect) {
-            filterSelect.value = openingName;
-        }
+        if (filterSelect) filterSelect.value = openingName;
         this.restartSession(false);
         return this.startNewDrill();
     }
@@ -814,7 +722,7 @@ class RepertoireTrainer {
     clearOpeningFocus() {
         this.openingFilter = null;
         const filterSelect = document.getElementById('trainOpeningFilter');
-        if (filterSelect) filterSelect.value = "";
+        if (filterSelect) filterSelect.value = '';
         this._updateFocusBanner(null);
         this.restartSession(false);
         return this.startNewDrill();
@@ -828,8 +736,9 @@ class RepertoireTrainer {
         this.hasAnsweredCurrentPosition = false;
         this.currentPositionHasMistake = false;
         this.currentPositionUsedHint = false;
+        this.pendingMoveNote = '';
+        this.drillReadyAt = 0;
 
-        // Check if standard 20-move session has reached completion target
         if (this.sessionMode !== 'deviations' && !this.isReinforcementPhase && this.sessionIndex >= this.sessionTarget) {
             if (this._pendingReinforcementIds().length > 0) {
                 this.startReinforcementPhase();
@@ -839,20 +748,15 @@ class RepertoireTrainer {
             return;
         }
 
-        // CODE-07: take ownership of a brand new drill. Any 550ms/800ms
-        // continuation still queued for the previous drill is cancelled here and
-        // its token is now stale.
         this.drillToken++;
         this._clearDrillTimers();
         this._resetLineReplay();
         const drillToken = this.drillToken;
 
-        // Reset waiting state & clear stale drill immediately so hints/actions cannot use old move!
         this.isWaitingForUser = false;
         this.currentDrill = null;
         this.updateHintButtonState(false);
 
-        // One `/train/progress` request shared by both loaders (was: 3 requests).
         const progressRequest = this.loadMasteryProgress();
         await Promise.all([
             this.loadOpeningsList({ progress: progressRequest }),
@@ -867,6 +771,9 @@ class RepertoireTrainer {
             feedback.style.display = 'none';
             feedback.className = 'feedback-box';
         }
+
+        // Anti-spoiler active recall: hide move notes before user attempts the position
+        this._updateNoteBox('');
 
         const colorSpan = document.getElementById('trainColorSpan');
         if (colorSpan) colorSpan.textContent = (this.activeColor === 'mixed') ? 'White & Black' : this.activeColor;
@@ -900,88 +807,88 @@ class RepertoireTrainer {
 
         try {
             const res = await fetch(url);
-            // CODE-07: a newer drill may have started while this was in flight.
             if (drillToken !== this.drillToken) return;
             if (res.status === 404) {
                 if (this.openingFilter) {
-                    alert(`No prepared moves found in your ${this.activeColor} repertoire for '${this.openingFilter}'. Switching to all openings.`);
+                    window.showToast?.(`No moves in '${this.openingFilter}'. Showing all studies.`, '#f59e0b');
                     this.clearOpeningFocus();
                     return;
                 }
-                alert(`No prepared moves found in your ${this.activeColor} repertoire yet. Build your repertoire in the Builder first!`);
+                const promptEl = document.getElementById('trainPrompt');
+                if (promptEl) {
+                    promptEl.innerHTML = `<div class="drill-prompt-headline">No prepared moves yet — add moves in Builder first.</div>`;
+                }
                 return;
             }
             const data = await res.json();
             if (drillToken !== this.drillToken) return;
 
-            // Handle completion flags in specific modes
             if (data.all_deviations_completed) {
-                window.showToast?.('No real game deviations found for this repertoire! 🎉', '#4ade80', 3200);
+                if (this.sessionMode === 'deviations') {
+                    this.showDeviationsCompleteBanner();
+                    return;
+                }
+                window.showToast?.('No game deviations pending.', '#34d399', 2600);
                 this.sessionMode = 'adaptive';
                 const modeSelect = document.getElementById('trainModeSelect');
                 if (modeSelect) modeSelect.value = 'adaptive';
                 return this.startNewDrill();
             }
             if (data.all_due_completed) {
-                window.showToast?.('All due spaced repetition reviews are up to date! 🎉', '#4ade80', 3200);
+                window.showToast?.('All due reviews complete.', '#34d399', 2600);
                 this.sessionMode = 'adaptive';
                 const modeSelect = document.getElementById('trainModeSelect');
                 if (modeSelect) modeSelect.value = 'adaptive';
                 return this.startNewDrill();
             }
             if (data.all_frontier_completed) {
-                window.showToast?.('All repertoire lines learned! Switching to retention review. 🎉', '#38bdf8', 3200);
+                window.showToast?.('All new lines learned. Switching to review.', '#5b9bd5', 2600);
                 this.sessionMode = 'adaptive';
                 const modeSelect = document.getElementById('trainModeSelect');
                 if (modeSelect) modeSelect.value = 'adaptive';
                 return this.startNewDrill();
             }
             if (data.all_lapses_completed || (this.isReinforcementPhase && (!this.sessionLapses || this.sessionLapses.length === 0))) {
-                window.showToast?.('All missed moves successfully reinforced! 🎉', '#4ade80', 3200);
+                window.showToast?.('All missed moves reinforced.', '#34d399', 2600);
                 this.isReinforcementPhase = false;
                 this.onSessionComplete(true);
-                return;
-            }
-            if (data.all_deviations_completed) {
-                this.showDeviationsCompleteBanner();
                 return;
             }
 
             this.currentDrill = data;
             this.currentFen = data.parent_fen;
+            this.pendingMoveNote = data.comment || '';
 
             if (data.id) {
                 this.sessionDrilledIds.push(data.id);
             }
 
-            // Orient board to the side being drilled (White or Black)
             const drillColor = this.getDrillColor(data);
             this.board.setOrientation(drillColor);
 
-            // Load board
+            // Load target position synchronously (zero input latency), then animate dynamic lead-in
             this.board.loadFEN(this.currentFen);
             this.board.clearArrows();
             if (data.last_move && data.last_move.from && data.last_move.to) {
                 this.board.setLastMove(data.last_move.from, data.last_move.to);
+                if (typeof this.board.animateGhostMove === 'function') {
+                    this.board.animateGhostMove(data.last_move.from, data.last_move.to);
+                }
             }
 
-            // The replay needs a full SAN path; deviation drills ship it as `move_history_sans`.
             data.path_san = (Array.isArray(data.path_san) && data.path_san.length)
                 ? data.path_san.slice()
                 : (Array.isArray(data.move_history_sans) ? data.move_history_sans.slice() : []);
             this._loadLineSteps();
 
-            // Update Breadcrumb & Pedagogical Badge (0px CLS)
             this.updateBreadcrumb(data.path_formatted, data.drill_reason, data.ply_depth);
 
-            // Set titles
             const nameEl = document.getElementById('trainOpeningName');
             const ecoEl = document.getElementById('trainOpeningEco');
-            const displayTitle = data.study_name || this.openingFilter || data.opening_name || (drillColor === 'white' ? 'White Opening Line' : 'Black Opening Line');
+            const displayTitle = data.study_name || this.openingFilter || data.opening_name || (drillColor === 'white' ? 'White Repertoire' : 'Black Repertoire');
             if (nameEl) { nameEl.textContent = displayTitle; nameEl.title = displayTitle; }
-            if (ecoEl) ecoEl.textContent = data.study_name ? `Study: ${data.study_name}` : (data.eco ? `${data.eco} • Prepared Repertoire Line` : 'Prepared Repertoire Line');
+            if (ecoEl) ecoEl.textContent = data.eco || 'Repertoire';
 
-            // Handle Deviations Banner vs standard session strip
             const devBanner = document.getElementById('trainDeviationBanner');
             const sessionStrip = document.querySelector('.trainer-session-strip');
 
@@ -1010,13 +917,13 @@ class RepertoireTrainer {
                     resultEl.textContent = resClass.toUpperCase();
                 }
                 if (moveNumEl) moveNumEl.textContent = data.deviation_move_number || 1;
-                if (dateEl && data.played_at) dateEl.textContent = `• ${new Date(data.played_at).toLocaleDateString()}`;
+                if (dateEl && data.played_at) dateEl.textContent = `· ${new Date(data.played_at).toLocaleDateString()}`;
                 if (playedSanEl) playedSanEl.textContent = data.played_san || '...';
-                if (prepSanEl) prepSanEl.textContent = '???';
-                if (countEl) countEl.textContent = `${data.deviation_index || 1} of ${data.total_deviations || 1}`;
+                if (prepSanEl) prepSanEl.textContent = '?';
+                if (countEl) countEl.textContent = `${data.deviation_index || 1} / ${data.total_deviations || 1}`;
                 if (linkEl) {
                     linkEl.href = data.game_url || (data.game_id ? `https://lichess.org/${data.game_id}` : '#');
-                    linkEl.style.display = data.game_id ? 'inline-block' : 'none';
+                    linkEl.style.display = data.game_id ? 'inline-flex' : 'none';
                 }
 
                 this.currentDeviationIndex = (data.deviation_index ? data.deviation_index - 1 : 0);
@@ -1028,11 +935,8 @@ class RepertoireTrainer {
                 const promptEl = document.getElementById('trainPrompt');
                 if (promptEl) {
                     promptEl.innerHTML = `
-                        <div style="font-weight:600; font-size:1.05rem; margin-bottom:0.25rem;">
-                            Fix Game Deviation as <span style="text-transform:capitalize;">${drillColor}</span>
-                        </div>
-                        <div style="color:var(--text-secondary); font-size:0.9rem;">
-                            In your game vs <strong>${this._escapeHtml(data.opponent_name || 'Opponent')}</strong>, you played <span style="color:#f87171; font-weight:700;">${this._escapeHtml(data.played_san)}</span> on move ${data.deviation_move_number || 1}. Play your prepared repertoire move!
+                        <div class="drill-prompt-headline">
+                            vs ${this._escapeHtml(data.opponent_name || 'Opponent')} — played <span class="text-crimson">${this._escapeHtml(data.played_san)}</span>
                         </div>
                     `;
                 }
@@ -1042,39 +946,34 @@ class RepertoireTrainer {
                 if (sessionStrip) sessionStrip.style.display = 'flex';
                 const promptEl = document.getElementById('trainPrompt');
                 if (promptEl) {
-                    promptEl.innerHTML = `
-                        <div style="font-weight:600; font-size:1.05rem; margin-bottom:0.25rem;">
-                            Your turn as <span id="trainColorSpan" style="text-transform:capitalize;">${drillColor}</span>
-                        </div>
-                        <div style="color:var(--text-secondary); font-size:0.9rem;">
-                            Play your prepared repertoire move on the board.
-                        </div>
-                    `;
+                    const capColor = drillColor.charAt(0).toUpperCase() + drillColor.slice(1);
+                    if (data.drill_reason === 'game_deviation' && data.played_san) {
+                        promptEl.innerHTML = `
+                            <div class="drill-prompt-headline">
+                                Play as <span id="trainColorSpan">${capColor}</span> · <span class="muted-tag">Played ${this._escapeHtml(data.played_san)} vs ${this._escapeHtml(data.opponent_name || 'Opponent')}</span>
+                            </div>
+                        `;
+                    } else {
+                        promptEl.innerHTML = `<div class="drill-prompt-headline">Play as <span id="trainColorSpan">${capColor}</span></div>`;
+                    }
                 }
             }
 
-            // Priority move badge (visibility-toggled, fixed width: 0px CLS)
             this._updateImportantBadge(data.is_important);
 
-            // Move notes & ideas (constant-height, visibility-toggled: 0px CLS)
-            this._updateNoteBox(data.comment);
-
-            // Plan arrows
             this.savedPlanArrows = [];
             if (data.arrows) {
                 try {
                     this.savedPlanArrows = JSON.parse(data.arrows);
-                } catch (e) {
+                } catch (_) {
                     this.savedPlanArrows = [];
                 }
             }
             const btnArrows = document.getElementById('btnTrainToggleArrows');
-            this._setConditional(btnArrows, !!(this.savedPlanArrows && this.savedPlanArrows.length), 'inline-block');
-            if (this.savedPlanArrows && this.savedPlanArrows.length) {
-                this.board.setArrows(this.savedPlanArrows);
-            }
+            this._setConditional(btnArrows, !!(this.savedPlanArrows && this.savedPlanArrows.length), 'inline-flex');
 
             this.isWaitingForUser = true;
+            this.drillReadyAt = this._nowMs();
             this.updateHintButtonState(true);
         } catch (e) {
             console.error('Error starting repertoire drill:', e);
@@ -1088,51 +987,38 @@ class RepertoireTrainer {
         if (movesEl) {
             if (pathFormatted && pathFormatted.trim()) {
                 movesEl.textContent = pathFormatted;
-                movesEl.title = `Position path: ${pathFormatted}`;
+                movesEl.title = pathFormatted;
             } else {
-                movesEl.innerHTML = `<span style="color:var(--text-muted); font-size:0.75rem;">Root starting position (Move 1)</span>`;
+                movesEl.textContent = 'Move 1';
                 movesEl.title = 'Starting position';
             }
         }
 
         if (badgeEl) {
-            if (reason === 'deviations') {
+            const moveNum = this.currentDrill?.deviation_move_number || (plyDepth ? Math.ceil(plyDepth / 2) : 1);
+            if (reason === 'deviations' || reason === 'game_deviation') {
                 badgeEl.className = 'trainer-reason-badge badge-lapse';
-                const moveNum = this.currentDrill?.deviation_move_number || (plyDepth ? Math.ceil(plyDepth / 2) : 1);
-                badgeEl.textContent = `⚠️ Real Game Deviation (Move ${moveNum})`;
-                badgeEl.title = 'Real Game Deviation: practice position where you departed from your repertoire';
+                badgeEl.textContent = `Deviation · M${moveNum}`;
             } else if (reason === 'frontier_new') {
                 badgeEl.className = 'trainer-reason-badge badge-frontier';
-                const moveNum = plyDepth ? Math.ceil(plyDepth / 2) : 1;
-                badgeEl.textContent = `🌱 New Move (Move ${moveNum})`;
-                badgeEl.title = 'Learnable frontier: progressive depth root-to-leaf';
+                badgeEl.textContent = `New · M${moveNum}`;
             } else if (reason === 'due_review') {
                 if (this.currentDrill?.is_leech) {
                     badgeEl.className = 'trainer-reason-badge badge-lapse';
-                    badgeEl.textContent = '🩸 Weak Spot / Leech';
-                    badgeEl.title = 'Consolidating a problem position with multiple past mistakes';
+                    badgeEl.textContent = 'Leech';
                 } else {
                     badgeEl.className = 'trainer-reason-badge badge-due';
-                    badgeEl.textContent = '⏰ Due Review';
-                    badgeEl.title = 'FSRS spaced repetition: memory retention review due';
+                    badgeEl.textContent = 'Due';
                 }
             } else if (reason === 'session_lapse') {
                 badgeEl.className = 'trainer-reason-badge badge-lapse';
-                badgeEl.textContent = '🔁 Retry Mistake';
-                badgeEl.title = 'Intra-session consolidation: re-testing a missed move after cooldown';
+                badgeEl.textContent = 'Reinforce';
             } else if (reason === 'maintenance' || reason === 'mastery_audit') {
                 badgeEl.className = 'trainer-reason-badge badge-maintenance';
-                if (this.currentDrill?.is_mastered_audit || reason === 'mastery_audit') {
-                    badgeEl.textContent = '🛡️ Mastered Spot-Check';
-                    badgeEl.title = 'Spot-checking a mastered position to catch hidden forgetting gaps';
-                } else {
-                    badgeEl.textContent = '🔄 Retention';
-                    badgeEl.title = 'Retention practice: refreshing mastered lines';
-                }
+                badgeEl.textContent = (this.currentDrill?.is_mastered_audit || reason === 'mastery_audit') ? 'Spot-Check' : 'Review';
             } else {
                 badgeEl.className = 'trainer-reason-badge badge-maintenance';
-                badgeEl.textContent = '🎯 Practice';
-                badgeEl.title = 'Repertoire practice';
+                badgeEl.textContent = 'Drill';
             }
         }
     }
@@ -1143,15 +1029,13 @@ class RepertoireTrainer {
             btnHint.disabled = !enabled;
             btnHint.style.opacity = enabled ? '1' : '0.45';
             btnHint.style.cursor = enabled ? 'pointer' : 'not-allowed';
-            btnHint.title = enabled ? 'Show hint for your next move' : 'No active move to hint';
         }
     }
 
     showHint() {
-        // `i` / the button always act on the LIVE drill position, never on a scrubbed board.
         if (this.replayMode) this.exitReplay();
         if (!this.isWaitingForUser || !this.currentDrill || !this.currentDrill.expected_uci) {
-            window.showToast?.('No prepared move in this position to hint.', '#94a3b8', 2200);
+            window.showToast?.('No active move to hint.', '#94a3b8', 2000);
             return;
         }
 
@@ -1159,29 +1043,18 @@ class RepertoireTrainer {
         const from = uci.slice(0, 2);
         const to = uci.slice(2, 4);
 
-        // Sanity check: Ensure board turn matches user color
         const fen = this.board.getFEN();
         const turn = fen.split(' ')[1];
         const drillColor = this.getDrillColor(this.currentDrill);
         const expectedTurn = drillColor === 'white' ? 'w' : 'b';
-        if (turn !== expectedTurn) {
-            console.warn('Hint blocked: Not user turn', turn, expectedTurn);
-            window.showToast?.('Wait for opponent move to finish.', '#94a3b8', 2200);
-            return;
-        }
+        if (turn !== expectedTurn) return;
 
-        // Resync board FEN if user played a mistake and board hasn't reset yet
         if (this.currentFen && fen.split(' ')[0] !== this.currentFen.split(' ')[0]) {
             this.board.loadFEN(this.currentFen);
         }
 
-        // Sanity check: Ensure piece on source square exists and belongs to user
         const piece = this.board.chess ? this.board.chess.get(from) : null;
-        if (piece && piece.color !== expectedTurn) {
-            console.warn('Hint blocked: Piece on source square does not belong to user', from, piece);
-            window.showToast?.('Position out of sync with hint.', '#ef4444', 2200);
-            return;
-        }
+        if (piece && piece.color !== expectedTurn) return;
 
         this.currentPositionUsedHint = true;
         if (this.currentDrill && this.currentDrill.id) {
@@ -1189,10 +1062,15 @@ class RepertoireTrainer {
         }
 
         this.board.clearArrows();
-        this.board.addArrow(from, to, '#22c55e');
+        this.board.addArrow(from, to, '#34d399');
+
+        // Reveal move note when hint is explicitly requested
+        if (this.pendingMoveNote) {
+            this._updateNoteBox(this.pendingMoveNote);
+        }
 
         if (this.currentDrill.expected_san) {
-            window.showToast?.(`💡 Hint: Play ${this.currentDrill.expected_san} (${from} → ${to})`, '#38bdf8', 2800);
+            window.showToast?.(`Hint: ${this.currentDrill.expected_san}`, '#5b9bd5', 2400);
         }
         if (this.sessionMode === 'deviations' || this.activeDrillDeviation) {
             const prepSanEl = document.getElementById('devBannerPreparedSan');
@@ -1203,7 +1081,6 @@ class RepertoireTrainer {
     }
 
     retryCurrentPosition() {
-        // `r` / the button always act on the LIVE drill position, never on a scrubbed board.
         if (this.replayMode) this.exitReplay();
         if (!this.currentFen || !this.currentDrill || !this.currentDrill.expected_uci) return;
         this.board.loadFEN(this.currentFen);
@@ -1212,6 +1089,7 @@ class RepertoireTrainer {
             this.board.setLastMove(this.currentDrill.last_move.from, this.currentDrill.last_move.to);
         }
         this.isWaitingForUser = true;
+        this.drillReadyAt = this._nowMs();
         this.updateHintButtonState(true);
 
         const feedback = document.getElementById('trainFeedback');
@@ -1219,48 +1097,17 @@ class RepertoireTrainer {
     }
 
     // ================================================================== //
-    //  Line Replay — "where did this drill position come from?"          //
-    //                                                                    //
-    //  The drill payloads carry the SAN path that led to the position    //
-    //  (`path_san`, or `move_history_sans` for deviation drills), so the  //
-    //  whole history can be replayed locally, with no backend call.       //
+    //  Line Replay
     // ================================================================== //
 
-    /**
-     * 3-token FEN key — placement, side to move, castling rights. **This is the key
-     * every position comparison in this file must use.**
-     *
-     * The en-passant field is deliberately EXCLUDED because the two sides of the
-     * timeline validation come from *different* engines:
-     *
-     *   * `parent_fen` is produced by the backend with **python-chess**, which writes
-     *     the en-passant square only when a legal en-passant capture actually exists
-     *     (`-` after most double pawn pushes). The backend normalises exactly this way
-     *     for the same reason (`backend/repertoire.py` compares 3-token keys);
-     *   * the timeline is rebuilt here with **chess.js**, which writes the en-passant
-     *     square after *every* double pawn push (`e6`, `c6`, `b6`, …).
-     *
-     * A 4-token key (the DB's `normalize_fen`, AGENTS.md §4) would therefore refuse
-     * every drill whose last move was a double pawn push — 1.e4, 1...e5, 1...c5,
-     * 1...d5, …b5 — silently discarding the whole timeline and hiding the Replay
-     * button for a huge class of real positions. Do NOT tighten this back to 4 tokens:
-     * a 4-token key is only ever valid for FENs written by the SAME engine.
-     */
     _fen3(fen) {
         return String(fen || '').trim().split(/\s+/).slice(0, 3).join(' ');
     }
 
-    /**
-     * The single mapping for the Trainer's keyboard. Kept as a method (not an inline
-     * closure) so `tests/frontend_harness.js` can drive the real mapping without a DOM.
-     * ←/h = back, →/l = forward, ↑/k/Home = start, ↓/j/End = end, Space = play/pause,
-     * Esc = leave the replay, r = Try Again, i = Show Hint.
-     */
     handleTrainerKey(e) {
         const key = e && e.key;
         if (!key) return false;
         if (key === 'ArrowLeft' || key === 'h' || key === 'H') {
-            // A held key must not spam the "nothing to replay" toast.
             if (e.repeat && !this.replayMode && this.lineSteps.length < 2) return false;
             e.preventDefault();
             this.replayStep(-1);
@@ -1283,8 +1130,8 @@ class RepertoireTrainer {
         }
         if (key === ' ' || key === 'Spacebar') {
             const tag = (e.target && e.target.tagName) ? String(e.target.tagName).toLowerCase() : '';
-            if (tag === 'button' || tag === 'a') return false;   // let the focused control activate
-            if (e.repeat) return false;                          // one toggle per press, never on auto-repeat
+            if (tag === 'button' || tag === 'a') return false;
+            if (e.repeat) return false;
             e.preventDefault();
             this.toggleReplayPlayback();
             return true;
@@ -1300,19 +1147,6 @@ class RepertoireTrainer {
         return false;
     }
 
-    /**
-     * Rebuilds the SAN path of the current drill into concrete board steps.
-     * Returns null when there is nothing honest to replay: no path recorded, a SAN
-     * the shipped chess.js cannot play, or a path that does not land on the drill's
-     * `parent_fen` (the last check is what keeps the feature truthful for
-     * hand-written payloads).
-     *
-     * The landing check compares **3-token** keys (`_fen3`, no en-passant token):
-     * `parent_fen` is a python-chess FEN and the rebuilt steps are chess.js FENs, and
-     * the two libraries disagree about the en-passant field on every double pawn push
-     * (see `_fen3()`). Any path that gets refused by a stricter key here is a path
-     * the engine itself would refuse, not a position mismatch.
-     */
     _buildLineSteps(drill) {
         if (!drill) return null;
         const sans = (Array.isArray(drill.path_san) && drill.path_san.length)
@@ -1320,25 +1154,21 @@ class RepertoireTrainer {
             : (Array.isArray(drill.move_history_sans) ? drill.move_history_sans.slice() : []);
         if (!sans.length) return null;
         let chess;
-        try { chess = new Chess(); } catch (err) { return null; }
+        try { chess = new Chess(); } catch (_) { return null; }
         const steps = [{ fen: chess.fen(), from: null, to: null, san: null }];
         for (const san of sans) {
             let mv = null;
-            try { mv = chess.move(String(san)); } catch (err) { mv = null; }
+            try { mv = chess.move(String(san)); } catch (_) { mv = null; }
             if (!mv) return null;
             steps.push({ fen: chess.fen(), from: mv.from, to: mv.to, san: mv.san || String(san) });
         }
         const targetFen = drill.parent_fen || this.currentFen || '';
         const target = this._fen3(targetFen);
         if (target && this._fen3(steps[steps.length - 1].fen) !== target) return null;
-        // Same position (the keys above proved it), but the two engines may spell the
-        // en-passant token differently: show the DRILL's own FEN on the last step so the
-        // board "paused at the end" of the replay is bit-identical to the live drill.
         if (targetFen) steps[steps.length - 1].fen = String(targetFen);
         return steps;
     }
 
-    /** (Re)loads the timeline from the drill on screen. Never runs mid-replay. */
     _loadLineSteps() {
         if (this.replayMode) return;
         this.lineSteps = this._buildLineSteps(this.currentDrill) || [];
@@ -1346,7 +1176,6 @@ class RepertoireTrainer {
         this._renderReplayBar();
     }
 
-    /** Hard reset — every drill change goes through here. */
     _resetLineReplay() {
         this._stopReplayTimer();
         this.replayPlaying = false;
@@ -1362,11 +1191,6 @@ class RepertoireTrainer {
         if (this.replayTimer) { clearTimeout(this.replayTimer); this.replayTimer = null; }
     }
 
-    /**
-     * AGENTS.md §8.4: the `▶ Replay Line` button and the transport bar keep their
-     * boxes and are revealed with `visibility` (+ `disabled`), never `display`, so
-     * nothing below the board reflows when the replay starts or stops.
-     */
     _renderReplayBar() {
         const steps = this.lineSteps || [];
         const canReplay = steps.length >= 2;
@@ -1407,23 +1231,9 @@ class RepertoireTrainer {
         if (status) {
             const mode = this.replayPlaying ? 'Playing' : 'Paused';
             status.textContent = `${mode} ${this.lineIndex} / ${lastIndex}`;
-            status.title = canReplay
-                ? `Line replay: move ${this.lineIndex} of ${lastIndex} — 650 ms per move`
-                : 'Line replay: no recorded move path for this position';
         }
     }
 
-    /**
-     * Synchronises board interactivity and `isWaitingForUser` with the current
-     * replay state:
-     *   - While actively auto-playing (`replayPlaying`) or scrubbed to an earlier
-     *     ply (`lineIndex < lastIndex`), the board is locked so the user cannot
-     *     grade a move on an intermediate position.
-     *   - Whenever the replay has arrived at the drill position (`!replayPlaying`
-     *     and `lineIndex >= lastIndex`) — or when replay mode is off — the board
-     *     is unlocked and `isWaitingForUser` is restored so the user can play their
-     *     move immediately without having to dismiss the replay bar first.
-     */
     _syncReplayInteractivity() {
         const shouldWait = Boolean(
             this.replaySavedWaiting ||
@@ -1439,6 +1249,7 @@ class RepertoireTrainer {
         if (atLiveDrill) {
             if (this.board && this.board.options) this.board.options.interactive = true;
             this.isWaitingForUser = shouldWait;
+            if (this.isWaitingForUser) this.drillReadyAt = this._nowMs();
             this.updateHintButtonState(this.isWaitingForUser);
         } else {
             if (this.board && this.board.options) this.board.options.interactive = false;
@@ -1447,7 +1258,6 @@ class RepertoireTrainer {
         }
     }
 
-    /** Puts the board on one step of the line (clamped) and repaints the transport bar. */
     _gotoLineStep(index) {
         const steps = this.lineSteps || [];
         if (!steps.length) return;
@@ -1476,14 +1286,6 @@ class RepertoireTrainer {
         this._renderReplayBar();
     }
 
-    /**
-     * Enters replay mode: the board stops accepting moves while on earlier plies
-     * and the drill's wait state is parked in `replaySavedWaiting` until `exitReplay()`.
-     *
-     * Refuses while a continuation is in flight: an opponent reply landing on a
-     * scrubbed board would overwrite `currentFen` with a position of the replay
-     * (CODE-07 family bug).
-     */
     _enterReplayMode() {
         if (!this.currentDrill || this.opponentReplyTimeout || this.autoNextTimeout) return false;
         if (!this.replayMode) {
@@ -1501,22 +1303,14 @@ class RepertoireTrainer {
         return true;
     }
 
-    /**
-     * `▶ Replay Line` / Space: plays the line that led to the drill position from
-     * the start, at `replayDelayMs` per move. Already replaying? Then the button is
-     * a pause/resume control.
-     */
     startReplay() {
         if (this.replayMode) { this.toggleReplayPlayback(); return; }
         const steps = this._buildLineSteps(this.currentDrill);
         if (!steps || steps.length < 2) {
-            window.showToast?.('No recorded move path for this position — replay is unavailable.', '#94a3b8', 2600);
+            window.showToast?.('No recorded move path for this position.', '#94a3b8', 2200);
             return;
         }
-        if (!this._enterReplayMode()) {
-            window.showToast?.('Wait for the opponent move to finish, then replay.', '#94a3b8', 2200);
-            return;
-        }
+        if (!this._enterReplayMode()) return;
         this.lineSteps = steps;
         this.lineIndex = 0;
         this.replayPlaying = true;
@@ -1524,10 +1318,6 @@ class RepertoireTrainer {
         this._scheduleReplayTick();
     }
 
-    /**
-     * Space: start / pause / resume. Pressing play while parked on the last step
-     * (the automatic replay stops there, owner decision) plays the line again.
-     */
     toggleReplayPlayback() {
         if (!this.replayMode) { this.startReplay(); return; }
         if (this.replayPlaying) { this.pauseReplay(); return; }
@@ -1549,20 +1339,12 @@ class RepertoireTrainer {
         this._renderReplayBar();
     }
 
-    /**
-     * Arrows + h/l. Stepping always pauses the automatic play (owner: "pause the
-     * automatic play and go back and forth").
-     *
-     * With no replay active a *backward* step enters the replay one ply back (the
-     * owner's decision), while a forward step is a no-op because the board is
-     * already on the live drill position.
-     */
     replayStep(delta) {
         const steps = this.lineSteps || [];
         if (!this.replayMode) {
             if (delta > 0) return;
             if (steps.length < 2) {
-                window.showToast?.('No recorded move path for this position to step through.', '#94a3b8', 2200);
+                window.showToast?.('No recorded move path to step through.', '#94a3b8', 2000);
                 return;
             }
             if (!this._enterReplayMode()) return;
@@ -1576,7 +1358,6 @@ class RepertoireTrainer {
         this._gotoLineStep(this.lineIndex + delta);
     }
 
-    /** ⏮ Start / ↑ / k / Home — jumps to the first position of the line. */
     replayJumpTo(index) {
         if (!this.replayMode) {
             if ((this.lineSteps || []).length < 2) return;
@@ -1587,16 +1368,10 @@ class RepertoireTrainer {
         this._gotoLineStep(index);
     }
 
-    /** ⏭ / ↓ / j / End / ✕ Exit — back to the live drill position. */
     replayJumpToEnd() {
         this.exitReplay();
     }
 
-    /**
-     * Leaves replay mode. `this.currentFen` was never written while scrubbing, so
-     * the board is restored from it — with the drill's last-move highlight and its
-     * saved plan arrows — and the position becomes answerable again.
-     */
     exitReplay() {
         if (!this.replayMode) return;
         this._stopReplayTimer();
@@ -1622,35 +1397,26 @@ class RepertoireTrainer {
             (this.currentDrill && this.currentDrill.expected_uci && !this.opponentReplyTimeout && !this.autoNextTimeout)
         );
         this.isWaitingForUser = shouldWait;
+        if (this.isWaitingForUser) this.drillReadyAt = this._nowMs();
         this.replaySavedWaiting = false;
         this.updateHintButtonState(this.isWaitingForUser);
         this._renderReplayBar();
     }
 
-    /**
-     * The 650 ms auto-play chain. CODE-07: the tick carries the `drillToken` it was
-     * scheduled under, so a drill replacement stops it without ever touching the
-     * board of the new drill.
-     */
     _scheduleReplayTick() {
         const token = this.drillToken;
         this._stopReplayTimer();
         this.replayTimer = setTimeout(() => {
             this.replayTimer = null;
-            if (token !== this.drillToken) return;                 // the drill changed under us
-            if (!this.replayMode || !this.replayPlaying) return;   // paused or left in the meantime
+            if (token !== this.drillToken) return;
+            if (!this.replayMode || !this.replayPlaying) return;
             const lastIndex = Math.max(0, (this.lineSteps || []).length - 1);
             const nextIndex = Math.min(lastIndex, this.lineIndex + 1);
             if (nextIndex >= lastIndex) {
-                // Arrived at the drill position: stop auto-play and unlock the board
-                // so the user can immediately play their move (or press ←/h to review).
                 this.replayPlaying = false;
             }
             this._gotoLineStep(nextIndex);
-            if (this.lineIndex >= lastIndex) {
-                window.showToast?.('Replay finished — play your move, or press ←/h to review.', '#94a3b8', 2600);
-                return;
-            }
+            if (this.lineIndex >= lastIndex) return;
             this._scheduleReplayTick();
         }, this.replayDelayMs);
     }
@@ -1668,40 +1434,12 @@ class RepertoireTrainer {
         }
     }
 
-    /**
-     * AUDIT FIXER-V — the owner's ruling: "A line should never finish on an opponent's move."
-     *
-     * There are two honest reasons a drill can stop, and only ONE of them is a completion:
-     *
-     *   * `repertoire_exhausted` — the position is the one the user's OWN prepared move
-     *     produced, and the repertoire genuinely has nothing more. A finished line; celebrated.
-     *
-     *   * `unanswered_opponent_branches` — the repertoire holds opponent replies for which the
-     *     user has prepared NO answer. The line is not finished, it is incomplete: it is missing
-     *     the user's own reply. Reported NEUTRAL (amber), never as a completion, and never as an
-     *     error either — the user did nothing wrong, they simply have not prepared this
-     *     variation, so the message names the fix ("add a reply in the Repertoire Builder")
-     *     instead of asserting success or blaming them.
-     *
-     * This is deliberately a TOTAL function over the payload: it also refuses to celebrate a
-     * payload that is not an end at all, or one that leaves the board on an opponent's move, so
-     * an old-shaped or malformed response can never produce a false "Line Complete!" here. The
-     * guaranteed property is therefore local to this function rather than to whichever branch
-     * happens to call it today.
-     *
-     * Both outcomes reuse the existing `.feedback-box` element and the floating toast, so
-     * neither introduces in-flow layout shift (AGENTS.md §8).
-     *
-     * @returns {{completed: boolean, cls: string, color: string, toast: string, text: string}}
-     */
     _lineEndPresentation(data) {
         const answered = (data && typeof data.unanswered_branches === 'number')
             ? data.unanswered_branches
             : 0;
         const reason = (data && data.line_end_reason) || null;
         const declaredEnd = !!(data && data.is_line_end);
-        // The board resting on an opponent's move means the line has NOT finished, whatever the
-        // payload claims: a completion is a position reached by the user's OWN move.
         const restsOnOpponentMove = !!(data && data.opponent_reply && !data.next_expected_uci);
         const unfinished = reason === 'unanswered_opponent_branches'
             || answered > 0
@@ -1723,20 +1461,18 @@ class RepertoireTrainer {
             completed: true,
             cls: 'correct',
             color: '#4ade80',
-            toast: '🎉 Line Complete!',
-            text: '🎉 Line Complete!'
+            toast: 'Line Complete!',
+            text: 'Line Complete!'
         };
     }
 
     _advanceAfterLineEnd(drillToken) {
-        // Check if reinforcement phase just finished all lapses
         if (this.isReinforcementPhase && (!this.sessionLapses || this.sessionLapses.length === 0)) {
             this.isReinforcementPhase = false;
             this.onSessionComplete(true);
             return;
         }
 
-        // Check if regular 20-move session is complete
         if (!this.isReinforcementPhase && this.sessionIndex >= this.sessionTarget) {
             if (this._pendingReinforcementIds().length > 0) {
                 this.startReinforcementPhase();
@@ -1746,7 +1482,6 @@ class RepertoireTrainer {
             return;
         }
 
-        // Otherwise, continue to next drill
         this.startNewDrill();
     }
 
@@ -1760,16 +1495,22 @@ class RepertoireTrainer {
             this._renderReplayBar();
         }
 
+        const responseMs = this.drillReadyAt > 0
+            ? Math.max(1, Math.round(this._nowMs() - this.drillReadyAt))
+            : null;
+
         const attemptedUci = from + to + (promo || '');
-        // SAN of the move the user actually played (needed to extend the replay path).
         const attemptSan = (moveRes && typeof moveRes.san === 'string') ? moveRes.san : null;
         const feedback = document.getElementById('trainFeedback');
-        // CODE-07: this attempt belongs to the drill that is on screen *now*.
         const drillToken = this.drillToken;
 
         const studyContext = this.openingFilter || this.currentDrill?.study_name || undefined;
         const isRetry = Boolean(this.currentPositionHasMistake || this.currentPositionUsedHint);
-        const isDeviationMode = (this.sessionMode === 'deviations' || Boolean(this.activeDrillDeviation));
+        const isDeviationMode = (
+            this.sessionMode === 'deviations' ||
+            Boolean(this.activeDrillDeviation) ||
+            this.currentDrill?.drill_reason === 'game_deviation'
+        );
         const deviationGameId = this.currentDrill?.game_id || this.activeDrillDeviation?.game_id || null;
         const deviationPlayedUci = this.currentDrill?.played_uci || this.activeDrillDeviation?.played_uci || null;
 
@@ -1786,6 +1527,7 @@ class RepertoireTrainer {
                     opening_filter: studyContext,
                     study_name: studyContext,
                     is_retry: isRetry,
+                    response_ms: responseMs,
                     game_id: deviationGameId,
                     is_deviation: isDeviationMode,
                     played_uci: deviationPlayedUci
@@ -1794,18 +1536,19 @@ class RepertoireTrainer {
             const data = await res.json();
             if (drillToken !== this.drillToken) return;
 
+            // Reveal move note immediately upon answering to reinforce the strategic plan
+            const answeredNote = data.comment || this.pendingMoveNote || '';
+            if (answeredNote) {
+                this._updateNoteBox(answeredNote);
+            }
+
             if (data.correct) {
                 if (!isRetry) {
-                    // Success on first attempt!
                     this.streak++;
                     this.practicedCount++;
                     this.correctCount++;
                     this.updateStats();
 
-                    // 2-Hit Consolidation Rule:
-                    // A missed move is cleared from the mid-session retry queue (`sessionLapses`) on
-                    // its first unassisted recall, but remains in `sessionReinforcementQueue` for the
-                    // end-of-session Reinforcement Round unless recalled twice unassisted.
                     if (data.prepared_id) {
                         const pid = data.prepared_id;
                         const wasLapse = this.sessionLapses.includes(pid) || this.sessionReinforcementQueue.includes(pid);
@@ -1820,12 +1563,10 @@ class RepertoireTrainer {
                         }
                     }
 
-                    // Track drilled move in session
                     if (data.prepared_id && !this.sessionDrilledIds.includes(data.prepared_id)) {
                         this.sessionDrilledIds.push(data.prepared_id);
                     }
 
-                    // Advance session progress only on first attempt per position
                     if (!this.hasAnsweredCurrentPosition) {
                         this.hasAnsweredCurrentPosition = true;
                         if (!this.isReinforcementPhase) {
@@ -1848,13 +1589,13 @@ class RepertoireTrainer {
                         feedback.style.display = 'block';
                         feedback.className = 'feedback-box correct';
                         if (this.sessionMode === 'deviations' || this.activeDrillDeviation) {
-                            const expSan = this.currentDrill?.expected_san || data.prepared_san || 'your prepared move';
-                            const playedSan = this.currentDrill?.played_san || this.activeDrillDeviation?.played_san || 'game move';
-                            feedback.textContent = `✓ Correct! ${expSan} is your prepared move (instead of ${playedSan} in your game). Deviation corrected & removed from your list! 🎉`;
+                            const expSan = this.currentDrill?.expected_san || data.your_san || 'prepared move';
+                            feedback.textContent = `✓ ${expSan} — deviation resolved.`;
                         } else {
                             feedback.textContent = `✓ ${data.message}`;
                         }
                     }
+
                     if (this.sessionMode === 'deviations' || this.activeDrillDeviation) {
                         const resolvedGameId = deviationGameId;
                         const resolvedFen = this.currentDrill?.parent_fen || this.currentFen;
@@ -1871,12 +1612,9 @@ class RepertoireTrainer {
                                 prepared_uci: resolvedPrep,
                                 user_color: drillColor
                             })
-                        }).catch(e => console.warn('Could not mark deviation resolved:', e));
+                        }).catch(() => {});
 
-                        if (this.totalDeviationsCount > 0) {
-                            this.totalDeviationsCount--;
-                        }
-
+                        if (this.totalDeviationsCount > 0) this.totalDeviationsCount--;
                         if (this.deviationsData && Array.isArray(this.deviationsData.deviations)) {
                             this.deviationsData.deviations = this.deviationsData.deviations.filter(d => {
                                 if (resolvedGameId && d.game_id === resolvedGameId) return false;
@@ -1891,11 +1629,10 @@ class RepertoireTrainer {
 
                         if (this.currentDrill?.expected_uci) {
                             this.board.clearArrows();
-                            this.board.addArrow(this.currentDrill.expected_uci.slice(0, 2), this.currentDrill.expected_uci.slice(2, 4), '#22c55e');
+                            this.board.addArrow(this.currentDrill.expected_uci.slice(0, 2), this.currentDrill.expected_uci.slice(2, 4), '#34d399');
                         }
 
                         this.activeDrillDeviation = null;
-
                         clearTimeout(this.autoNextTimeout);
                         this.autoNextTimeout = setTimeout(() => {
                             if (this.drillToken !== drillToken) return;
@@ -1907,14 +1644,11 @@ class RepertoireTrainer {
                                 }
                                 this.startNewDrill({ index: this.currentDeviationIndex });
                             }
-                        }, 1200);
+                        }, 1100);
                         return;
                     }
                     this.activeDrillDeviation = null;
                 } else {
-                    // Correct on retry or with hint assistance:
-                    // Does NOT count as a first-try win; streak and correct stats are not incremented.
-                    // Keep in session lapses so the move is properly reinforced.
                     if (data.prepared_id) {
                         this._recordSessionLapse(data.prepared_id);
                     }
@@ -1943,40 +1677,30 @@ class RepertoireTrainer {
                     if (feedback) {
                         feedback.style.display = 'block';
                         feedback.className = 'feedback-box good_alternative';
-                        if (this.sessionMode === 'deviations' || this.activeDrillDeviation) {
-                            const expSan = this.currentDrill?.expected_san || data.prepared_san || 'your prepared move';
-                            const playedSan = this.currentDrill?.played_san || this.activeDrillDeviation?.played_san || 'game move';
-                            feedback.textContent = `↻ Correct! ${expSan} is your prepared move (instead of ${playedSan} in your game).`;
-                        } else {
-                            feedback.textContent = `↻ ${data.message}`;
-                        }
+                        feedback.textContent = `↻ ${data.message}`;
                     }
 
                     if (this.sessionMode === 'deviations') {
                         if (this.currentDrill?.expected_uci) {
                             this.board.clearArrows();
-                            this.board.addArrow(this.currentDrill.expected_uci.slice(0, 2), this.currentDrill.expected_uci.slice(2, 4), '#22c55e');
+                            this.board.addArrow(this.currentDrill.expected_uci.slice(0, 2), this.currentDrill.expected_uci.slice(2, 4), '#34d399');
                         }
                         clearTimeout(this.autoNextTimeout);
                         this.autoNextTimeout = setTimeout(() => {
                             if (this.drillToken !== drillToken) return;
                             this.nextDeviation();
-                        }, 1200);
+                        }, 1100);
                         return;
                     }
                 }
 
-                // Smoothly refresh repertoire mastery progress
                 this.loadMasteryProgress();
 
-                // If opponent reply exists, play it after delay
                 if (data.opponent_reply) {
                     this.isWaitingForUser = false;
                     this.updateHintButtonState(false);
 
                     this.opponentReplyTimeout = setTimeout(() => {
-                        // CODE-07: the drill may have been replaced (New Drill,
-                        // colour switch, focus change) while this was queued.
                         if (drillToken !== this.drillToken) return;
                         const opp = data.opponent_reply;
                         const oppFrom = opp.uci.slice(0, 2);
@@ -1990,14 +1714,11 @@ class RepertoireTrainer {
                             this.currentDrill.last_move = { from: oppFrom, to: oppTo, san: opp.san };
                         }
 
-                        // Determine if line continues or has completed
                         if (data.next_expected_uci && !data.is_line_end) {
                             if (this.currentDrill) {
                                 this.currentDrill.expected_uci = data.next_expected_uci;
                                 this.currentDrill.expected_san = data.next_expected_san;
-                                if (data.study_name) {
-                                    this.currentDrill.study_name = data.study_name;
-                                }
+                                if (data.study_name) this.currentDrill.study_name = data.study_name;
                                 if (data.next_opening_name) {
                                     this.currentDrill.opening_name = data.next_opening_name;
                                     const nameEl = document.getElementById('trainOpeningName');
@@ -2011,10 +1732,6 @@ class RepertoireTrainer {
                                 this.currentDrill.path_formatted = updatedPath;
                                 this.updateBreadcrumb(updatedPath, this.currentDrill.drill_reason, (this.currentDrill.ply_depth || 1) + 2);
 
-                                // Keep the replay timeline truthful for the deeper position. The drill's
-                                // `parent_fen` is a snapshot of the position it was fetched for, so it has
-                                // to follow the board: `_buildLineSteps()` validates the rebuilt path
-                                // against it and would otherwise discard a perfectly good timeline.
                                 if (Array.isArray(this.currentDrill.path_san)) {
                                     this.currentDrill.path_san.push(userSan, oppSan);
                                     if (this.currentFen) this.currentDrill.parent_fen = this.currentFen;
@@ -2022,40 +1739,34 @@ class RepertoireTrainer {
                                 }
                             }
 
-                            // Ready for user's next move in the continuing line
                             this.hasAnsweredCurrentPosition = false;
                             this.currentPositionHasMistake = false;
                             this.currentPositionUsedHint = false;
+                            this.pendingMoveNote = data.next_comment || '';
+                            // Hide next move's note until recall attempt
+                            this._updateNoteBox('');
                             this.isWaitingForUser = true;
+                            this.drillReadyAt = this._nowMs();
                             this.updateHintButtonState(true);
 
                             if (feedback) {
                                 feedback.className = 'feedback-box good_alternative';
-                                feedback.textContent = `Opponent replied with ${opp.san}. Your turn!`;
+                                feedback.textContent = `Opponent played ${opp.san}. Your turn.`;
                             }
 
-                            // Update next move's importance badge (0px CLS)
                             this._updateImportantBadge(data.next_is_important);
-                            // Update next move's notes (0px CLS)
-                            this._updateNoteBox(data.next_comment);
-                            // Update next move's plan arrows
                             this.savedPlanArrows = [];
                             if (data.next_arrows) {
                                 try {
                                     this.savedPlanArrows = JSON.parse(data.next_arrows);
-                                } catch (e) {
+                                } catch (_) {
                                     this.savedPlanArrows = [];
                                 }
                             }
                             const btnArrows = document.getElementById('btnTrainToggleArrows');
-                            this._setConditional(btnArrows, !!(this.savedPlanArrows && this.savedPlanArrows.length), 'inline-block');
-                            if (this.savedPlanArrows && this.savedPlanArrows.length) {
-                                this.board.setArrows(this.savedPlanArrows);
-                            } else {
-                                this.board.clearArrows();
-                            }
+                            this._setConditional(btnArrows, !!(this.savedPlanArrows && this.savedPlanArrows.length), 'inline-flex');
+                            this.board.clearArrows();
                         } else {
-                            // Line paused on opponent's move with no prepared reply
                             if (this.currentDrill) {
                                 this.currentDrill.expected_uci = null;
                                 this.currentDrill.expected_san = null;
@@ -2066,24 +1777,18 @@ class RepertoireTrainer {
                             if (feedback) {
                                 feedback.style.display = 'block';
                                 feedback.className = 'feedback-box good_alternative';
-                                feedback.textContent =
-                                    `Opponent replied ${opp.san}. Your repertoire has no prepared answer here — `
-                                    + 'add a reply for it in the Repertoire Builder to finish this line.';
+                                feedback.textContent = `Opponent replied ${opp.san}. Your repertoire has no prepared answer here — add a reply in the Repertoire Builder.`;
                             }
-                            window.showToast?.(
-                                `Line paused — no prepared answer to ${opp.san}. Add it in the Repertoire Builder.`,
-                                '#f59e0b', 3200);
+                            window.showToast?.(`Line paused — no prepared answer to ${opp.san}.`, '#f59e0b', 3000);
 
-                            // Advance immediately in session (short 200ms delay so opponent move animation completes)
                             clearTimeout(this.autoNextTimeout);
                             this.autoNextTimeout = setTimeout(() => {
                                 if (drillToken !== this.drillToken) return;
                                 this._advanceAfterLineEnd(drillToken);
                             }, 200);
                         }
-                    }, 550);
+                    }, 520);
                 } else {
-                    // Line ended on user's own prepared move
                     const lineEnd = this._lineEndPresentation(data);
                     if (this.currentDrill) {
                         this.currentDrill.expected_uci = null;
@@ -2097,24 +1802,21 @@ class RepertoireTrainer {
                         feedback.className = `feedback-box ${lineEnd.cls}`;
                         feedback.textContent = lineEnd.text;
                     }
-                    window.showToast?.(lineEnd.toast, lineEnd.color, lineEnd.completed ? 1200 : 3200);
+                    window.showToast?.(lineEnd.toast, lineEnd.color, lineEnd.completed ? 1100 : 3000);
 
-                    // Advance immediately in session (quick 150ms delay for smooth transition)
                     clearTimeout(this.autoNextTimeout);
                     this.autoNextTimeout = setTimeout(() => {
                         if (drillToken !== this.drillToken) return;
                         this._advanceAfterLineEnd(drillToken);
-                    }, 150);
+                    }, 180);
                 }
             } else {
-                // Incorrect
+                // Mistake
                 this.streak = 0;
                 this.practicedCount++;
                 this.updateStats();
-
                 this.currentPositionHasMistake = true;
 
-                // Add to intra-session blunder buffer for re-drilling
                 if (data.prepared_id) {
                     this._recordSessionLapse(data.prepared_id);
                 }
@@ -2134,11 +1836,7 @@ class RepertoireTrainer {
                     feedback.style.display = 'block';
                     feedback.className = 'feedback-box blunder';
                     if (this.sessionMode === 'deviations' && this.currentDrill) {
-                        if (attemptedUci === this.currentDrill.played_uci) {
-                            feedback.textContent = `⚠️ That's what you played in your game (${this.currentDrill.played_san})! But your prepared repertoire move is ${this.currentDrill.expected_san}.`;
-                        } else {
-                            feedback.textContent = `✗ Incorrect. In your game vs ${this.currentDrill.opponent_name || 'Opponent'} you played ${this.currentDrill.played_san}. Your prepared move is ${this.currentDrill.expected_san}.`;
-                        }
+                        feedback.textContent = `✗ Game move: ${this.currentDrill.played_san}. Prepared: ${this.currentDrill.expected_san}.`;
                     } else {
                         feedback.textContent = `✗ ${data.message}`;
                     }
@@ -2146,15 +1844,12 @@ class RepertoireTrainer {
 
                 if (data.expected_uci) {
                     this.board.clearArrows();
-                    this.board.addArrow(data.expected_uci.slice(0, 2), data.expected_uci.slice(2, 4), '#22c55e');
+                    this.board.addArrow(data.expected_uci.slice(0, 2), data.expected_uci.slice(2, 4), '#34d399');
                 }
 
                 this.loadMasteryProgress();
 
-                // Reset board back to current position so user can immediately retry with correct move,
-                // then fade the solution arrow after 950ms so the user executes from memory.
                 this.mistakeResetTimeout = setTimeout(() => {
-                    // CODE-07: never repaint a drill that is no longer on screen.
                     if (drillToken !== this.drillToken) return;
                     this.board.loadFEN(this.currentFen);
                     if (this.currentDrill && this.currentDrill.last_move) {
@@ -2162,16 +1857,13 @@ class RepertoireTrainer {
                     }
                     if (data.expected_uci) {
                         this.board.clearArrows();
-                        this.board.addArrow(data.expected_uci.slice(0, 2), data.expected_uci.slice(2, 4), '#22c55e');
+                        this.board.addArrow(data.expected_uci.slice(0, 2), data.expected_uci.slice(2, 4), '#34d399');
                         this.solutionArrowFadeTimeout = setTimeout(() => {
                             if (drillToken !== this.drillToken) return;
                             this.board.clearArrows();
-                            if (this.savedPlanArrows && this.savedPlanArrows.length) {
-                                this.board.setArrows(this.savedPlanArrows);
-                            }
-                        }, 950);
+                        }, 900);
                     }
-                }, 800);
+                }, 750);
             }
         } catch (e) {
             console.error('Error verifying repertoire move:', e);
@@ -2179,8 +1871,9 @@ class RepertoireTrainer {
     }
 
     // ================================================================== //
-    //  Game Deviations Methods (Subtab in Trainer)
+    //  Game Deviations View
     // ================================================================== //
+
     switchTrainerTab(tab) {
         this.activeTrainerTab = tab;
         const btnDrills = document.getElementById('btnTrainerTabDrills');
@@ -2209,7 +1902,7 @@ class RepertoireTrainer {
     async loadGameDeviations() {
         const list = document.getElementById('trainerDeviationsList');
         if (list && (!this.deviationsData || !this.deviationsData.deviations)) {
-            list.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:2rem;">Analyzing game repertoire deviations...</div>';
+            list.innerHTML = '<div class="table-empty-cell">Loading deviations...</div>';
         }
 
         try {
@@ -2221,7 +1914,6 @@ class RepertoireTrainer {
             const data = await res.json();
             this.deviationsData = data;
 
-            // Update stats
             const badge = document.getElementById('trainDeviationsBadge');
             if (badge) badge.textContent = data.games_with_deviations || 0;
 
@@ -2236,12 +1928,11 @@ class RepertoireTrainer {
 
             this.renderDeviationsList();
         } catch (e) {
-            console.error('Error loading game deviations:', e);
             if (list) {
                 list.textContent = '';
                 const errDiv = document.createElement('div');
-                errDiv.style.cssText = 'text-align:center; color:#ef4444; padding:2rem;';
-                errDiv.textContent = 'Could not load game deviations: ' + (e.message || '');
+                errDiv.className = 'table-empty-cell text-crimson';
+                errDiv.textContent = 'Could not load deviations: ' + (e.message || '');
                 list.appendChild(errDiv);
             }
         }
@@ -2267,20 +1958,14 @@ class RepertoireTrainer {
         }
 
         if (devs.length === 0) {
-            list.innerHTML = `
-                <div class="card-panel" style="text-align:center; padding:2.5rem; color:var(--text-muted); background:rgba(15,23,42,0.6);">
-                    <div style="font-size:2rem; margin-bottom:0.5rem;">🎉</div>
-                    <div style="font-weight:700; color:#fff; font-size:1.1rem; margin-bottom:0.25rem;">No Deviations Found!</div>
-                    <div style="font-size:0.85rem;">You followed your prepared opening repertoire in all stored games for this filter.</div>
-                </div>
-            `;
+            list.innerHTML = `<div class="card-panel table-empty-cell">No deviations found.</div>`;
             return;
         }
 
         list.innerHTML = devs.map((d, idx) => {
             const resultCls = this._normalizeGameOutcome(d.game_result || d.result, d.user_color);
             const resultLabel = resultCls.toUpperCase();
-            const colorSymbol = d.user_color === 'white' ? '⚪' : '⚫';
+            const swatchCls = d.user_color === 'white' ? 'swatch-white' : 'swatch-black';
             const speed = d.speed ? d.speed.toUpperCase() : 'GAME';
             const rating = d.opponent_rating ? `(${d.opponent_rating})` : '';
             const gameDate = d.played_at ? new Date(d.played_at).toLocaleDateString() : '';
@@ -2289,11 +1974,11 @@ class RepertoireTrainer {
                 <div class="deviation-card" data-idx="${idx}">
                     <div class="deviation-header">
                         <div class="deviation-game-info">
-                            <span style="font-size:0.8rem;" title="${d.user_color}">${colorSymbol}</span>
+                            <span class="swatch ${swatchCls}" title="${this._escapeAttr(d.user_color)}"></span>
                             <span class="deviation-opponent">vs ${this._escapeHtml(d.opponent_name || 'Opponent')} ${rating}</span>
                             <span class="game-outcome-pill ${resultCls}">${resultLabel}</span>
-                            <span class="badge-pill" style="font-size:0.68rem; color:var(--text-muted);">${this._escapeHtml(speed)}</span>
-                            <span style="font-size:0.75rem; color:var(--text-muted);">${gameDate}</span>
+                            <span class="badge-pill">${this._escapeHtml(speed)}</span>
+                            <span class="muted-tag">${gameDate}</span>
                         </div>
                         <div class="deviation-opening-tag">
                             <strong>${this._escapeHtml(d.opening_name || 'Opening')}</strong> ${d.eco ? '· ' + this._escapeHtml(d.eco) : ''}
@@ -2301,24 +1986,22 @@ class RepertoireTrainer {
                     </div>
 
                     <div class="deviation-comparison-grid">
-                        <div class="deviation-box played">
-                            <span class="deviation-box-label">Played in Game (Move ${d.deviation_move_number})</span>
-                            <span class="deviation-move-val" style="color:#f87171;">${this._escapeHtml(d.played_san)}</span>
+                        <div class="deviation-box">
+                            <span class="deviation-box-label">Played (Move ${d.deviation_move_number})</span>
+                            <span class="deviation-move-val text-crimson">${this._escapeHtml(d.played_san)}</span>
                         </div>
-                        <div class="deviation-arrow-icon">➔</div>
-                        <div class="deviation-box prepared">
-                            <span class="deviation-box-label">Your Prepared Repertoire</span>
-                            <span class="deviation-move-val" style="color:#4ade80;">${this._escapeHtml(d.prepared_san)}</span>
+                        <div class="deviation-arrow-icon">&rarr;</div>
+                        <div class="deviation-box">
+                            <span class="deviation-box-label">Prepared</span>
+                            <span class="deviation-move-val text-emerald">${this._escapeHtml(d.prepared_san)}</span>
                         </div>
                     </div>
 
-                    ${d.prepared_comment ? `<div class="deviation-note-callout" title="${this._escapeAttr(d.prepared_comment)}">📝 <strong>Plan:</strong> ${this._escapeHtml(d.prepared_comment)}</div>` : ''}
+                    ${d.prepared_comment ? `<div class="deviation-note-callout" title="${this._escapeAttr(d.prepared_comment)}">${this._escapeHtml(d.prepared_comment)}</div>` : ''}
 
                     <div class="deviation-actions">
-                        ${d.game_id ? `<a href="https://lichess.org/${this._escapeAttr(d.game_id)}" target="_blank" rel="noopener noreferrer" class="btn-secondary" style="font-size:0.72rem; padding:0.25rem 0.55rem; text-decoration:none;">↗ Lichess</a>` : ''}
-                        <button class="btn-primary btn-drill-deviation" data-idx="${idx}" style="font-size:0.75rem; padding:0.3rem 0.75rem;">
-                            🎯 Drill Position
-                        </button>
+                        ${d.game_id ? `<a href="https://lichess.org/${this._escapeAttr(d.game_id)}" target="_blank" rel="noopener noreferrer" class="btn-secondary btn-xs" style="text-decoration:none;">Lichess ↗</a>` : ''}
+                        <button class="btn-primary btn-sm btn-drill-deviation" data-idx="${idx}" type="button">Drill</button>
                     </div>
                 </div>
             `;
@@ -2352,7 +2035,6 @@ class RepertoireTrainer {
         if (drillsSection) drillsSection.style.display = 'flex';
         if (deviationsView) deviationsView.style.display = 'none';
 
-        // Switch to dev color if needed
         if (dev.user_color && (dev.user_color === 'white' || dev.user_color === 'black')) {
             this.activeColor = dev.user_color;
             const btnMixed = document.getElementById('btnTrainMixed');

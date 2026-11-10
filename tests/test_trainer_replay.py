@@ -250,11 +250,6 @@ class TestHlParityInAllViews(unittest.TestCase):
         block = _keydown_block(source, "document.getElementById('viewRepertoire')")
         self._assert_pairs(block, self.BUILDER_PAIRS, "builder")
 
-    def test_scout_arrow_and_vim_keys_share_one_handler(self):
-        source = _read("scout.js")
-        block = _keydown_block(source, "document.getElementById('viewScout')")
-        self._assert_pairs(block, self.SCOUT_PAIRS, "scout")
-
     def test_trainer_arrow_and_vim_keys_share_one_mapping(self):
         source = _read("repertoire_trainer.js")
         dispatcher = _keydown_block(source, "document.getElementById('viewRepTrainer')")

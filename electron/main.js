@@ -19,8 +19,6 @@ const BACKEND_START_ATTEMPTS = 5;
 if (process.platform === 'linux') {
     app.commandLine.appendSwitch('ozone-platform-hint', 'auto');
     app.commandLine.appendSwitch('enable-features', 'WaylandWindowDecorations');
-    // Prevent uninitialized YUV zero-buffer green flicker during video decode initialization on Linux/hybrid GPUs
-    app.commandLine.appendSwitch('disable-accelerated-video-decode');
 }
 
 let mainWindow = null;
@@ -42,42 +40,22 @@ const EXTERNAL_HOST_ALLOWLIST = new Set([
     'lichess.org',
     'www.lichess.org',
     'chessbook.com',
-    'www.chessbook.com',
-    'youtube.com',
-    'www.youtube.com',
-    'm.youtube.com',
-    'youtu.be',
-    'www.youtu.be',
-    'youtube-nocookie.com',
-    'www.youtube-nocookie.com'
+    'www.chessbook.com'
 ]);
 
-// Content-Security-Policy injected into every main-frame response of our own
-// backend (see applySessionHardening()). Minimum viable for this app:
-//   * script-src 'self' + https://www.youtube.com - the YouTube IFrame Player API
-//     (frontend/index.html) also bootstraps
-//     https://www.youtube.com/s/player/<hash>/www-widgetapi.js, i.e. the same
-//     host. No 'unsafe-inline', no 'unsafe-eval'.
-//   * style-src 'unsafe-inline' is REQUIRED: index.html and the JS templates
-//     carry ~360 style="..." attributes. It does not weaken script-src.
-//   * frame-src: the YouTube embed is the only frame the app creates.
-//   * connect-src: every fetch()/stream in the app is same-origin relative.
-//   * img-src: local pieces, data:/blob: and i.ytimg.com thumbnails only.
-//   * default-src 'self' is a safety net for anything not enumerated (workers,
-//     manifests) - never a wildcard.
 const APP_CSP = [
     "default-src 'self'",
     "base-uri 'none'",
     "object-src 'none'",
     "frame-ancestors 'none'",
     "form-action 'none'",
-    "script-src 'self' https://www.youtube.com",
+    "script-src 'self'",
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob: https://i.ytimg.com",
+    "img-src 'self' data: blob:",
     "font-src 'self' data:",
     "media-src 'self' blob:",
     "connect-src 'self'",
-    "frame-src https://www.youtube.com"
+    "frame-src 'none'"
 ].join('; ');
 
 // True only for the exact origin of our own local backend.
@@ -392,7 +370,7 @@ function createWindow() {
         height: 940,
         minWidth: 1040,
         minHeight: 700,
-        backgroundColor: '#0b1120',
+        backgroundColor: '#0b0d11',
         icon: path.join(__dirname, 'icon.png'),
         show: false,
         webPreferences: {

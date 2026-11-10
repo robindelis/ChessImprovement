@@ -262,7 +262,7 @@ def get_fixture_summary():
 #: `init_db()`, the only legitimate authority) if a module has mangled it, so a
 #: destructive experiment in one module cannot cascade into every later one.
 REQUIRED_TABLES = (
-    "games", "blunders", "drill_reviews", "explorer_cache", "scouted_content",
+    "games", "blunders", "drill_reviews", "explorer_cache",
     "repertoire_moves", "repertoire_studies", "study_moves", "settings",
 )
 
@@ -385,11 +385,6 @@ def _reset_singletons():
         except Exception:
             pass
     RepertoireManager._instance = None
-    try:
-        from backend.scout import ContentScout
-        ContentScout._instance = None
-    except Exception:
-        pass
 
     _reset_process_globals()
 

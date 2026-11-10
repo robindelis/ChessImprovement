@@ -201,15 +201,14 @@ class TestContentSecurityPolicy(unittest.TestCase):
         self.assertNotIn("'unsafe-eval'", script_src)
         self.assertNotIn("'wasm-unsafe-eval'", script_src)
 
-    def test_script_src_is_pinned_to_self_and_the_youtube_host(self):
-        self.assertEqual(self.directive("script-src"), "'self' https://www.youtube.com")
+    def test_script_src_is_pinned_to_self_only(self):
+        self.assertEqual(self.directive("script-src"), "'self'")
 
     def test_style_src_allows_inline_styles(self):
-        """index.html carries ~360 style="" attributes, so this one is required."""
         self.assertEqual(self.directive("style-src"), "'self' 'unsafe-inline'")
 
-    def test_frame_src_allows_only_the_youtube_embed(self):
-        self.assertEqual(self.directive("frame-src"), "https://www.youtube.com")
+    def test_frame_src_is_denied(self):
+        self.assertEqual(self.directive("frame-src"), "'none'")
 
     def test_connect_src_is_self_only(self):
         self.assertEqual(self.directive("connect-src"), "'self'")
@@ -326,10 +325,11 @@ process.stdout.write(JSON.stringify({ cases, trusted, csp: api.APP_CSP }));
     ALLOWED = [
         "https://lichess.org/gVf9kL3M",
         "https://lichess.org/account/oauth/token",
-        "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-        "https://youtu.be/dQw4w9WgXcQ",
+        "https://chessbook.com/",
     ]
     DENIED = [
+        "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        "https://youtu.be/dQw4w9WgXcQ",
         "http://lichess.org/gVf9kL3M",          # not https
         "https://evil.example/steal",           # not allow-listed
         "https://lichess.org.evil.example/",    # suffix confusion
@@ -387,7 +387,8 @@ process.stdout.write(JSON.stringify({ cases, trusted, csp: api.APP_CSP }));
             self.assertEqual(self.out["trusted"][url], expected, url)
 
     def test_exported_csp_matches_the_source_constant(self):
-        self.assertIn("script-src 'self' https://www.youtube.com", self.out["csp"])
+        self.assertIn("script-src 'self';", self.out["csp"])
+        self.assertIn("frame-src 'none'", self.out["csp"])
 
 
 class TestFrontendContract(unittest.TestCase):
@@ -420,11 +421,10 @@ class TestFrontendContract(unittest.TestCase):
         self.assertLessEqual(len(offenders), 1,
                              f"more inline handlers than the documented budget: {offenders}")
 
-    def test_index_html_uses_no_external_script_other_than_youtube(self):
+    def test_index_html_uses_no_external_scripts(self):
         html = read(INDEX_HTML)
         for src in re.findall(r"<script[^>]*\bsrc=[\"']([^\"']+)[\"']", html):
-            if src.startswith("http"):
-                self.assertIn("youtube.com", src, f"unexpected remote script: {src}")
+            self.assertFalse(src.startswith("http"), f"unexpected remote script: {src}")
 
     def test_app_never_navigates_the_window_away(self):
         """The shell blocks real navigation, so the SPA must not rely on it."""

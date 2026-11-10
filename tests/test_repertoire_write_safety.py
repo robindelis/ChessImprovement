@@ -139,6 +139,7 @@ class RepertoireWriteSafety(unittest.TestCase):
             (START,),
         )
         conn.commit()
+        conn.close()
         before = _rows(
             "SELECT * FROM repertoire_moves WHERE parent_fen = ? AND move_uci = 'e2e4'", (START,)
         )[0]
@@ -216,6 +217,7 @@ class RepertoireWriteSafety(unittest.TestCase):
             """
         )
         conn.commit()
+        conn.close()
         before = _rows("SELECT * FROM repertoire_moves WHERE repertoire='white' ORDER BY id")
 
         result = rm.seed_default_repertoires(force=True)

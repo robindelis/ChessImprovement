@@ -19,25 +19,31 @@ Personalized chess repertoire builder, trainer, and game review app for **`RobiD
 ## 📁 Key Files
 ```
 backend/
-  api.py            # REST API, SSE streams, CORS
-  db.py             # Schema, migrations, SQLite factory
-  repertoire.py     # Tree manager, spaced repetition (SRS), studies, threat score
-  analyzer.py       # Stockfish blunder detection
-  evaluator.py      # Stockfish async pool & SSE eval stream
+  api.py            # REST API, SSE streams, local-origin security boundary
+  db.py             # Schema, migrations, closing_db() SQLite factory
+  repertoire.py     # Repertoire tree CRUD, studies, overlap & PGN import
+  explorer.py       # 2000+ Lichess Explorer cache, candidate evals, threat score
+  game_sync.py      # Lichess game ingestion, SSE sync streams, blunder gaps
+  trainer.py        # FSRS-5 memory model, implicit latency grading, DAG graph
   deviations.py     # Game deviation detection & practice drills
-  scout_discovery.py# Opening scout & video discovery
+  analyzer.py       # Stockfish blunder detection
+  evaluator.py      # Stockfish async/sync pools & SSE eval stream
+  utils.py          # FEN normalization & Lichess outcome coercion
 frontend/
-  repertoire_builder.js  # Repertoire tree, board, eval bar, game gaps
-  repertoire_trainer.js  # SRS training against opponent replies
+  index.html             # 2-tab Studio shell (Builder | Trainer + Settings modal)
+  style.css              # Single Dark Studio stylesheet
+  repertoire_builder.js  # Repertoire tree, board, eval bar, Explorer, Gaps & Games
+  repertoire_trainer.js  # FSRS-5 active-recall trainer & game deviations
   board.js               # Interactive SVG chessboard
-  scout.js               # Course video scout & board sync
+  app.js                 # Tab switcher, Settings modal, study modal & toasts
 tests/
-  test_setup.py     # Temp SQLite DB isolation on import
+  test_setup.py          # Temp SQLite DB isolation on import
+  test_fsrs5_sota_trainer.py # FSRS-5, latency grading, DAG & UI contract tests
 ```
 
 ## ⚠️ Core Invariants
 1. **Test Isolation**: Import `tests.test_setup` first in tests. Never touch `chess_improvement.db`.
-2. **Offline Tests**: Mock external HTTP (Lichess/YouTube).
+2. **Offline Tests**: Mock external HTTP (Lichess).
 3. **Threat Score**: Candidate moves ranked by $N \times (L^2 + 0.02)$ where $L = 1 - W/100$.
 4. **FEN Normalization**: Use 4 tokens (`placement turn castling ep`) for keys.
 5. **No Data Loss**: Never delete or overwrite user moves without explicit consent.

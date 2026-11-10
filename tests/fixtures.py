@@ -487,7 +487,6 @@ FIXTURE_TABLES = (
     "blunders",
     "drill_reviews",
     "explorer_cache",
-    "scouted_content",
     "repertoire_moves",
     "repertoire_studies",
     "study_moves",
@@ -556,14 +555,6 @@ def seed_synthetic(conn, now=None):
            VALUES (?, ?, ?, ?)""",
         [(fen, ratings, json.dumps(payload), now)
          for fen, ratings, payload in synthetic_explorer_rows()],
-    )
-
-    conn.executemany(
-        """INSERT OR REPLACE INTO scouted_content (
-               source_id, source_type, title, channel, opening_name, eco,
-               thumbnail_url, duration, data_json, scouted_at, is_favorite
-           ) VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
-        [tuple(row.values()) for row in synthetic_scouted_content()],
     )
 
     conn.commit()

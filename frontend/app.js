@@ -1,4 +1,4 @@
-// Chess Opening Improvement Platform - Main App Controller
+// Repertoire Studio — Main Controller
 class ChessApp {
     constructor() {
         this.currentTab = 'repertoire';
@@ -14,12 +14,31 @@ class ChessApp {
     }
 
     _bindUI() {
-        // Nav tabs
         document.querySelectorAll('.nav-tab').forEach(tab => {
             tab.addEventListener('click', () => this.showTab(tab.dataset.tab));
         });
 
-        // Settings form
+        const btnOpenSettings = document.getElementById('btnOpenSettings');
+        const btnCloseSettings = document.getElementById('btnCloseSettingsModal');
+        const settingsModal = document.getElementById('settingsModal');
+
+        if (btnOpenSettings) {
+            btnOpenSettings.addEventListener('click', () => this.openSettingsModal());
+        }
+        if (btnCloseSettings) {
+            btnCloseSettings.addEventListener('click', () => this.closeSettingsModal());
+        }
+        if (settingsModal) {
+            settingsModal.addEventListener('click', (e) => {
+                const rect = settingsModal.getBoundingClientRect();
+                const inside = (
+                    rect.top <= e.clientY && e.clientY <= rect.top + rect.height &&
+                    rect.left <= e.clientX && e.clientX <= rect.left + rect.width
+                );
+                if (!inside) this.closeSettingsModal();
+            });
+        }
+
         const form = document.getElementById('settingsForm');
         if (form) {
             form.addEventListener('submit', (e) => {
@@ -28,17 +47,16 @@ class ChessApp {
             });
         }
 
-        // Settings Danger Zone reset button
         const btnSettingsReset = document.getElementById('btnSettingsResetRepertoire');
         if (btnSettingsReset) {
             btnSettingsReset.addEventListener('click', () => {
+                this.closeSettingsModal();
                 if (window.repertoireBuilder && typeof window.repertoireBuilder.confirmAndResetRepertoire === 'function') {
                     window.repertoireBuilder.confirmAndResetRepertoire();
                 }
             });
         }
 
-        // Electron desktop menu integration
         if (window.desktopApp && typeof window.desktopApp.onSyncGames === 'function') {
             window.desktopApp.onSyncGames(() => {
                 if (window.repertoireBuilder && typeof window.repertoireBuilder.resyncGames === 'function') {
@@ -48,7 +66,26 @@ class ChessApp {
         }
     }
 
+    openSettingsModal() {
+        this.loadSettings();
+        const modal = document.getElementById('settingsModal');
+        if (modal && typeof modal.showModal === 'function' && !modal.open) {
+            modal.showModal();
+        }
+    }
+
+    closeSettingsModal() {
+        const modal = document.getElementById('settingsModal');
+        if (modal && modal.open) {
+            modal.close();
+        }
+    }
+
     showTab(tabName) {
+        if (tabName === 'settings') {
+            this.openSettingsModal();
+            return;
+        }
         this.currentTab = tabName;
         document.querySelectorAll('.nav-tab').forEach(t => {
             t.classList.toggle('active', t.dataset.tab === tabName);
@@ -57,7 +94,6 @@ class ChessApp {
         document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
 
         if (tabName === 'repertoire') {
-            document.body?.classList?.remove('scout-studio-active');
             const viewRep = document.getElementById('viewRepertoire');
             if (viewRep) viewRep.classList.add('active');
             if (window.repertoireBuilder) {
@@ -69,27 +105,11 @@ class ChessApp {
                 }
             }
         } else if (tabName === 'rep-trainer') {
-            document.body?.classList?.remove('scout-studio-active');
             const viewTrain = document.getElementById('viewRepTrainer');
             if (viewTrain) viewTrain.classList.add('active');
             if (window.repertoireTrainer) {
                 window.repertoireTrainer.startNewDrill();
             }
-        } else if (tabName === 'scout') {
-            const viewScout = document.getElementById('viewScout');
-            if (viewScout) viewScout.classList.add('active');
-            if (viewScout?.classList?.contains('studio-mode')) {
-                document.body?.classList?.add('scout-studio-active');
-            }
-            const scoutInst = window.openingScout || window.videoScout;
-            if (scoutInst && scoutInst.board) {
-                scoutInst.board.render();
-            }
-        } else if (tabName === 'settings') {
-            document.body?.classList?.remove('scout-studio-active');
-            const viewSettings = document.getElementById('viewSettings');
-            if (viewSettings) viewSettings.classList.add('active');
-            this.loadSettings();
         }
     }
 
@@ -100,12 +120,14 @@ class ChessApp {
             this.account = data;
             if (data.username) {
                 const badge = document.getElementById('userBadge');
-                if (badge) badge.style.display = 'flex';
+                if (badge) badge.style.display = 'inline-flex';
                 const uname = document.getElementById('badgeUsername');
                 if (uname) uname.textContent = data.username;
                 const rating = document.getElementById('badgeRating');
-                const rapid = data.perfs?.rapid?.rating || data.perfs?.blitz?.rating || 'Unrated';
-                if (rating) rating.textContent = `${rapid} Rapid`;
+                const rapid = data.perfs?.rapid?.rating || data.perfs?.blitz?.rating || '';
+                if (rating) {
+                    rating.textContent = rapid ? String(rapid) : 'Local';
+                }
             }
         } catch (e) {
             console.error('Account load error:', e);
@@ -115,19 +137,13 @@ class ChessApp {
     async loadSettings() {
         try {
             const res = await fetch('/api/settings');
-            if (!res.ok) {
-                throw new Error(`Server responded ${res.status}`);
-            }
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
             const uname = document.getElementById('inputUsername');
             if (uname) uname.value = data.lichess_username || '';
             const tokenInput = document.getElementById('inputToken');
             if (data.has_token && tokenInput) {
-                tokenInput.placeholder = '•••••••••••••••••••• (configured)';
-            }
-            const geminiInput = document.getElementById('inputGeminiKey');
-            if (data.has_gemini_key && geminiInput) {
-                geminiInput.placeholder = '•••••••••••••••••••• (configured)';
+                tokenInput.placeholder = '•••••••••••• (configured)';
             }
             if (data.gap_threshold !== undefined && data.gap_threshold !== null) {
                 const gapInput = document.getElementById('inputDefaultGap');
@@ -156,7 +172,7 @@ class ChessApp {
             }
         } catch (e) {
             console.error('Settings load error:', e);
-            window.showToast?.('Could not load settings from the server.', '#ef4444');
+            window.showToast?.('Could not load settings.', '#ef4444');
         }
     }
 
@@ -164,15 +180,10 @@ class ChessApp {
         const tokenInput = document.getElementById('inputToken');
         const token = tokenInput?.value;
         const username = document.getElementById('inputUsername')?.value;
-        const geminiInput = document.getElementById('inputGeminiKey');
-        const geminiKey = geminiInput?.value;
         const gap = document.getElementById('inputDefaultGap')?.value;
 
-        const payload = {
-            lichess_username: username
-        };
+        const payload = { lichess_username: username };
         if (token) payload.lichess_token = token;
-        if (geminiKey) payload.gemini_api_key = geminiKey;
         if (gap !== undefined && gap !== '') {
             const parsedGapPayload = parseFloat(gap);
             if (!Number.isNaN(parsedGapPayload) && parsedGapPayload >= 0.1 && parsedGapPayload <= 100) {
@@ -195,10 +206,6 @@ class ChessApp {
             payload.sync_perf_types = selectedSpeeds.join(',');
         }
 
-        // CODE-08: the success path used to run unconditionally - `res.ok` and
-        // the server's `detail` were both ignored, so a 400/422/500 still showed
-        // "Settings saved successfully!". Every non-2xx answer is now surfaced.
-        let data = null;
         try {
             const res = await fetch('/api/settings', {
                 method: 'POST',
@@ -207,27 +214,21 @@ class ChessApp {
             });
             let detail = '';
             try {
-                data = await res.json();
+                const data = await res.json();
                 detail = (data && typeof data.detail === 'string') ? data.detail : '';
-            } catch (_) {
-                detail = '';
-            }
+            } catch (_) {}
             if (!res.ok) {
-                const message = detail || `Server responded ${res.status} ${res.statusText || ''}`.trim();
-                window.showToast?.(`Settings NOT saved: ${message}`, '#ef4444', 5000);
+                const message = detail || `HTTP ${res.status}`;
+                window.showToast?.(`Settings not saved: ${message}`, '#ef4444', 5000);
                 return;
             }
         } catch (e) {
-            console.error('Error saving settings:', e);
-            window.showToast?.(`Settings NOT saved: ${e.message}`, '#ef4444', 5000);
+            window.showToast?.(`Settings not saved: ${e.message}`, '#ef4444', 5000);
             return;
         }
 
-        window.showToast('Settings saved successfully!', '#4ade80');
-        // Never keep the raw `lip_...` secret in the DOM (and never re-submit it
-        // on the next save) - the server only ever reports `has_token`.
+        window.showToast('Settings saved.', '#34d399');
         if (token && tokenInput) tokenInput.value = '';
-        if (geminiKey && geminiInput) geminiInput.value = '';
 
         if (gap && window.repertoireBuilder) {
             const parsedGap = parseFloat(gap);
@@ -235,32 +236,24 @@ class ChessApp {
                 window.repertoireBuilder.gapThreshold = parsedGap;
                 const sel = document.getElementById('repGapThreshold');
                 if (sel) sel.value = gap;
-            } else {
-                window.showToast?.('Default gap threshold is not a number - ignored.', '#f59e0b');
             }
         }
+        this.closeSettingsModal();
         await this.loadAccount();
     }
 }
 
 window.app = new ChessApp();
 
-// Mandatory Study Selection & Creation Modal Helper
-//
-// CODE-18: `modal.showModal()` throws `InvalidStateError` when the dialog is
-// already open. That call sat inside the Promise executor, so a double click
-// rejected the promise *outside* every caller's try/catch - the import silently
-// aborted with no toast at all. A single in-flight promise is now shared by
-// every concurrent caller and the modal is never opened twice.
 let studyPromptPending = null;
-window.promptStudySelection = function({ repertoire = 'white', defaultName = '', title = 'Save Line to Study', confirmText = '', mode = 'auto' } = {}) {
+window.promptStudySelection = function({ repertoire = 'white', defaultName = '', title = 'Save to Study', confirmText = '', mode = 'auto' } = {}) {
     if (studyPromptPending) return studyPromptPending;
 
     const pending = new Promise((resolve) => {
         const settle = (value) => resolve(value);
         const modal = document.getElementById('studySelectModal');
         if (!modal || typeof modal.showModal !== 'function') {
-            const fallback = prompt('Enter Study Name for this line:', defaultName);
+            const fallback = prompt('Study Name:', defaultName);
             settle(fallback && fallback.trim() ? fallback.trim() : null);
             return;
         }
@@ -279,17 +272,11 @@ window.promptStudySelection = function({ repertoire = 'white', defaultName = '',
         const btnConfirm = document.getElementById('btnConfirmStudyModal');
 
         if (titleEl) titleEl.textContent = title;
-        if (confirmText && btnConfirm) {
-            btnConfirm.textContent = confirmText;
-        } else if (btnConfirm) {
-            btnConfirm.textContent = (mode === 'new') ? 'Create Study' : 'Save to Study';
+        if (btnConfirm) {
+            btnConfirm.textContent = confirmText || ((mode === 'new') ? 'Create Study' : 'Save');
         }
-
         if (colorBadge) {
-            colorBadge.textContent = repertoire.toUpperCase();
-            colorBadge.style.background = repertoire === 'white' ? '#f8fafc' : '#0f172a';
-            colorBadge.style.color = repertoire === 'white' ? '#0f172a' : '#f8fafc';
-            colorBadge.style.border = '1px solid #475569';
+            colorBadge.textContent = repertoire.charAt(0).toUpperCase() + repertoire.slice(1);
         }
         if (errorEl) {
             errorEl.style.display = 'none';
@@ -297,33 +284,26 @@ window.promptStudySelection = function({ repertoire = 'white', defaultName = '',
         }
 
         let activeTab = (mode === 'new') ? 'new' : 'existing';
-
         const setTab = (tab) => {
             activeTab = tab;
             if (tabExisting) tabExisting.classList.toggle('active', tab === 'existing');
             if (tabNew) tabNew.classList.toggle('active', tab === 'new');
-            if (existingSection) existingSection.style.display = tab === 'existing' ? 'block' : 'none';
-            if (newSection) newSection.style.display = tab === 'new' ? 'block' : 'none';
+            if (existingSection) existingSection.style.display = tab === 'existing' ? 'flex' : 'none';
+            if (newSection) newSection.style.display = tab === 'new' ? 'flex' : 'none';
             if (errorEl) errorEl.style.display = 'none';
             if (!confirmText && btnConfirm) {
-                btnConfirm.textContent = (tab === 'new') ? 'Create Study' : 'Save to Study';
+                btnConfirm.textContent = (tab === 'new') ? 'Create Study' : 'Save';
             }
             if (tab === 'new' && newNameInput) {
                 setTimeout(() => {
-                    try {
-                        newNameInput.focus();
-                        newNameInput.select();
-                    } catch (_) {}
-                }, 60);
+                    try { newNameInput.focus(); newNameInput.select(); } catch (_) {}
+                }, 50);
             }
         };
 
         if (tabExisting) tabExisting.onclick = () => setTab('existing');
         if (tabNew) tabNew.onclick = () => setTab('new');
-
-        if (selectDropdown) {
-            selectDropdown.innerHTML = '<option value="">Loading studies...</option>';
-        }
+        if (selectDropdown) selectDropdown.innerHTML = '<option value="">Loading...</option>';
 
         let promptSettled = false;
         let isCleanedUp = false;
@@ -332,29 +312,22 @@ window.promptStudySelection = function({ repertoire = 'white', defaultName = '',
         fetch(`/api/repertoire/studies?repertoire=${encodeURIComponent(repertoire)}`)
             .then(res => (res && res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res ? res.status : 'error'}`))))
             .then(studies => {
-                // The dialog may have been cancelled while this was in flight.
                 if (!selectDropdown || !isLive()) return;
-                selectDropdown.innerHTML = '<option value="">-- Choose Existing Study --</option>';
+                selectDropdown.innerHTML = '<option value="">-- Choose Study --</option>';
                 if (Array.isArray(studies) && studies.length > 0) {
                     studies.forEach(s => {
                         const opt = document.createElement('option');
                         opt.value = s.name;
-                        const countInfo = s.total_moves ? ` (${s.total_moves} moves)` : '';
+                        const countInfo = s.total_moves ? ` (${s.total_moves})` : '';
                         opt.textContent = `${s.name}${countInfo}`;
                         selectDropdown.appendChild(opt);
                     });
 
-                    // Pre-select if currently selected in builder or scout
                     const builderSelect = document.getElementById('builderStudySelect');
-                    const scoutSelect = document.getElementById('scoutStudySelect');
-                    const activeSelect = (builderSelect && builderSelect.value) ? builderSelect : ((scoutSelect && scoutSelect.value) ? scoutSelect : null);
-
                     let matchedExisting = false;
-                    if (activeSelect && activeSelect.value) {
-                        selectDropdown.value = activeSelect.value;
-                        if (selectDropdown.value === activeSelect.value) {
-                            matchedExisting = true;
-                        }
+                    if (builderSelect && builderSelect.value) {
+                        selectDropdown.value = builderSelect.value;
+                        if (selectDropdown.value === builderSelect.value) matchedExisting = true;
                     }
                     if (!matchedExisting && defaultName) {
                         for (let opt of selectDropdown.options) {
@@ -377,22 +350,17 @@ window.promptStudySelection = function({ repertoire = 'white', defaultName = '',
                         setTab('existing');
                     }
                 } else {
-                    if (newNameInput && defaultName) {
-                        newNameInput.value = defaultName;
-                    }
+                    if (newNameInput && defaultName) newNameInput.value = defaultName;
                     setTab('new');
                 }
             })
-            .catch(err => {
-                console.error('Error fetching studies for modal:', err);
+            .catch(() => {
                 if (!isLive()) return;
-                if (selectDropdown) selectDropdown.innerHTML = '<option value="">-- No Studies Found --</option>';
+                if (selectDropdown) selectDropdown.innerHTML = '<option value="">-- No Studies --</option>';
                 setTab('new');
             });
 
-        if (newNameInput) {
-            newNameInput.value = defaultName || '';
-        }
+        if (newNameInput) newNameInput.value = defaultName || '';
 
         const cleanup = () => {
             if (isCleanedUp) return;
@@ -423,7 +391,7 @@ window.promptStudySelection = function({ repertoire = 'white', defaultName = '',
                 chosenName = selectDropdown ? selectDropdown.value.trim() : '';
                 if (!chosenName) {
                     if (errorEl) {
-                        errorEl.textContent = 'Please select an existing study, or switch to "+ New Study" to create one.';
+                        errorEl.textContent = 'Select a study or create a new one.';
                         errorEl.style.display = 'block';
                     }
                     return;
@@ -432,16 +400,12 @@ window.promptStudySelection = function({ repertoire = 'white', defaultName = '',
                 chosenName = newNameInput ? newNameInput.value.trim() : '';
                 if (!chosenName) {
                     if (errorEl) {
-                        errorEl.textContent = 'Please enter a name for the study (mandatory).';
+                        errorEl.textContent = 'Enter a study name.';
                         errorEl.style.display = 'block';
                     }
                     if (newNameInput) newNameInput.focus();
                     return;
                 }
-                // Pre-register study on server. `res.ok` is checked: previously a
-                // 4xx (e.g. duplicate/invalid name) still resolved the promise
-                // with the name, and the line was imported against a study that
-                // did not exist.
                 try {
                     if (btnConfirm) {
                         btnConfirm.disabled = true;
@@ -453,30 +417,29 @@ window.promptStudySelection = function({ repertoire = 'white', defaultName = '',
                         body: JSON.stringify({ name: chosenName, repertoire: repertoire })
                     });
                     if (!createRes.ok) {
-                        let detail = `Server responded ${createRes.status}`;
+                        let detail = `HTTP ${createRes.status}`;
                         try {
                             const body = await createRes.json();
                             if (body && body.detail) detail = body.detail;
                         } catch (_) {}
                         if (errorEl) {
-                            errorEl.textContent = `Could not create study: ${detail}`;
+                            errorEl.textContent = detail;
                             errorEl.style.display = 'block';
                         }
                         if (btnConfirm) {
                             btnConfirm.disabled = false;
-                            btnConfirm.textContent = confirmText || ((mode === 'new') ? 'Create Study' : 'Save to Study');
+                            btnConfirm.textContent = confirmText || ((mode === 'new') ? 'Create Study' : 'Save');
                         }
                         return;
                     }
                 } catch (e) {
-                    console.error('Error creating study:', e);
                     if (errorEl) {
-                        errorEl.textContent = `Could not create study: ${e.message}`;
+                        errorEl.textContent = e.message;
                         errorEl.style.display = 'block';
                     }
                     if (btnConfirm) {
                         btnConfirm.disabled = false;
-                        btnConfirm.textContent = confirmText || ((mode === 'new') ? 'Create Study' : 'Save to Study');
+                        btnConfirm.textContent = confirmText || ((mode === 'new') ? 'Create Study' : 'Save');
                     }
                     return;
                 } finally {
@@ -489,31 +452,20 @@ window.promptStudySelection = function({ repertoire = 'white', defaultName = '',
             settleOnce(chosenName);
         };
 
-        // Keyboard handler for Enter key in newNameInput
         if (newNameInput) {
             newNameInput.onkeydown = (e) => {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleConfirm();
-                } else if (e.key === 'Escape') {
-                    e.preventDefault();
-                    handleCancel();
-                }
+                if (e.key === 'Enter') { e.preventDefault(); handleConfirm(); }
+                else if (e.key === 'Escape') { e.preventDefault(); handleCancel(); }
             };
         }
 
-        // Click outside backdrop to close
         modal.onclick = (e) => {
             const rect = modal.getBoundingClientRect();
             const isInDialog = (
-                rect.top <= e.clientY &&
-                e.clientY <= rect.top + rect.height &&
-                rect.left <= e.clientX &&
-                e.clientX <= rect.left + rect.width
+                rect.top <= e.clientY && e.clientY <= rect.top + rect.height &&
+                rect.left <= e.clientX && e.clientX <= rect.left + rect.width
             );
-            if (!isInDialog) {
-                handleCancel();
-            }
+            if (!isInDialog) handleCancel();
         };
 
         if (btnCancel) btnCancel.onclick = handleCancel;
@@ -525,32 +477,25 @@ window.promptStudySelection = function({ repertoire = 'white', defaultName = '',
         setTab(initialTab);
         try {
             modal.showModal();
-        } catch (e) {
-            console.error('Could not open the study selection dialog:', e);
+        } catch (_) {
             cleanup();
             settleOnce(null);
             return;
         }
         if (initialTab === 'new' && newNameInput) {
             setTimeout(() => {
-                try {
-                    newNameInput.focus();
-                    newNameInput.select();
-                } catch (_) {}
-            }, 60);
+                try { newNameInput.focus(); newNameInput.select(); } catch (_) {}
+            }, 50);
         }
     });
 
-    // Register the in-flight promise AFTER construction (the executor can settle
-    // synchronously), then release the re-entrancy slot once it settles.
     studyPromptPending = pending;
     const release = () => { if (studyPromptPending === pending) studyPromptPending = null; };
     pending.then(release, release);
     return pending;
 };
 
-// Global Floating Toast Notification System (Zero Layout Shift)
-window.showToast = function(msg, color = '#4ade80', duration = 3200) {
+window.showToast = function(msg, color = '#34d399', duration = 3200) {
     if (!msg) return;
     let container = document.getElementById('appToastContainer');
     if (!container) {
@@ -564,13 +509,10 @@ window.showToast = function(msg, color = '#4ade80', duration = 3200) {
     toast.className = 'app-toast';
     toast.style.borderColor = color;
 
-    // Dot indicator
     const dot = document.createElement('span');
     dot.className = 'app-toast-dot';
     dot.style.background = color;
-    dot.style.boxShadow = `0 0 8px ${color}88`;
 
-    // Text content
     const text = document.createElement('span');
     text.className = 'app-toast-text';
     text.textContent = msg;
@@ -579,17 +521,13 @@ window.showToast = function(msg, color = '#4ade80', duration = 3200) {
     toast.appendChild(text);
     container.appendChild(toast);
 
-    // Trigger appear animation
-    requestAnimationFrame(() => {
-        toast.classList.add('visible');
-    });
+    requestAnimationFrame(() => toast.classList.add('visible'));
 
-    // Auto remove
     setTimeout(() => {
         toast.classList.remove('visible');
         toast.classList.add('leaving');
         setTimeout(() => {
             if (toast.parentNode) toast.parentNode.removeChild(toast);
-        }, 280);
+        }, 240);
     }, duration);
 };

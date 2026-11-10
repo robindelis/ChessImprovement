@@ -7,7 +7,7 @@ import unittest
 
 from fastapi.testclient import TestClient
 
-from backend import api, db, evaluator, repertoire, scout
+from backend import api, db, evaluator, repertoire
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -22,7 +22,6 @@ class TestBugHuntBackendRegressions(unittest.TestCase):
             cursor.execute("DELETE FROM repertoire_moves")
             cursor.execute("DELETE FROM repertoire_studies")
             cursor.execute("DELETE FROM games")
-            cursor.execute("DELETE FROM scouted_content")
             conn.commit()
         finally:
             conn.close()
@@ -126,32 +125,7 @@ class TestBugHuntBackendRegressions(unittest.TestCase):
         self.assertIn(r2.json()["status"], ("ok", "success"))
         self.assertGreaterEqual(r2.json()["imported_moves"], 1)
 
-    def test_scout_favorite_on_unextracted_shelf_item(self):
-        res1 = self.client.post(
-            "/api/scout/favorite",
-            json={
-                "source_id": "eco_guide_b90",
-                "source_type": "eco_guide",
-                "title": "Sicilian Najdorf Guide",
-                "channel": "Theory Shelf",
-                "opening_name": "Sicilian Defense",
-            },
-        )
-        self.assertEqual(res1.status_code, 200)
-        self.assertTrue(res1.json()["is_favorite"])
-
-        # Toggling again unbookmarks it
-        res2 = self.client.post(
-            "/api/scout/favorite",
-            json={"source_id": "eco_guide_b90"},
-        )
-        self.assertEqual(res2.status_code, 200)
-        self.assertFalse(res2.json()["is_favorite"])
-
-    def test_scout_import_line_does_not_self_clobber_or_leave_orphans(self):
-        # Two conflicting White lines from start position in a single import batch:
-        # Line 1: 1. e4 e5 2. Nf3
-        # Line 2: 1. d4 d5 2. c4
+    def test_import_line_does_not_self_clobber_or_leave_orphans(self):
         fen_start = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
         fen_e4 = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1"
         fen_e5 = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2"
@@ -168,12 +142,10 @@ class TestBugHuntBackendRegressions(unittest.TestCase):
             {"fen_before": fen_d4, "uci": "d7d5", "san": "d5", "fen_after": fen_d5},
             {"fen_before": fen_d5, "uci": "c2c4", "san": "c4", "fen_after": fen_c4},
         ]
-        cs = scout.ContentScout.get_instance()
-        result = cs.import_line_to_repertoire("white", moves, study_name="Test Study")
-        self.assertEqual(result["imported_count"], 3)
         rm = repertoire.RepertoireManager.get_instance()
+        result = rm.import_line_to_repertoire("white", moves, study_name="Test Study")
+        self.assertEqual(result["imported_count"], 3)
         tree = rm.get_repertoire_tree("white")["moves_by_parent"]
-        # 1. e4 should be preserved (not overwritten by 1. d4), and 1...d5 / 2. c4 should not be orphaned in DB
         self.assertEqual([m["move_san"] for m in tree.get(repertoire.normalize_fen(fen_start), [])], ["e4"])
         self.assertNotIn(repertoire.normalize_fen(fen_d4), tree)
         self.assertNotIn(repertoire.normalize_fen(fen_d5), tree)
@@ -215,8 +187,7 @@ class TestFrontendBugHuntAndLayoutInvariants(unittest.TestCase):
     def test_board_js_viewport_fit_and_single_listener(self):
         src = (ROOT / "frontend" / "board.js").read_text(encoding="utf-8")
         self.assertIn("computeIdealBoardSize", src)
-        self.assertIn("Math.max(300, Math.min(620, Math.round(optimal)))", src)
-        # Ensure we don't attach duplicate addEventListener on .btn-board-smaller/.btn-board-larger/.btn-board-fit
+        self.assertIn("Math.max(300, Math.min(660, Math.round(optimal)))", src)
         self.assertNotIn("document.querySelectorAll('.btn-board-smaller').forEach", src)
 
     def test_repertoire_builder_fixes_present(self):
@@ -235,10 +206,7 @@ class TestFrontendBugHuntAndLayoutInvariants(unittest.TestCase):
         self.assertIn("deviationsView.style.display = isDeviations ? 'flex' : 'none'", src)
         self.assertIn("noteBox.style.minHeight = '54px'", src)
 
-    def test_scout_and_app_fixes_present(self):
-        scout_src = (ROOT / "frontend" / "scout.js").read_text(encoding="utf-8")
-        self.assertIn("window.openingScout = window.videoScout", scout_src)
-        self.assertIn("builder.addressGap({ parent_fen: fen, opponent_uci: uci })", scout_src)
+    def test_app_settings_fixes_present(self):
         app_src = (ROOT / "frontend" / "app.js").read_text(encoding="utf-8")
         self.assertIn("inputDefaultGap", app_src)
         self.assertIn("gap_threshold", app_src)

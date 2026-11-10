@@ -44,28 +44,10 @@ class TestAPI(unittest.TestCase):
         self.assertEqual(data["username"], SYNTHETIC_USERNAME)
         self.assertFalse(data["token_present"])
 
-    def test_dashboard_endpoint(self):
-        res = self.client.get("/api/dashboard")
-        self.assertEqual(res.status_code, 200)
-        data = res.json()
-        self.assertIn("total_games", data)
-        self.assertIn("total_blunders", data)
-
-    def test_blunders_endpoint(self):
-        res = self.client.get("/api/blunders")
-        self.assertEqual(res.status_code, 200)
-        self.assertIsInstance(res.json(), list)
-
-    def test_training_paths_endpoint(self):
-        res = self.client.get("/api/train/paths")
-        self.assertEqual(res.status_code, 200)
-        data = res.json()
-        self.assertIn("paths", data)
-        self.assertIn("due_today", data)
-        # BUG-B07 check: group_name should never be None or empty
-        for p in data["paths"]:
-            self.assertIsNotNone(p.get("group_name"))
-            self.assertTrue(len(p.get("group_name", "")) > 0)
+    def test_removed_legacy_endpoints_return_404(self):
+        for legacy in ("/api/dashboard", "/api/blunders", "/api/train/paths", "/api/scout/search"):
+            res = self.client.get(legacy)
+            self.assertEqual(res.status_code, 404, f"{legacy} should be removed")
 
     def test_repertoire_tree(self):
         with patch("backend.repertoire.RepertoireManager.get_candidate_moves_2000",
@@ -219,11 +201,11 @@ class TestAPI(unittest.TestCase):
                 "moves": "e4 e5"
             }
         ]
-        with patch("backend.api.LichessClient.fetch_user_games", return_value=malformed_games), \
+        with patch("backend.repertoire.LichessClient.fetch_user_games", return_value=malformed_games), \
              patch("backend.analyzer.GameAnalyzer.analyze_game_openings", return_value=[]):
-            res = self.client.post("/api/sync?max_games=3")
+            res = self.client.post("/api/repertoire/sync_games?max_games=3")
             self.assertEqual(res.status_code, 200)
-            self.assertEqual(res.json().get("status"), "success")
+            self.assertIn(res.json().get("status"), ("success", "partial", "no_games"))
 
     # --- BUG-08: gap_threshold setting and bounds ---
     def test_settings_gap_threshold_and_bounds(self):

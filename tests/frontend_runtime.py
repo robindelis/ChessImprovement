@@ -30,7 +30,6 @@ REQUIRED_FRONTEND_FILES = (
     os.path.join(PROJECT_ROOT, "frontend", "board.js"),
     os.path.join(PROJECT_ROOT, "frontend", "repertoire_builder.js"),
     os.path.join(PROJECT_ROOT, "frontend", "repertoire_trainer.js"),
-    os.path.join(PROJECT_ROOT, "frontend", "scout.js"),
     os.path.join(PROJECT_ROOT, "frontend", "app.js"),
     os.path.join(PROJECT_ROOT, "frontend", "vendor", "chess.min.js"),
 )

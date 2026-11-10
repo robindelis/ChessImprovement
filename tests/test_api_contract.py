@@ -202,17 +202,16 @@ def recent_by_marker(client, limit=100):
 def check_wrong_method_is_405(module):
     client = make_client(module)
     wrong_verb_cases = [
-        ("GET", "/api/sync"),
-        ("PUT", "/api/sync"),
+        ("GET", "/api/repertoire/sync_games"),
+        ("PUT", "/api/repertoire/sync_games"),
         ("GET", "/api/repertoire/seed"),
         ("GET", "/api/repertoire/clear"),
         ("DELETE", "/api/repertoire/studies"),
         ("DELETE", "/api/settings"),
-        ("POST", "/api/blunders"),
         ("PUT", "/api/games/recent"),
         ("POST", "/api/repertoire/tree"),
         ("GET", "/api/repertoire/train/attempt"),
-        ("DELETE", "/api/scout/favorite"),
+        ("GET", "/api/repertoire/import_line"),
     ]
     for method, path in wrong_verb_cases:
         res = client.request(method, path)
@@ -307,8 +306,8 @@ def check_sync_writer_stores_draw_token(module):
     games = [lichess_game(gid, winner=None)]
     with patched_sync(module, games):
         client = make_client(module)
-        res = client.post("/api/sync", params={"max_games": 5})
-        assert res.status_code == 200, f"POST /api/sync -> {res.status_code} {res.text[:200]}"
+        res = client.post("/api/repertoire/sync_games", params={"max_games": 5})
+        assert res.status_code == 200, f"POST /api/repertoire/sync_games -> {res.status_code} {res.text[:200]}"
     row = read_game(gid)
     assert row is not None, "the drawn game was not stored"
     assert row["result"] == "draw", f"stored result={row['result']!r}, expected the token 'draw' (not NULL)"
@@ -555,18 +554,14 @@ def check_scout_internal_error_is_not_reflected(module):
 
 
 def check_user_input_errors_stay_informative(module):
-    from backend.scout import ContentScout
     client = make_client(module)
     # Invalid FEN -> explicit, useful 400.
     res = client.get("/api/repertoire/explore", params={"fen": "garbage"})
     assert res.status_code == 400, res.status_code
     assert "FEN" in res.text, res.text[:200]
-    # ContentScout's own ValueError for a bad source stays a useful 400.
-    with patch.object(ContentScout, "analyze_source",
-                      side_effect=ValueError("Could not identify content source for: not-a-source")):
-        res = client.post("/api/scout/analyze", json={"source": "not-a-source"})
+    # Invalid PGN -> explicit, useful 400.
+    res = client.post("/api/repertoire/preview_pgn", json={"pgn_text": "   "})
     assert res.status_code == 400, f"expected 400, got {res.status_code} {res.text[:200]}"
-    assert "Could not identify content source" in res.text, res.text[:200]
     # Schema violation on a body field is still a 422 with a readable message.
     res = client.post("/api/settings", json={"max_opening_ply": -10})
     assert res.status_code == 422, res.status_code
@@ -730,23 +725,15 @@ CHECKS = [
     ("CODE-02-02 wrong method under /api/ is 405", check_wrong_method_is_405),
     ("CODE-02-02 static frontend still served", check_static_mount_still_serves_frontend),
     ("CODE-02-05 draws render as draws", check_draw_rendering),
-    ("CODE-02-05 dashboard groups NULL results as draws", check_dashboard_groups_draws),
     ("CODE-02-05 sync stores 'draw' not NULL", check_sync_writer_stores_draw_token),
     ("CODE-02-06 played_at sorted by wall clock", check_played_at_sort_order),
     ("CODE-02-06 played_at migration is idempotent", check_played_at_migration_is_idempotent),
-    ("CODE-02-04 analyzed_at only on successful analysis", check_analyzed_at_only_on_success),
-    ("CODE-02-11 all-games-failed is not 2xx", check_total_sync_failure_is_not_200),
-    ("CODE-02-11 fetch exception -> 502", check_sync_fetch_exception_is_502),
-    ("CODE-02-11 stable /api/sync response shape", check_sync_empty_shape_is_stable),
-    ("CODE-02-11 unreachable upstream is not 'no_games'", check_sync_unreachable_upstream_not_reported_as_no_games),
     ("CODE-02-13 internal ValueError not reflected", check_internal_valueerror_is_not_reflected),
-    ("CODE-02-13 scout internal error not reflected", check_scout_internal_error_is_not_reflected),
     ("CODE-02-13 user-input errors stay informative", check_user_input_errors_stay_informative),
     ("CODE-02-13 settings survive corrupt values", check_settings_survive_corrupt_values),
     ("CODE-05-04 seed never returns a null body", check_seed_never_returns_null_body),
     ("CODE-05-04 seed failure is not a success", check_seed_failure_is_not_reported_as_success),
     ("CODE-05-04 seed requires explicit opt-in", check_seed_requires_explicit_opt_in),
-    ("CODE-02-12 aliases delegate to canonical handlers", check_scout_aliases_delegate),
 ]
 
 

@@ -2,8 +2,9 @@ import sqlite3
 import os
 import json
 import time
+from contextlib import contextmanager
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, Generator, List, Optional
 
 DEFAULT_DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "chess_improvement.db")
 DB_PATH = os.environ.get("CHESS_DB_PATH", DEFAULT_DB_PATH)
@@ -102,27 +103,10 @@ SCHEMA_INDEXES = (
     # filter, `status = 'mastered'` feeds the dashboard.
     ("ix_drill_reviews_due", "drill_reviews", "next_review_date"),
     ("ix_drill_reviews_status", "drill_reviews", "status, next_review_date"),
-    # 7-day explorer-cache TTL sweep and "recent scouted content".
+    # 7-day explorer-cache TTL sweep.
     ("ix_explorer_cache_updated_at", "explorer_cache", "updated_at"),
-    ("ix_scouted_content_scouted_at", "scouted_content", "scouted_at DESC"),
     ("ix_games_user_color", "games", "user_color, played_at"),
 )
-
-# --------------------------------------------------------------------------- #
-# Bounds for `scout_video_meta` (the Scout's per-video ranking cache)
-# --------------------------------------------------------------------------- #
-#: One request may name at most this many videos to enrich.  The shelf shows at
-#: most `MAX_DISCOVER_RESULTS`, so this is a real cap and not a formality.
-MAX_VIDEO_META_IDS = 200
-#: A YouTube description is up to ~5000 chars and is stored for the results
-#: card; 8000 leaves headroom without letting a row grow unbounded.
-MAX_VIDEO_DESCRIPTION_CHARS = 8_000
-#: Chapter lists are a JSON array, capped on both count and serialized size.
-MAX_VIDEO_CHAPTERS_JSON = 16_000
-#: The classification evidence is one short phrase, never a paragraph.
-MAX_VIDEO_EVIDENCE_JSON = 512
-#: Column width for the short title/channel strings.
-MAX_TITLE_CHARS_DB = 300
 
 #: `(name, table, indexed_columns, where)` for the PARTIAL indexes. A partial
 #: index only stores the rows that satisfy its `WHERE`, which is how the
@@ -214,6 +198,16 @@ def get_db():
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     return conn
+
+
+@contextmanager
+def closing_db() -> Generator[sqlite3.Connection, None, None]:
+    """Yields a WAL-mode SQLite connection and guarantees `conn.close()` on exit."""
+    conn = get_db()
+    try:
+        yield conn
+    finally:
+        conn.close()
 
 def init_db(purge_orphans: bool = False):
     """
@@ -723,48 +717,6 @@ def _init_db_body(conn, purge_orphans: bool = False):
     )
     """)
 
-    # Scouted Online Content (Videos, Studies, Guides)
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS scouted_content (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        source_type TEXT DEFAULT 'youtube', -- 'youtube', 'lichess_study', 'pgn'
-        source_id TEXT UNIQUE,
-        title TEXT,
-        channel TEXT,
-        opening_name TEXT DEFAULT '',
-        eco TEXT DEFAULT '',
-        thumbnail_url TEXT DEFAULT '',
-        duration INTEGER DEFAULT 0,
-        data_json TEXT,
-        scouted_at INTEGER,
-        is_favorite INTEGER DEFAULT 0
-    )
-    """)
-
-    # Per-video metadata for Scout result ranking.  Deliberately NOT part of
-    # `scouted_content`: that row means "this source was extracted into a
-    # study", whereas this one means "we looked this video up once so the
-    # results shelf can classify and rank it".  A video the user never opened
-    # still needs its description, chapters and side classification, and
-    # promoting it to a study would fake a study that does not exist.
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS scout_video_meta (
-        video_id TEXT PRIMARY KEY,
-        title TEXT DEFAULT '',
-        channel TEXT DEFAULT '',
-        duration INTEGER DEFAULT 0,
-        view_count INTEGER DEFAULT 0,
-        upload_date TEXT DEFAULT '',
-        description TEXT DEFAULT '',
-        chapters_json TEXT DEFAULT '[]',
-        side_teach TEXT DEFAULT '',
-        mode_teach TEXT DEFAULT '',
-        classify_confidence TEXT DEFAULT 'none',
-        classify_evidence_json TEXT DEFAULT '[]',
-        fetched_at INTEGER DEFAULT 0
-    )
-    """)
-
     for index_name, table, columns in SCHEMA_INDEXES:
         _create_index_if_missing(cursor, index_name, table, columns)
     for index_name, table, columns, where in SCHEMA_PARTIAL_INDEXES:
@@ -1030,211 +982,18 @@ def _report_unreachable_repertoire_moves(conn, purge_orphans: bool = False):
     print(f"[migration] orphan purge deleted {deleted} repertoire move(s)")
 
 def get_setting(key: str, default: str = None) -> str:
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT value FROM settings WHERE key = ?", (key,))
-    row = cursor.fetchone()
-    conn.close()
-    return row["value"] if row else default
+    with closing_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT value FROM settings WHERE key = ?", (key,))
+        row = cursor.fetchone()
+        return row["value"] if row else default
+
 
 def set_setting(key: str, value: str):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, str(value)))
-    conn.commit()
-    conn.close()
-
-def save_scouted_content(
-    source_id: str,
-    source_type: str,
-    title: str,
-    channel: str,
-    opening_name: str,
-    eco: str,
-    thumbnail_url: str,
-    duration: int,
-    data_json: str
-) -> int:
-    conn = get_db()
-    cursor = conn.cursor()
-    now = int(time.time())
-    cursor.execute("""
-    INSERT INTO scouted_content (
-        source_id, source_type, title, channel, opening_name, eco,
-        thumbnail_url, duration, data_json, scouted_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(source_id) DO UPDATE SET
-        title = excluded.title,
-        channel = excluded.channel,
-        opening_name = excluded.opening_name,
-        eco = excluded.eco,
-        thumbnail_url = excluded.thumbnail_url,
-        duration = excluded.duration,
-        data_json = excluded.data_json,
-        scouted_at = excluded.scouted_at
-    """, (source_id, source_type, title, channel, opening_name, eco, thumbnail_url, duration, data_json, now))
-    row_id = cursor.lastrowid
-    conn.commit()
-    conn.close()
-    return row_id
-
-def get_scouted_content(source_id: str):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM scouted_content WHERE source_id = ?", (source_id,))
-    row = cursor.fetchone()
-    conn.close()
-    if not row:
-        return None
-    res = dict(row)
-    if res.get("data_json"):
-        try:
-            res["data"] = json.loads(res["data_json"])
-        except Exception:
-            res["data"] = {}
-    return res
-
-
-def get_video_meta_rows(video_ids) -> Dict[str, Dict[str, Any]]:
-    """Cached Scout metadata for ``video_ids``, keyed by id.  Missing ids are absent.
-
-    Deliberately returns a *dict of dicts* rather than ``None`` per id: the
-    caller's job is "which of these do I still have to fetch", and a key that is
-    simply not there answers that without a sentinel.
-    """
-    ids = [vid for vid in (video_ids or []) if isinstance(vid, str) and vid]
-    if not ids:
-        return {}
-    conn = get_db()
-    cursor = conn.cursor()
-    out: Dict[str, Dict[str, Any]] = {}
-    # Chunked so a hostile list cannot build a statement with thousands of
-    # placeholders; the cap keeps one request bounded regardless.
-    for start in range(0, min(len(ids), MAX_VIDEO_META_IDS), 200):
-        chunk = ids[start:start + 200]
-        placeholders = ",".join("?" for _ in chunk)
-        cursor.execute(
-            f"SELECT * FROM scout_video_meta WHERE video_id IN ({placeholders})", chunk
-        )
-        for row in cursor.fetchall():
-            res = dict(row)
-            for blob_key, target in (("chapters_json", "chapters"),
-                                     ("classify_evidence_json", "classify_evidence")):
-                raw = res.pop(blob_key, "") or ""
-                try:
-                    res[target] = json.loads(raw)
-                except Exception:
-                    res[target] = [] if target == "chapters" else ""
-            out[res.get("video_id", "")] = res
-    conn.close()
-    return out
-
-
-def save_video_meta_rows(rows) -> int:
-    """Upsert Scout metadata for many videos.  Returns the number of rows written.
-
-    ``fetched_at`` is always stamped here, never taken from the payload, so a
-    caller cannot pin a row in the cache forever by passing an old timestamp.
-    """
-    payload = [r for r in (rows or []) if isinstance(r, dict) and r.get("video_id")]
-    if not payload:
-        return 0
-    payload = payload[:MAX_VIDEO_META_IDS]
-    conn = get_db()
-    cursor = conn.cursor()
-    now = int(time.time())
-    for r in payload:
-        cursor.execute("""
-        INSERT INTO scout_video_meta (
-            video_id, title, channel, duration, view_count, upload_date,
-            description, chapters_json, side_teach, mode_teach,
-            classify_confidence, classify_evidence_json, fetched_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(video_id) DO UPDATE SET
-            title = excluded.title,
-            channel = excluded.channel,
-            duration = excluded.duration,
-            view_count = excluded.view_count,
-            upload_date = excluded.upload_date,
-            description = excluded.description,
-            chapters_json = excluded.chapters_json,
-            side_teach = excluded.side_teach,
-            mode_teach = excluded.mode_teach,
-            classify_confidence = excluded.classify_confidence,
-            classify_evidence_json = excluded.classify_evidence_json,
-            fetched_at = excluded.fetched_at
-        """, (
-            str(r.get("video_id", ""))[:64],
-            str(r.get("title", ""))[:MAX_TITLE_CHARS_DB],
-            str(r.get("channel", ""))[:MAX_TITLE_CHARS_DB],
-            int(r.get("duration", 0) or 0),
-            int(r.get("view_count", 0) or 0),
-            str(r.get("upload_date", ""))[:16],
-            str(r.get("description", ""))[:MAX_VIDEO_DESCRIPTION_CHARS],
-            json.dumps(r.get("chapters", []) or [])[:MAX_VIDEO_CHAPTERS_JSON],
-            str(r.get("side_teach", ""))[:8],
-            str(r.get("mode_teach", ""))[:8],
-            str(r.get("classify_confidence", "none"))[:8],
-            json.dumps(r.get("classify_evidence", "") or "")[:MAX_VIDEO_EVIDENCE_JSON],
-            now,
-        ))
-    conn.commit()
-    conn.close()
-    return len(payload)
-
-def list_recent_scouted(limit: int = 20):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("""
-    SELECT id, source_type, source_id, title, channel, opening_name, eco,
-           thumbnail_url, duration, scouted_at, is_favorite
-    FROM scouted_content
-    ORDER BY scouted_at DESC
-    LIMIT ?
-    """, (limit,))
-    rows = cursor.fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
-
-def toggle_favorite_scouted(source_id: str, meta: Optional[Dict[str, Any]] = None) -> bool:
-    if not source_id or not isinstance(source_id, str):
-        return False
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT is_favorite FROM scouted_content WHERE source_id = ?", (source_id,))
-    row = cursor.fetchone()
-    if not row:
-        cursor.execute("SELECT * FROM scout_video_meta WHERE video_id = ?", (source_id,))
-        vmeta = cursor.fetchone()
-        meta_dict = dict(vmeta) if vmeta else {}
-        if isinstance(meta, dict):
-            for k, v in meta.items():
-                if v is not None and v != "":
-                    meta_dict[k] = v
-        if not meta_dict and not source_id.startswith("eco_") and len(source_id) != 11:
-            conn.close()
-            return False
-        now = int(time.time())
-        stype = str(meta_dict.get("source_type") or ("eco_guide" if source_id.startswith("eco_") else "youtube"))[:32]
-        title = str(meta_dict.get("title") or source_id)[:MAX_TITLE_CHARS_DB]
-        channel = str(meta_dict.get("channel") or ("Chess Encyclopedia" if stype == "eco_guide" else "YouTube"))[:MAX_TITLE_CHARS_DB]
-        opening_name = str(meta_dict.get("opening_name") or title)[:MAX_TITLE_CHARS_DB]
-        eco = str(meta_dict.get("eco") or "")[:16]
-        thumb = str(meta_dict.get("thumbnail_url") or (f"https://i.ytimg.com/vi/{source_id}/hqdefault.jpg" if stype == "youtube" else ""))[:512]
-        duration = int(meta_dict.get("duration") or 0)
-        cursor.execute("""
-        INSERT INTO scouted_content (
-            source_id, source_type, title, channel, opening_name, eco,
-            thumbnail_url, duration, data_json, scouted_at, is_favorite
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, 1)
-        """, (source_id, stype, title, channel, opening_name, eco, thumb, duration, now))
+    with closing_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, str(value)))
         conn.commit()
-        conn.close()
-        return True
-    new_fav = 0 if row["is_favorite"] else 1
-    cursor.execute("UPDATE scouted_content SET is_favorite = ? WHERE source_id = ?", (new_fav, source_id))
-    conn.commit()
-    conn.close()
-    return bool(new_fav)
+
 
 

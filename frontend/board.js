@@ -1057,10 +1057,10 @@ class InteractiveChessboard {
         if (typeof window === 'undefined') return 460;
         const vh = window.innerHeight || 800;
         const vw = window.innerWidth || 1280;
-        const maxV = Math.max(300, vh - 255);
-        const maxH = vw > 1100 ? Math.max(320, vw - 760) : Math.max(300, vw - 80);
+        const maxV = Math.max(300, vh - 235);
+        const maxH = vw > 1100 ? Math.max(360, vw - 580) : Math.max(300, vw - 60);
         const optimal = Math.min(maxV, maxH);
-        return Math.max(300, Math.min(620, Math.round(optimal)));
+        return Math.max(300, Math.min(660, Math.round(optimal)));
     }
 
     static setGlobalBoardSize(sizeInPx, persist = false) {

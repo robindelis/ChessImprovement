@@ -281,7 +281,7 @@ class RepertoireBuilder {
             white: new SessionLineTree(),
             black: new SessionLineTree()
         };
-        this.activeSidebarTab = 'tree'; // 'tree' | 'games' | 'gaps'
+        this.activeSidebarTab = 'gaps'; // 'gaps' | 'games'
         this.recentGames = [];
         this.activeReviewGame = null;
         this.activeReviewGap = null;
@@ -433,7 +433,6 @@ class RepertoireBuilder {
         const btnEnd = document.getElementById('btnRepEnd');
         const btnFlip = document.getElementById('btnRepFlip');
         const btnReset = document.getElementById('btnRepReset');
-        const btnSeed = document.getElementById('btnSeedDefaults');
 
         if (btnStart) btnStart.addEventListener('click', () => this.jumpToStart());
         if (btnPrev) btnPrev.addEventListener('click', () => this.stepBack());
@@ -444,8 +443,6 @@ class RepertoireBuilder {
                 const newOr = this.board.options.orientation === 'white' ? 'black' : 'white';
                 this.board.setOrientation(newOr);
                 this.applyEvalBarOrientation(newOr);
-                // The label colour class is orientation-independent, so it must be re-applied
-                // after the flip or the last score stays dark-on-dark / light-on-white.
                 this.renderEvalBar(this.lastEval.scoreCp, this.lastEval.mate, this.lastEval.depth);
             });
         }
@@ -456,19 +453,6 @@ class RepertoireBuilder {
                 } else {
                     this.jumpToStart();
                 }
-            });
-        }
-        if (btnSeed) {
-            btnSeed.addEventListener('click', async () => {
-                if (confirm("Reset and seed standard Italian Game, Sicilian Dragon, and King's Indian repertoire lines?")) {
-                    await this.seedDefaults();
-                }
-            });
-        }
-        const btnResetDB = document.getElementById('btnResetRepertoire');
-        if (btnResetDB) {
-            btnResetDB.addEventListener('click', async () => {
-                await this.confirmAndResetRepertoire();
             });
         }
         this.initImportModal();
@@ -598,11 +582,9 @@ class RepertoireBuilder {
         bindSortHeader('thSortMyStats', 'threat');
         bindSortHeader('thSortEval', 'eval');
 
-        // Explored Lines Tree, Recent Games & Coverage Gaps Tab switching
-        const btnTabTree = document.getElementById('btnTabRepLinesTree');
+        // Recent Games & Coverage Gaps Tab switching
         const btnTabGames = document.getElementById('btnTabRepGames');
         const btnTabGaps = document.getElementById('btnTabRepCoverageGaps');
-        if (btnTabTree) btnTabTree.addEventListener('click', () => this.switchSidebarTab('tree'));
         if (btnTabGames) btnTabGames.addEventListener('click', () => this.switchSidebarTab('games'));
         if (btnTabGaps) btnTabGaps.addEventListener('click', () => this.switchSidebarTab('gaps'));
 
@@ -676,25 +658,9 @@ class RepertoireBuilder {
             });
         }
 
-        // Quick Whole-Line actions bar buttons
+        // Quick Whole-Line actions bar button
         const btnAddLine = document.getElementById('btnRepAddWholeLine');
         if (btnAddLine) btnAddLine.addEventListener('click', () => this.importToRepertoire(this.activeColor));
-
-        const btnViewTree = document.getElementById('btnRepViewTree');
-        if (btnViewTree) btnViewTree.addEventListener('click', () => {
-            this.switchSidebarTab('tree');
-            document.getElementById('repVariationsList')?.scrollIntoView({ behavior: 'smooth' });
-        });
-
-        const btnClearTree = document.getElementById('btnRepClearTree');
-        if (btnClearTree) btnClearTree.addEventListener('click', () => this.clearSessionTree());
-
-        // Tree header action buttons
-        const btnImportAll = document.getElementById('btnRepImportAll');
-        if (btnImportAll) btnImportAll.addEventListener('click', () => this.importAllLinesToRepertoire(this.activeColor));
-
-        const btnClearAllTree = document.getElementById('btnRepClearAllTree');
-        if (btnClearAllTree) btnClearAllTree.addEventListener('click', () => this.clearSessionTree());
 
         this.isInitialized = true;
     }
@@ -1701,16 +1667,12 @@ class RepertoireBuilder {
             pctEl.textContent = `${cov}%`;
             pctEl.title = `${cov}% of opponent reply weight covered`;
         }
-        const railCov = document.getElementById('railCoverageVal');
-        if (railCov) {
-            railCov.textContent = `${cov}%`;
-        }
         if (fillEl) {
             fillEl.style.width = `${cov}%`;
             if (cov >= 70) {
-                fillEl.style.background = 'linear-gradient(90deg, #38bdf8, #22c55e)';
+                fillEl.style.background = 'linear-gradient(90deg, #d4a853, #34d399)';
             } else if (cov >= 40) {
-                fillEl.style.background = 'linear-gradient(90deg, #f59e0b, #38bdf8)';
+                fillEl.style.background = 'linear-gradient(90deg, #f59e0b, #d4a853)';
             } else {
                 fillEl.style.background = 'linear-gradient(90deg, #ef4444, #f59e0b)';
             }
@@ -4239,33 +4201,25 @@ class RepertoireBuilder {
     }
 
     switchSidebarTab(tab) {
-        this.activeSidebarTab = tab;
-        const btnTree = document.getElementById('btnTabRepLinesTree');
+        const nextTab = (tab === 'games') ? 'games' : 'gaps';
+        this.activeSidebarTab = nextTab;
         const btnGames = document.getElementById('btnTabRepGames');
         const btnGaps = document.getElementById('btnTabRepCoverageGaps');
-        const treeActions = document.getElementById('repTreeHeaderActions');
         const gamesActions = document.getElementById('repGamesHeaderActions');
         const gapsActions = document.getElementById('repGapsHeaderActions');
-        const treeContainer = document.getElementById('repTreeContainer');
         const gamesContainer = document.getElementById('repGamesContainer');
         const gapsContainer = document.getElementById('repGapsContainer');
 
-        if (btnTree) btnTree.classList.toggle('active', tab === 'tree');
-        if (btnGames) btnGames.classList.toggle('active', tab === 'games');
-        if (btnGaps) btnGaps.classList.toggle('active', tab === 'gaps');
-        if (treeActions) treeActions.style.display = (tab === 'tree') ? 'flex' : 'none';
-        if (gamesActions) gamesActions.style.display = (tab === 'games') ? 'flex' : 'none';
-        if (gapsActions) gapsActions.style.display = (tab === 'gaps') ? 'flex' : 'none';
-        if (treeContainer) treeContainer.style.display = (tab === 'tree') ? 'flex' : 'none';
-        if (gamesContainer) gamesContainer.style.display = (tab === 'games') ? 'flex' : 'none';
-        if (gapsContainer) gapsContainer.style.display = (tab === 'gaps') ? 'flex' : 'none';
+        if (btnGames) btnGames.classList.toggle('active', nextTab === 'games');
+        if (btnGaps) btnGaps.classList.toggle('active', nextTab === 'gaps');
+        if (gamesActions) gamesActions.style.display = (nextTab === 'games') ? 'flex' : 'none';
+        if (gapsActions) gapsActions.style.display = (nextTab === 'gaps') ? 'flex' : 'none';
+        if (gamesContainer) gamesContainer.style.display = (nextTab === 'games') ? 'flex' : 'none';
+        if (gapsContainer) gapsContainer.style.display = (nextTab === 'gaps') ? 'flex' : 'none';
 
-        if (tab === 'tree') {
-            this.renderTreeLines();
-            this.scheduleOverlapCheck();
-        } else if (tab === 'games') {
+        if (nextTab === 'games') {
             this.loadRecentGames();
-        } else if (tab === 'gaps') {
+        } else {
             this.renderGapLists();
         }
     }
@@ -4339,12 +4293,6 @@ class RepertoireBuilder {
     }
 
     updateActiveLineCounts() {
-        const lines = this.lineTree.getAllLines();
-        const count = lines.length;
-        const tabBadge = document.getElementById('repTreeTabCount');
-        if (tabBadge) tabBadge.textContent = count;
-        const quickLineCount = document.getElementById('repQuickLineCount');
-        if (quickLineCount) quickLineCount.textContent = count;
         this.scheduleOverlapCheck();
     }
 
@@ -4354,10 +4302,8 @@ class RepertoireBuilder {
         }
         this.activeOverlapDebounce = setTimeout(() => {
             this.activeOverlapDebounce = null;
-            // One generation + one abort handle shared by all four POSTs of this batch.
             const { gen, abortCtrl } = this._beginOverlapBatch();
             this.checkActiveLineOverlap(gen, abortCtrl);
-            this.checkTreeOverlap(gen, abortCtrl);
         }, 120);
     }
 
@@ -4397,7 +4343,7 @@ class RepertoireBuilder {
         const activeLine = this.lineTree.getActiveLine();
         if (!activeLine || activeLine.length === 0) {
             if (strip) {
-                strip.innerHTML = '<span style="font-size:0.72rem; color:var(--text-muted); font-weight:500;">Repertoire: Starting Position</span>';
+                strip.innerHTML = '';
                 strip.style.display = 'flex';
             }
             return;
@@ -4432,7 +4378,6 @@ class RepertoireBuilder {
                 };
 
                 strip.innerHTML = `
-                    <span style="font-size:0.72rem; color:var(--text-muted); font-weight:600; flex-shrink:0;">Repertoire:</span>
                     ${getBadge(dataW, 'White')}
                     ${getBadge(dataB, 'Black')}
                 `;
@@ -4534,217 +4479,12 @@ class RepertoireBuilder {
         return { text: `📥 Line → ${repName}`, title: `Save this whole line into ${repName} Repertoire` };
     }
 
-    _applyTreeBadges(lines) {
-        const list = document.getElementById('repVariationsList');
-        if (!list) return;
-        if (!Array.isArray(lines)) return;
-
-        const cards = list.querySelectorAll('.scout-var-card');
-        cards.forEach((card) => {
-            const idx = parseInt(card.getAttribute('data-idx'), 10);
-            const line = lines[idx];
-            if (!line) return;
-            const key = String(line.leafNode ? line.leafNode.id : '');
-            const wData = this.treeOverlapMap?.white?.[key];
-            const bData = this.treeOverlapMap?.black?.[key];
-
-            let badgesWrap = card.querySelector('.scout-card-overlap-badges');
-            if (!badgesWrap) {
-                badgesWrap = document.createElement('div');
-                badgesWrap.className = 'scout-card-overlap-badges';
-                badgesWrap.style.cssText = 'display:flex; gap:0.35rem; align-items:center; margin-top:0.35rem; flex-wrap:wrap;';
-                const pgnEl = card.querySelector('.scout-var-pgn');
-                if (pgnEl) card.insertBefore(badgesWrap, pgnEl.nextSibling);
-            }
-            badgesWrap.innerHTML = this._overlapBadgesHtml(wData, bData);
-
-            const btnW = card.querySelector('.btn-import-rep-tree-white');
-            if (btnW && wData) {
-                const st = this._importButtonState(wData, 'White');
-                btnW.textContent = st.text;
-                btnW.title = st.title;
-            }
-            const btnB = card.querySelector('.btn-import-rep-tree-black');
-            if (btnB && bData) {
-                const st = this._importButtonState(bData, 'Black');
-                btnB.textContent = st.text;
-                btnB.title = st.title;
-            }
-        });
-    }
-
-    /**
-     * Markup for one "Explored Line" card. Extracted from `renderTreeLines()` purely so it can be
-     * rendered (and audited) on its own — the produced markup is unchanged.
-     *
-     * SEC-J: `line.name` / `line.eco` are `opening_name` / `eco` values that reached the session
-     * tree from a `/api/games/recent` row or from the repertoire DB, and `line.pgn` is assembled
-     * from those moves' SAN/UCI — all untrusted, so all three are escaped. `badgesHtml` and the two
-     * import-button labels are deliberately NOT escaped here: they are produced by
-     * `_overlapBadgesHtml()` / `_importButtonState()` and escaped exactly once, inside those
-     * helpers (escaping them again here is the double-escaping bug this comment guards against).
-     */
-    _treeLineCardHtml(line, idx, activeUcis) {
-        const moves = (line && line.moves) ? line.moves : [];
-        const lineUcis = moves.map(m => m.uci).join(' ');
-        const isActive = Boolean(activeUcis && (lineUcis === activeUcis || lineUcis.startsWith(activeUcis)));
-
-        // Stable, node-derived id (CODE3-06) - a positional index would let a stale response
-        // repaint a different line's badges.
-        const overlapKey = String(line.leafNode ? line.leafNode.id : '');
-        const wData = this.treeOverlapMap?.white?.[overlapKey];
-        const bData = this.treeOverlapMap?.black?.[overlapKey];
-
-        const badgesHtml = this._overlapBadgesHtml(wData, bData);
-
-        const btnWhite = this._importButtonState(wData, 'White');
-        const btnBlack = this._importButtonState(bData, 'Black');
-
-        const showDelWhite = wData && (wData.status === 'already_present' || wData.status === 'partially_present');
-        const showDelBlack = bData && (bData.status === 'already_present' || bData.status === 'partially_present');
-
-        const hasNotes = moves.some(m => m.comment && m.comment.trim());
-        const hasImportant = moves.some(m => m.is_important);
-
-        return `
-            <div class="scout-var-card ${isActive ? 'active' : ''}" data-idx="${idx}">
-                <div class="scout-var-header">
-                    <div style="display:flex; align-items:center; gap:0.4rem; overflow:hidden;">
-                        <span class="scout-var-badge">#${idx + 1}</span>
-                        <span style="font-weight:700; color:#fff; font-size:0.83rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                            ${this._escapeHtml(line.name || 'Explored Line')}
-                        </span>
-                        ${line.eco ? `<span style="font-size:0.7rem; color:var(--accent-primary); font-weight:700;">${this._escapeHtml(line.eco)}</span>` : ''}
-                    </div>
-                    <div style="display:flex; align-items:center; gap:0.35rem; flex-shrink:0;">
-                        ${hasNotes ? '<span title="Contains move notes" style="cursor:help; font-size:0.75rem;">📝</span>' : ''}
-                        ${hasImportant ? '<span title="Contains priority moves" style="cursor:help; font-size:0.75rem;">⭐</span>' : ''}
-                        <span class="scout-var-plies">${this._num(line.plyCount, 0)} plies</span>
-                        ${isActive ? '<span class="scout-var-status">Active</span>' : ''}
-                    </div>
-                </div>
-                <div class="scout-var-pgn" title="${this._escapeAttr(line.pgn)}">${this._escapeHtml(line.pgn)}</div>
-                <div class="scout-card-overlap-badges" style="display:flex; gap:0.35rem; align-items:center; margin-top:0.35rem; flex-wrap:wrap;">
-                    ${badgesHtml}
-                </div>
-                <div class="scout-var-actions" style="display:flex; gap:0.3rem; align-items:center; flex-wrap:wrap; margin-top:0.4rem;">
-                    <button class="btn-var-action btn-load-rep-tree-line" data-idx="${idx}" title="Load this line onto the board">
-                        👀 Load
-                    </button>
-                    <button class="btn-var-action btn-import-rep-tree-white" data-idx="${idx}" title="${this._escapeAttr(btnWhite.title)}">
-                        ${this._escapeHtml(btnWhite.text)}
-                    </button>
-                    <button class="btn-var-action btn-import-rep-tree-black" data-idx="${idx}" title="${this._escapeAttr(btnBlack.title)}">
-                        ${this._escapeHtml(btnBlack.text)}
-                    </button>
-                    ${showDelWhite ? `
-                        <button class="btn-var-action btn-del-rep-tree-white" data-idx="${idx}" title="Remove line from White Repertoire" style="color:#ef4444; border-color:rgba(239,68,68,0.35);">
-                            🗑️ White
-                        </button>
-                    ` : ''}
-                    ${showDelBlack ? `
-                        <button class="btn-var-action btn-del-rep-tree-black" data-idx="${idx}" title="Remove line from Black Repertoire" style="color:#ef4444; border-color:rgba(239,68,68,0.35);">
-                            🗑️ Black
-                        </button>
-                    ` : ''}
-                    <button class="btn-var-action btn-del-rep-session-line" data-idx="${idx}" title="Delete this line from session tree" style="color:var(--text-muted); padding:0.25rem 0.45rem;">
-                        ✕
-                    </button>
-                </div>
-            </div>
-        `;
+    _applyTreeBadges() {
+        // Session scratchpad cards removed; overlap badges live on `#repActiveLineOverlap`.
     }
 
     renderTreeLines() {
-        const list = document.getElementById('repVariationsList');
-        const tabBadge = document.getElementById('repTreeTabCount');
-        const quickCount = document.getElementById('repQuickLineCount');
-
-        const lines = this.lineTree.getAllLines();
-        const count = lines.length;
-
-        if (tabBadge) tabBadge.textContent = count;
-        if (quickCount) quickCount.textContent = count;
-
-        if (!list) return;
-
-        if (count === 0) {
-            list.innerHTML = `
-                <div style="color:var(--text-muted); padding:1.5rem 1rem; text-align:center; display:flex; flex-direction:column; align-items:center; gap:0.5rem;">
-                    <div style="font-size:2rem; opacity:0.6;">♟️</div>
-                    <div style="font-weight:600; color:var(--text-primary); font-size:0.85rem;">No lines explored yet</div>
-                    <div style="font-size:0.75rem; line-height:1.45; max-width:260px;">
-                        Play moves on the board or click candidate moves. All variations and branches you explore will appear here automatically.
-                    </div>
-                </div>
-            `;
-            return;
-        }
-
-        const activeLine = this.lineTree.getActiveLine();
-        const activeUcis = activeLine.map(m => m.uci).join(' ');
-
-        list.innerHTML = lines
-            .map((line, idx) => this._treeLineCardHtml(line, idx, activeUcis))
-            .join('');
-
-        // Attach event listeners for each card
-        list.querySelectorAll('.btn-load-rep-tree-line').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const idx = parseInt(btn.getAttribute('data-idx'), 10);
-                if (lines[idx]) this.loadTreeLine(lines[idx]);
-            });
-        });
-        list.querySelectorAll('.btn-import-rep-tree-white').forEach(btn => {
-            btn.addEventListener('click', async (e) => {
-                e.stopPropagation();
-                const idx = parseInt(btn.getAttribute('data-idx'), 10);
-                if (!lines[idx]) return;
-                if (btn.disabled) return;
-                btn.disabled = true;
-                try {
-                    await this.importToRepertoire('white', lines[idx].moves);
-                } finally {
-                    if (btn.isConnected) btn.disabled = false;
-                }
-            });
-        });
-        list.querySelectorAll('.btn-import-rep-tree-black').forEach(btn => {
-            btn.addEventListener('click', async (e) => {
-                e.stopPropagation();
-                const idx = parseInt(btn.getAttribute('data-idx'), 10);
-                if (!lines[idx]) return;
-                if (btn.disabled) return;
-                btn.disabled = true;
-                try {
-                    await this.importToRepertoire('black', lines[idx].moves);
-                } finally {
-                    if (btn.isConnected) btn.disabled = false;
-                }
-            });
-        });
-        list.querySelectorAll('.btn-del-rep-tree-white').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const idx = parseInt(btn.getAttribute('data-idx'), 10);
-                if (lines[idx]) this.removeTreeLineFromRepertoire(lines[idx], 'white');
-            });
-        });
-        list.querySelectorAll('.btn-del-rep-tree-black').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const idx = parseInt(btn.getAttribute('data-idx'), 10);
-                if (lines[idx]) this.removeTreeLineFromRepertoire(lines[idx], 'black');
-            });
-        });
-        list.querySelectorAll('.btn-del-rep-session-line').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const idx = parseInt(btn.getAttribute('data-idx'), 10);
-                if (lines[idx]) this.deleteSessionLine(lines[idx]);
-            });
-        });
+        // Session scratchpad cards removed in favour of direct repertoire tree + Gaps/Games deck.
     }
 
     loadTreeLine(line) {

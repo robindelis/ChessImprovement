@@ -11,8 +11,8 @@ import re
 import time
 import chess
 from typing import Any, Dict, List, Optional, Set, Tuple
-from backend.db import get_db, get_setting, set_setting
-from backend.repertoire import normalize_fen
+from backend.db import closing_db, get_db, get_setting, set_setting
+from backend.utils import normalize_fen
 
 RESOLVED_DEVIATIONS_SETTING_KEY = "resolved_deviations"
 
@@ -97,78 +97,77 @@ def find_game_deviations(
         if r.get("fen") and r.get("played_uci")
     }
 
-    conn = get_db()
-    cursor = conn.cursor()
+    with closing_db() as conn:
+        cursor = conn.cursor()
 
-    # 1. Load active user repertoire moves & opponent branches
-    rep_query = """
-    SELECT repertoire, parent_fen, move_uci, move_san, is_user_move,
-           opening_name, eco, comment, arrows
-    FROM repertoire_moves
-    """
-    params: List[Any] = []
-    if color:
-        rep_query += " WHERE repertoire = ?"
-        params.append(color)
+        # 1. Load active user repertoire moves & opponent branches
+        rep_query = """
+        SELECT repertoire, parent_fen, move_uci, move_san, is_user_move,
+               opening_name, eco, comment, arrows
+        FROM repertoire_moves
+        """
+        params: List[Any] = []
+        if color:
+            rep_query += " WHERE repertoire = ?"
+            params.append(color)
 
-    cursor.execute(rep_query, params)
-    rep_rows = cursor.fetchall()
+        cursor.execute(rep_query, params)
+        rep_rows = cursor.fetchall()
 
-    # Map: (repertoire, 4-token parent_fen) -> user move dict
-    # And 3-token fallback for transpositions
-    user_moves: Dict[Tuple[str, str], Dict[str, Any]] = {}
-    user_moves_3: Dict[Tuple[str, str], Dict[str, Any]] = {}
+        # Map: (repertoire, 4-token parent_fen) -> user move dict
+        # And 3-token fallback for transpositions
+        user_moves: Dict[Tuple[str, str], Dict[str, Any]] = {}
+        user_moves_3: Dict[Tuple[str, str], Dict[str, Any]] = {}
 
-    # Set of opponent branch UCIs: (repertoire, 4-token parent_fen) -> set(uci)
-    opp_moves: Dict[Tuple[str, str], Set[str]] = {}
-    opp_moves_3: Dict[Tuple[str, str], Set[str]] = {}
+        # Set of opponent branch UCIs: (repertoire, 4-token parent_fen) -> set(uci)
+        opp_moves: Dict[Tuple[str, str], Set[str]] = {}
+        opp_moves_3: Dict[Tuple[str, str], Set[str]] = {}
 
-    for row in rep_rows:
-        r_color = row["repertoire"]
-        p_fen = normalize_fen(row["parent_fen"])
-        p_fen_3 = " ".join(p_fen.split()[:3])
-        m_uci = row["move_uci"]
-        is_user = bool(row["is_user_move"])
+        for row in rep_rows:
+            r_color = row["repertoire"]
+            p_fen = normalize_fen(row["parent_fen"])
+            p_fen_3 = " ".join(p_fen.split()[:3])
+            m_uci = row["move_uci"]
+            is_user = bool(row["is_user_move"])
 
-        if is_user:
-            user_moves[(r_color, p_fen)] = dict(row)
-            if (r_color, p_fen_3) not in user_moves_3:
-                user_moves_3[(r_color, p_fen_3)] = dict(row)
-        else:
-            opp_key = (r_color, p_fen)
-            if opp_key not in opp_moves:
-                opp_moves[opp_key] = set()
-            opp_moves[opp_key].add(m_uci)
+            if is_user:
+                user_moves[(r_color, p_fen)] = dict(row)
+                if (r_color, p_fen_3) not in user_moves_3:
+                    user_moves_3[(r_color, p_fen_3)] = dict(row)
+            else:
+                opp_key = (r_color, p_fen)
+                if opp_key not in opp_moves:
+                    opp_moves[opp_key] = set()
+                opp_moves[opp_key].add(m_uci)
 
-            opp_key_3 = (r_color, p_fen_3)
-            if opp_key_3 not in opp_moves_3:
-                opp_moves_3[opp_key_3] = set()
-            opp_moves_3[opp_key_3].add(m_uci)
+                opp_key_3 = (r_color, p_fen_3)
+                if opp_key_3 not in opp_moves_3:
+                    opp_moves_3[opp_key_3] = set()
+                opp_moves_3[opp_key_3].add(m_uci)
 
-    # 2. Query games
-    games_query = "SELECT * FROM games"
-    game_conditions = []
-    game_params: List[Any] = []
+        # 2. Query games
+        games_query = "SELECT * FROM games"
+        game_conditions = []
+        game_params: List[Any] = []
 
-    if color:
-        game_conditions.append("user_color = ?")
-        game_params.append(color)
+        if color:
+            game_conditions.append("user_color = ?")
+            game_params.append(color)
 
-    if search and search.strip():
-        q = f"%{search.strip()}%"
-        game_conditions.append(
-            "(white_player LIKE ? OR black_player LIKE ? OR opening_name LIKE ? OR eco LIKE ?)"
-        )
-        game_params.extend([q, q, q, q])
+        if search and search.strip():
+            q = f"%{search.strip()}%"
+            game_conditions.append(
+                "(white_player LIKE ? OR black_player LIKE ? OR opening_name LIKE ? OR eco LIKE ?)"
+            )
+            game_params.extend([q, q, q, q])
 
-    if game_conditions:
-        games_query += " WHERE " + " AND ".join(game_conditions)
+        if game_conditions:
+            games_query += " WHERE " + " AND ".join(game_conditions)
 
-    games_query += " ORDER BY played_at DESC"
+        games_query += " ORDER BY played_at DESC"
 
-    cursor.execute(games_query, game_params)
-    game_rows = cursor.fetchall()
-    conn.close()
+        cursor.execute(games_query, game_params)
+        game_rows = cursor.fetchall()
 
     total_games = len(game_rows)
     deviations: List[Dict[str, Any]] = []

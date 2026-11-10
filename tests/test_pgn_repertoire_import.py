@@ -123,6 +123,7 @@ class TestPgnRepertoireImport(unittest.TestCase):
         self.assertEqual(len(replies), 3)
         for rep in replies:
             self.assertEqual(rep["is_user_move"], 0)
+        conn.close()
 
     def test_import_split_chapters_creates_studies(self):
         """Multi-chapter PGN with split_chapters_as_studies creates named studies."""
@@ -172,6 +173,7 @@ class TestPgnRepertoireImport(unittest.TestCase):
         c.execute("SELECT move_uci FROM repertoire_moves WHERE parent_fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -' AND is_user_move = 1")
         row = c.fetchone()
         self.assertEqual(row["move_uci"], "e2e4")
+        conn.close()
 
     def test_clean_repertoire_mode(self):
         """clean_repertoire=True wipes pre-existing moves before importing."""
@@ -194,6 +196,7 @@ class TestPgnRepertoireImport(unittest.TestCase):
         c.execute("SELECT move_uci FROM repertoire_moves WHERE parent_fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -' AND is_user_move = 1")
         row = c.fetchone()
         self.assertEqual(row["move_uci"], "e2e4")
+        conn.close()
 
     def test_api_endpoints_preview_and_import(self):
         """Tests the REST API routes POST /api/repertoire/preview_pgn and /api/repertoire/import_pgn."""

@@ -561,18 +561,12 @@ class TestBlunderListAndDashboardAgree(unittest.TestCase):
         tests.test_setup.reset_fixtures()
         self.client = TestClient(app, base_url="http://testserver", raise_server_exceptions=False)
 
-    def test_the_list_and_the_dashboard_count_the_same_blunders(self):
-        response = self.client.get("/api/blunders?limit=200", headers={"Host": "127.0.0.1:38281"})
+    def test_game_gaps_endpoint_resolves_only_valid_game_blunders(self):
+        response = self.client.get("/api/repertoire/game_gaps?color=white&min_games=0", headers={"Host": "127.0.0.1:38281"})
         self.assertEqual(response.status_code, 200, response.text)
-        listed = response.json()
-        dashboard = self.client.get("/api/dashboard", headers={"Host": "127.0.0.1:38281"})
-        self.assertEqual(dashboard.status_code, 200, dashboard.text)
-        total = dashboard.json()["total_blunders"]
-        self.assertEqual(len(listed), total,
-                         "GET /api/blunders shows %d rows while the dashboard counts %d"
-                         % (len(listed), total))
-        # Nothing shown is invisible: every listed row has a game to point at.
-        for row in listed:
+        body = response.json()
+        for row in body.get("gaps", []):
+            self.assertTrue(row.get("game_id"), row)
             self.assertTrue(row.get("played_at") is not None, row)
 
     def test_a_blunder_row_always_has_a_resolvable_game(self):
