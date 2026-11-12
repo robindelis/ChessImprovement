@@ -1786,6 +1786,15 @@ class RepertoireBuilder {
                 item.className = 'game-card' + (isCurrentReview ? ' active-review' : '');
                 item.innerHTML = this._gameCardHtml(g);
 
+                const btnAnalyze = item.querySelector('.btn-analyze-game');
+                if (btnAnalyze) {
+                    btnAnalyze.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        window.app?.showTab('analysis');
+                        window.gameAnalysis?.openGame(g.id, { autoAnalyze: true });
+                    });
+                }
+
                 const btnReview = item.querySelector('.btn-review-game');
                 if (btnReview) {
                     btnReview.addEventListener('click', (e) => {
@@ -1869,8 +1878,11 @@ class RepertoireBuilder {
                 </div>
             </div>
             <div style="display:flex; align-items:center; gap:0.35rem; flex-shrink:0;">
-                <button class="btn-primary btn-review-game" style="font-size:0.74rem; padding:0.3rem 0.6rem; cursor:pointer;" title="Load game on board to explore opening and variations">
-                    Review & Explore &rarr;
+                <button class="btn-primary btn-analyze-game" style="font-size:0.74rem; padding:0.3rem 0.6rem; cursor:pointer;" title="Full Stockfish 19 Game Review & Guided Repertoire Coach">
+                    Analyze &rarr;
+                </button>
+                <button class="btn-secondary btn-review-game" style="font-size:0.74rem; padding:0.3rem 0.55rem; cursor:pointer;" title="Load game on Builder board">
+                    Board
                 </button>
                 <button class="btn-secondary btn-quick-add-opening" style="font-size:0.72rem; padding:0.3rem 0.5rem; cursor:pointer;" title="Import recognized opening into your ${userColorAttr} repertoire">
                     📥 Add Opening

@@ -1084,8 +1084,9 @@ class AsyncEngineEvaluator:
         fen: str,
         max_depth: int = 16,
         request: Optional[Request] = None,
+        multipv: int = 1,
     ) -> AsyncGenerator[str, None]:
-        """Progressively yield SSE evaluation events for ``fen`` (contract v1).
+        """Progressively yield SSE evaluation events for ``fen`` (contract v2).
 
         Guarantees:
         * every frame is a complete ``data:``-first event block;
@@ -1095,6 +1096,7 @@ class AsyncEngineEvaluator:
           disconnect / generator abandonment, so no engine process is leaked.
         """
         max_depth = max(1, min(30, int(max_depth)))
+        multipv = max(1, min(5, int(multipv)))
         norm_fen = normalize_fen(fen)
 
         if request and await request.is_disconnected():
@@ -1128,7 +1130,7 @@ class AsyncEngineEvaluator:
             ))
             return
 
-        cached = self.get_cached_eval(fen)
+        cached = self.get_cached_eval(fen) if multipv == 1 else None
         if cached:
             replayed = build_eval_event(
                 depth=int(cached.get("depth", 0)),
@@ -1167,18 +1169,23 @@ class AsyncEngineEvaluator:
         try:
             last_res: Optional[Dict[str, Any]] = None
             last_emitted_depth = 0
-            with await engine.analysis(board, chess.engine.Limit(depth=max_depth)) as analysis:
+            mpv_lines: Dict[int, Dict[str, Any]] = {}
+            limit = chess.engine.Limit(depth=max_depth)
+            if multipv > 1:
+                try:
+                    analysis_ctx = await engine.analysis(board, limit, multipv=multipv)
+                except TypeError:
+                    analysis_ctx = await engine.analysis(board, limit)
+            else:
+                analysis_ctx = await engine.analysis(board, limit)
+            with analysis_ctx as analysis:
                 async for info in analysis:
                     if "score" not in info or "depth" not in info:
                         continue
                     if request and await request.is_disconnected():
                         break
                     depth = int(info["depth"])
-                    if depth == last_emitted_depth:
-                        continue
-                    if not (depth <= 4 or depth % 3 == 0 or depth >= max_depth):
-                        continue
-                    last_emitted_depth = depth
+                    rank = int(info.get("multipv", 1))
 
                     score_obj = info["score"].white()  # every score is White POV
                     score_cp = score_obj.score()
@@ -1186,29 +1193,53 @@ class AsyncEngineEvaluator:
                     if score_cp is None and mate is None:
                         continue
 
-                    # The line is re-read on *every* emitted frame, which is what
-                    # makes it evolve with depth: at depth 4 it is a crude
-                    # principal line, at depth 16 it is the move the user is
-                    # actually looking for.  `best_move`/`best_san` stay exactly
-                    # the first ply of it, so the two never disagree.
                     line = pv_line(board, info.get("pv", []), PV_MAX_PLIES)
                     best_move_uci = line[0]["uci"] if line else ""
                     best_move_san = line[0]["san"] if line else ""
 
+                    if multipv > 1:
+                        mpv_lines[rank] = {
+                            "rank": rank,
+                            "depth": depth,
+                            "score_cp": _clamp_cp(score_cp if score_cp is not None else (MATE_SCORE_CP if (mate and mate > 0) else -MATE_SCORE_CP)),
+                            "mate": int(mate) if mate is not None else None,
+                            "is_mate": mate is not None,
+                            "best_move": best_move_uci,
+                            "best_san": best_move_san,
+                            "pv": sanitize_pv(line),
+                        }
+                        if rank != 1 and depth < max_depth:
+                            continue
+
+                    if depth == last_emitted_depth and (multipv == 1 or rank != multipv):
+                        continue
+                    if not (depth <= 4 or depth % 3 == 0 or depth >= max_depth):
+                        continue
+                    last_emitted_depth = depth
+
+                    primary = mpv_lines.get(1) if multipv > 1 and 1 in mpv_lines else None
+                    p_cp = primary["score_cp"] if primary else score_cp
+                    p_mate = primary["mate"] if primary else mate
+                    p_uci = primary["best_move"] if primary else best_move_uci
+                    p_san = primary["best_san"] if primary else best_move_san
+                    p_pv = primary["pv"] if primary else line
+
                     last_res = build_eval_event(
                         depth=depth,
-                        score_cp=score_cp,
-                        mate=mate,
-                        best_move=best_move_uci,
-                        best_san=best_move_san,
+                        score_cp=p_cp,
+                        mate=p_mate,
+                        best_move=p_uci,
+                        best_san=p_san,
                         final=(depth >= max_depth),
                         fen=norm_fen,
-                        pv=line,
+                        pv=p_pv,
                     )
+                    if multipv > 1:
+                        last_res["lines"] = [mpv_lines[k] for k in sorted(mpv_lines.keys())[:multipv]]
                     yield _frame(last_res)
 
             # Only cache when the search actually reached max_depth.
-            if last_res and last_res.get("depth", 0) >= max_depth:
+            if multipv == 1 and last_res and last_res.get("depth", 0) >= max_depth:
                 last_res["final"] = True
                 self._set_cached_eval(fen, last_res)
         except (asyncio.CancelledError, GeneratorExit):

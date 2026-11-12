@@ -3,6 +3,8 @@ class ChessApp {
     constructor() {
         this.currentTab = 'repertoire';
         this.account = null;
+        this.fairPlayLocked = false;
+        this.activeLiveGameId = null;
 
         this._bindUI();
         this.init();
@@ -57,6 +59,17 @@ class ChessApp {
             });
         }
 
+        const btnOAuth = document.getElementById('btnSettingsOAuthLichess');
+        if (btnOAuth) {
+            btnOAuth.addEventListener('click', () => this.startLichessOAuth());
+        }
+
+        window.addEventListener('focus', () => {
+            if (this._awaitingOAuth) {
+                this._checkOAuthCompletion();
+            }
+        });
+
         if (window.desktopApp && typeof window.desktopApp.onSyncGames === 'function') {
             window.desktopApp.onSyncGames(() => {
                 if (window.repertoireBuilder && typeof window.repertoireBuilder.resyncGames === 'function') {
@@ -81,9 +94,74 @@ class ChessApp {
         }
     }
 
+    setFairPlayLock(locked, gameId = null) {
+        this.fairPlayLocked = Boolean(locked);
+        this.activeLiveGameId = gameId;
+        document.querySelectorAll('.nav-tab').forEach(t => {
+            const tab = t.dataset.tab;
+            const disabled = this.fairPlayLocked && tab !== 'play';
+            t.classList.toggle('is-locked', disabled);
+        });
+    }
+
+    async startLichessOAuth() {
+        try {
+            const res = await fetch('/api/auth/lichess/start', { method: 'POST' });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            if (data.auth_url) {
+                this._awaitingOAuth = true;
+                const link = document.createElement('a');
+                link.href = data.auth_url;
+                link.target = '_blank';
+                link.rel = 'noopener noreferrer';
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                window.showToast?.('Authorize in your browser, then return here.', '#5b9bd5', 5000);
+            }
+        } catch (e) {
+            window.showToast?.(`Could not start Lichess login: ${e.message}`, '#ef4444');
+        }
+    }
+
+    async _checkOAuthCompletion() {
+        try {
+            const res = await fetch('/api/auth/lichess/status');
+            if (!res.ok) return;
+            const st = await res.json();
+            if (st.connected && st.can_play) {
+                this._awaitingOAuth = false;
+                await this.loadAccount();
+                await window.livePlay?.refreshAuthStatus();
+                this._updateScopeBadge(st);
+                window.showToast?.(`Connected to Lichess as ${st.username}`, '#34d399');
+            }
+        } catch (_) {}
+    }
+
+    _updateScopeBadge(st) {
+        const badge = document.getElementById('settingsScopeBadge');
+        if (!badge || !st) return;
+        if (!st.connected) {
+            badge.textContent = 'Not connected';
+            badge.className = 'muted-tag';
+        } else if (st.can_play) {
+            badge.textContent = `✓ ${st.username} (Play ready)`;
+            badge.className = 'muted-tag text-emerald';
+        } else {
+            badge.textContent = `${st.username} (Missing board:play)`;
+            badge.className = 'muted-tag text-amber';
+        }
+    }
+
     showTab(tabName) {
         if (tabName === 'settings') {
             this.openSettingsModal();
+            return;
+        }
+        if (this.fairPlayLocked && tabName !== 'play') {
+            window.showToast?.('Fair-Play Lock: Repertoire & Engine tools unlock as soon as your live game finishes.', '#f59e0b', 3500);
             return;
         }
         this.currentTab = tabName;
@@ -93,7 +171,15 @@ class ChessApp {
 
         document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
 
-        if (tabName === 'repertoire') {
+        if (tabName === 'play') {
+            const viewPlay = document.getElementById('viewPlay');
+            if (viewPlay) viewPlay.classList.add('active');
+            window.livePlay?.refreshAuthStatus();
+        } else if (tabName === 'analysis') {
+            const viewAnalysis = document.getElementById('viewAnalysis');
+            if (viewAnalysis) viewAnalysis.classList.add('active');
+            window.gameAnalysis?.onShowTab();
+        } else if (tabName === 'repertoire') {
             const viewRep = document.getElementById('viewRepertoire');
             if (viewRep) viewRep.classList.add('active');
             if (window.repertoireBuilder) {
@@ -157,6 +243,16 @@ class ChessApp {
                     }
                 }
             }
+            if (data.analysis_depth !== undefined && data.analysis_depth !== null) {
+                const depthSel = document.getElementById('inputAnalysisDepth');
+                if (depthSel) depthSel.value = String(data.analysis_depth);
+                const analysisBarSel = document.getElementById('analysisDepthSelect');
+                if (analysisBarSel) analysisBarSel.value = String(data.analysis_depth);
+            }
+            fetch('/api/auth/lichess/status')
+                .then(r => r.ok ? r.json() : null)
+                .then(st => { if (st) this._updateScopeBadge(st); })
+                .catch(() => {});
             if (data.sync_perf_types) {
                 const types = data.sync_perf_types.split(',').map(s => s.trim().toLowerCase());
                 const checkboxMap = {
@@ -181,9 +277,14 @@ class ChessApp {
         const token = tokenInput?.value;
         const username = document.getElementById('inputUsername')?.value;
         const gap = document.getElementById('inputDefaultGap')?.value;
+        const analysisDepth = document.getElementById('inputAnalysisDepth')?.value;
 
         const payload = { lichess_username: username };
         if (token) payload.lichess_token = token;
+        if (analysisDepth) {
+            const d = parseInt(analysisDepth, 10);
+            if (!Number.isNaN(d)) payload.analysis_depth = d;
+        }
         if (gap !== undefined && gap !== '') {
             const parsedGapPayload = parseFloat(gap);
             if (!Number.isNaN(parsedGapPayload) && parsedGapPayload >= 0.1 && parsedGapPayload <= 100) {
@@ -240,6 +341,7 @@ class ChessApp {
         }
         this.closeSettingsModal();
         await this.loadAccount();
+        await window.livePlay?.refreshAuthStatus();
     }
 }
 

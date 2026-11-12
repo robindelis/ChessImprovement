@@ -19,26 +19,32 @@ Personalized chess repertoire builder, trainer, and game review app for **`RobiD
 ## 📁 Key Files
 ```
 backend/
-  api.py            # REST API, SSE streams, local-origin security boundary
+  api.py            # REST API, SSE streams, Fair-Play guard & local-origin boundary
   db.py             # Schema, migrations, closing_db() SQLite factory
+  lichess_auth.py   # Lichess OAuth2 PKCE flow & board:play scope inspector
+  live_play.py      # Lichess Board API live game, seek, challenge & clock manager
+  game_analysis.py  # Full-game Stockfish 19 review (Depth 19 + MultiPV-3) & sequence saver
   repertoire.py     # Repertoire tree CRUD, studies, overlap & PGN import
   explorer.py       # 2000+ Lichess Explorer cache, candidate evals, threat score
   game_sync.py      # Lichess game ingestion, SSE sync streams, blunder gaps
   trainer.py        # FSRS-5 memory model, implicit latency grading, DAG graph
   deviations.py     # Game deviation detection & practice drills
-  analyzer.py       # Stockfish blunder detection
-  evaluator.py      # Stockfish async/sync pools & SSE eval stream
+  analyzer.py       # Stockfish blunder persistence & reconciliation
+  evaluator.py      # Stockfish async/sync pools & MultiPV SSE eval stream
   utils.py          # FEN normalization & Lichess outcome coercion
 frontend/
-  index.html             # 2-tab Studio shell (Builder | Trainer + Settings modal)
+  index.html             # 4-tab Studio shell (Play | Analysis | Builder | Trainer)
   style.css              # Single Dark Studio stylesheet
+  live_play.js           # Live Lichess board, clocks, seeks, challenges & Fair-Play lock
+  game_analysis.js       # Full-game Stockfish 19 review, eval graph & guided trap fixer
   repertoire_builder.js  # Repertoire tree, board, eval bar, Explorer, Gaps & Games
   repertoire_trainer.js  # FSRS-5 active-recall trainer & game deviations
-  board.js               # Interactive SVG chessboard
-  app.js                 # Tab switcher, Settings modal, study modal & toasts
+  board.js               # Interactive SVG chessboard with promotion chooser
+  app.js                 # Workspace router, OAuth PKCE, Settings modal & toasts
 tests/
-  test_setup.py          # Temp SQLite DB isolation on import
-  test_fsrs5_sota_trainer.py # FSRS-5, latency grading, DAG & UI contract tests
+  test_setup.py                       # Temp SQLite DB isolation on import
+  test_platform_play_and_analysis.py  # Live Play, OAuth PKCE, Depth-19 analysis & sequence saver
+  test_fsrs5_sota_trainer.py          # FSRS-5, latency grading, DAG & UI contract tests
 ```
 
 ## ⚠️ Core Invariants

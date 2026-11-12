@@ -571,9 +571,19 @@ def _init_db_body(conn, purge_orphans: bool = False):
         opening_name TEXT,
         eco TEXT,
         moves_san TEXT,
-        analyzed_at INTEGER DEFAULT 0
+        analyzed_at INTEGER DEFAULT 0,
+        analysis_json TEXT DEFAULT '',
+        analysis_depth INTEGER DEFAULT 0,
+        white_accuracy REAL DEFAULT NULL,
+        black_accuracy REAL DEFAULT NULL,
+        clocks_json TEXT DEFAULT ''
     )
     """)
+    _add_column_if_missing(cursor, "games", "analysis_json", "TEXT DEFAULT ''")
+    _add_column_if_missing(cursor, "games", "analysis_depth", "INTEGER DEFAULT 0")
+    _add_column_if_missing(cursor, "games", "white_accuracy", "REAL DEFAULT NULL")
+    _add_column_if_missing(cursor, "games", "black_accuracy", "REAL DEFAULT NULL")
+    _add_column_if_missing(cursor, "games", "clocks_json", "TEXT DEFAULT ''")
     
     # Blunders table
     #
@@ -760,6 +770,7 @@ def _init_db_body(conn, purge_orphans: bool = False):
     cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('max_opening_ply', '24')")
     cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('blunder_threshold_cp', '150')")
     cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('gap_threshold', '5.0')")
+    cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('analysis_depth', '19')")
 
     # Migration: restore study-linked moves, backfill study_name, and REPORT
     # (never delete, unless explicitly opted in) moves that are unreachable from

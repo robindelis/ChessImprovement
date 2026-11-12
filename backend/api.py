@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Literal, Optional
 import chess
 from fastapi import FastAPI, HTTPException, Path, Query, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse, Response, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.datastructures import MutableHeaders
@@ -30,7 +30,22 @@ from backend.evaluator import (
     EngineBusy,
     get_sync_engine_pool,
 )
+from backend.game_analysis import (
+    DEFAULT_ANALYSIS_DEPTH,
+    MAX_ANALYSIS_DEPTH,
+    MIN_ANALYSIS_DEPTH,
+    analyze_full_game_sync,
+    preview_sequence_for_repertoire,
+    save_sequence_to_repertoire,
+    stream_game_analysis,
+)
+from backend.lichess_auth import (
+    complete_oauth_pkce,
+    inspect_token_capabilities,
+    start_oauth_pkce,
+)
 from backend.lichess_client import DEFAULT_PERF_TYPES, LichessClient
+from backend.live_play import LivePlayError, LivePlayManager
 from backend.openings import OpeningBook
 from backend.repertoire import RepertoireManager, extract_player_info, normalize_fen
 
@@ -452,7 +467,13 @@ class LocalBoundaryMiddleware:
             )
             return
 
-        if fetch_site and fetch_site not in ALLOWED_FETCH_SITES:
+        is_oauth_callback_nav = (
+            method == "GET"
+            and scope.get("path") == "/api/auth/lichess/callback"
+            and (headers.get("sec-fetch-mode") or "").strip().lower() in ("navigate", "")
+            and not origin
+        )
+        if fetch_site and fetch_site not in ALLOWED_FETCH_SITES and not is_oauth_callback_nav:
             logger.warning("Refused %s %s: Sec-Fetch-Site %r", method, scope.get("path"), fetch_site)
             await self._respond(
                 send_with_security_headers,
@@ -577,12 +598,22 @@ def startup_event():
 
 @app.on_event("shutdown")
 async def shutdown_event():
+    LivePlayManager.get_instance().shutdown()
     evaluator = AsyncEngineEvaluator.get_instance()
     await evaluator.close()
     try:
         get_sync_engine_pool().close_all()
     except Exception:
         logger.exception("Closing the sync engine pool failed")
+
+
+def _enforce_fair_play() -> None:
+    """Reject repertoire/explorer/engine queries while a live Lichess game is active."""
+    if LivePlayManager.get_instance().is_live_game_active():
+        raise HTTPException(
+            status_code=409,
+            detail="Fair-Play Lock: Repertoire and engine tools are disabled during an active live game.",
+        )
 
 
 # --------------------------------------------------------------------------- #
@@ -611,6 +642,54 @@ class SettingsPayload(BaseModel):
     blunder_threshold_cp: Optional[int] = Field(None, ge=1, le=2000)
     gap_threshold: Optional[float] = Field(None, ge=0.1, le=100.0, allow_inf_nan=False)
     sync_perf_types: Optional[str] = Field(None, max_length=120)
+    analysis_depth: Optional[int] = Field(None, ge=MIN_ANALYSIS_DEPTH, le=MAX_ANALYSIS_DEPTH)
+
+
+class PlaySeekPayload(BaseModel):
+    minutes: int = Field(10, ge=1, le=180)
+    increment: int = Field(0, ge=0, le=180)
+    rated: bool = True
+    color: Literal["white", "black", "random"] = "random"
+
+
+class PlayChallengePayload(BaseModel):
+    mode: Literal["ai", "user"] = "ai"
+    ai_level: int = Field(5, ge=1, le=8)
+    username: Optional[str] = Field("", max_length=MAX_USERNAME_LEN)
+    clock_limit_sec: int = Field(600, ge=60, le=10800)
+    increment_sec: int = Field(0, ge=0, le=180)
+    rated: bool = False
+    color: Literal["white", "black", "random"] = "random"
+
+
+class PlayChallengeRespondPayload(BaseModel):
+    challenge_id: str = Field(..., min_length=1, max_length=64)
+    accept: bool = True
+
+
+class PlayMovePayload(BaseModel):
+    game_id: str = Field(..., min_length=1, max_length=64)
+    move_uci: str = Field(..., min_length=4, max_length=MAX_UCI_LEN)
+    offer_draw: bool = False
+
+
+class PlayActionPayload(BaseModel):
+    game_id: str = Field(..., min_length=1, max_length=64)
+    action: Literal["abort", "resign", "draw_offer", "draw_accept", "draw_decline", "claim_victory", "dismiss"]
+
+
+class SequencePreviewPayload(BaseModel):
+    repertoire: Literal["white", "black"]
+    moves: List[Dict[str, Any]] = Field(..., max_length=MAX_LINE_PLIES)
+
+
+class SequenceSavePayload(BaseModel):
+    repertoire: Literal["white", "black"]
+    moves: List[Dict[str, Any]] = Field(..., max_length=MAX_LINE_PLIES)
+    study_name: Optional[str] = Field(None, max_length=MAX_STUDY_NAME_LEN)
+    replace_conflicts: bool = False
+    prioritize_for_training: bool = True
+    note: Optional[str] = Field(None, max_length=MAX_COMMENT_LEN)
 
 
 class LineImportPayload(BaseModel):
@@ -742,6 +821,7 @@ def get_settings():
         "blunder_threshold_cp": _setting_int("blunder_threshold_cp", 150),
         "gap_threshold": _setting_float("gap_threshold", 5.0),
         "sync_perf_types": get_setting("sync_perf_types", DEFAULT_PERF_TYPES),
+        "analysis_depth": _setting_int("analysis_depth", DEFAULT_ANALYSIS_DEPTH),
     }
 
 
@@ -759,6 +839,8 @@ def update_settings(payload: SettingsPayload):
         set_setting("gap_threshold", str(payload.gap_threshold))
     if payload.sync_perf_types is not None:
         set_setting("sync_perf_types", payload.sync_perf_types.strip())
+    if payload.analysis_depth is not None:
+        set_setting("analysis_depth", str(payload.analysis_depth))
     return {"status": "ok", "message": "Settings saved."}
 
 
@@ -872,6 +954,9 @@ def get_recent_games(
             "moves_san": moves_san,
             "total_plies": len(tokens),
             "opening_ply": opening_ply or min(len(tokens), 12),
+            "analysis_depth": int(row.get("analysis_depth") or 0),
+            "white_accuracy": row.get("white_accuracy"),
+            "black_accuracy": row.get("black_accuracy"),
             "game_url": f"https://lichess.org/{row.get('id')}",
         })
 
@@ -953,6 +1038,7 @@ def explore_position_2000(
     ratings: str = Query("2000,2200,2500"),
     color: Literal["white", "black"] = Query("white"),
 ):
+    _enforce_fair_play()
     if not is_valid_fen(fen):
         raise HTTPException(status_code=400, detail="Invalid FEN string")
     return RepertoireManager.get_instance().get_candidate_moves_2000(fen, ratings=ratings, color=color)
@@ -965,6 +1051,7 @@ def get_repertoire_tree(
     min_games: int = Query(30, ge=0),
     include_patched: bool = Query(False),
 ):
+    _enforce_fair_play()
     return RepertoireManager.get_instance().get_repertoire_tree(
         color, gap_threshold=threshold, min_games=min_games, include_patched=include_patched
     )
@@ -1174,12 +1261,18 @@ def get_repertoire_game_gaps(
 
 
 @app.get("/api/repertoire/eval_stream")
-async def stream_position_eval(request: Request, fen: str = Query(...), depth: int = Query(16, ge=1, le=30)):
+async def stream_position_eval(
+    request: Request,
+    fen: str = Query(...),
+    depth: int = Query(16, ge=1, le=30),
+    multipv: int = Query(1, ge=1, le=5),
+):
+    _enforce_fair_play()
     if not is_valid_fen(fen):
         raise HTTPException(status_code=400, detail="Invalid FEN string")
     evaluator = AsyncEngineEvaluator.get_instance()
     return StreamingResponse(
-        evaluator.stream_eval(fen, max_depth=depth, request=request),
+        evaluator.stream_eval(fen, max_depth=depth, request=request, multipv=multipv),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"},
     )
@@ -1217,6 +1310,7 @@ def get_next_repertoire_drill(
     index: Optional[int] = Query(None, ge=0, le=10000),
     game_id: Optional[str] = Query(None, max_length=64),
 ):
+    _enforce_fair_play()
     if mode == "deviations":
         recent_list = [x.strip() for x in (recent_ids or "").split(",") if x.strip()]
         dev_color = None if color in ("mixed", "both", "all") else color
@@ -1244,6 +1338,7 @@ def get_next_repertoire_drill(
 
 @app.post("/api/repertoire/train/attempt")
 def evaluate_repertoire_attempt(payload: TrainerMovePayload):
+    _enforce_fair_play()
     if not is_valid_fen(payload.current_fen):
         raise HTTPException(status_code=400, detail="Invalid FEN string")
     filter_val = payload.study_name or payload.opening_filter
@@ -1339,6 +1434,234 @@ def resolve_repertoire_deviation_endpoint(payload: ResolveDeviationPayload):
 def reset_repertoire_deviations_endpoint():
     reset_resolved_deviations()
     return {"status": "success", "message": "All resolved deviations reset."}
+
+
+# --------------------------------------------------------------------------- #
+# Lichess OAuth2 PKCE & Live Board API Endpoints
+# --------------------------------------------------------------------------- #
+
+
+@app.get("/api/auth/lichess/status")
+def get_lichess_auth_status():
+    return inspect_token_capabilities()
+
+
+@app.post("/api/auth/lichess/start")
+def start_lichess_oauth(request: Request):
+    host = request.headers.get("host") or "127.0.0.1:38281"
+    redirect_uri = f"http://{host}/api/auth/lichess/callback"
+    return start_oauth_pkce(redirect_uri=redirect_uri)
+
+
+@app.get("/api/auth/lichess/callback")
+def lichess_oauth_callback(code: str = Query(""), state: str = Query(""), error: str = Query("")):
+    if error:
+        ok, msg, username = False, f"Lichess authorization canceled ({error}).", None
+    else:
+        ok, msg, username = complete_oauth_pkce(code=code, state=state)
+
+    safe_title = "Connected to Lichess" if ok else "Lichess Connection Failed"
+    accent = "#34d399" if ok else "#ef4444"
+    safe_user = re.sub(r"[^A-Za-z0-9_\-]", "", username or "")
+    safe_msg = (
+        f"Signed in as {safe_user}. Return to Repertoire Studio."
+        if ok and safe_user
+        else re.sub(r"[<>\"'&]", "", msg)[:180]
+    )
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>{safe_title}</title>
+<style>
+body {{ background:#0b0d11; color:#eef2f7; font-family:system-ui,sans-serif; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; }}
+.card {{ background:#151922; border:1px solid rgba(255,255,255,0.12); border-radius:10px; padding:2rem 2.4rem; text-align:center; max-width:420px; }}
+h2 {{ color:{accent}; margin:0 0 0.6rem; font-size:1.2rem; }}
+p {{ color:#98a3b3; margin:0 0 1.2rem; font-size:0.92rem; }}
+a {{ display:inline-block; background:#d4a853; color:#0b0d11; font-weight:700; text-decoration:none; padding:0.5rem 1.1rem; border-radius:6px; }}
+</style></head>
+<body><div class="card"><h2>{safe_title}</h2><p>{safe_msg}</p><a href="/">Open Studio</a></div></body>
+</html>"""
+    return HTMLResponse(content=html, status_code=200 if ok else 400)
+
+
+@app.get("/api/play/state")
+def get_live_play_state():
+    return LivePlayManager.get_instance().snapshot()
+
+
+@app.get("/api/play/stream")
+async def stream_live_play(request: Request):
+    mgr = LivePlayManager.get_instance()
+    return StreamingResponse(
+        mgr.stream_events(request=request),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.post("/api/play/seek")
+def start_live_seek(payload: PlaySeekPayload):
+    try:
+        return LivePlayManager.get_instance().start_seek(
+            minutes=payload.minutes,
+            increment=payload.increment,
+            rated=payload.rated,
+            color=payload.color,
+        )
+    except LivePlayError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc))
+
+
+@app.post("/api/play/seek/cancel")
+def cancel_live_seek():
+    return LivePlayManager.get_instance().cancel_seek()
+
+
+@app.post("/api/play/challenge")
+def create_live_challenge(payload: PlayChallengePayload):
+    try:
+        return LivePlayManager.get_instance().create_challenge(
+            mode=payload.mode,
+            ai_level=payload.ai_level,
+            username=payload.username or "",
+            clock_limit_sec=payload.clock_limit_sec,
+            increment_sec=payload.increment_sec,
+            rated=payload.rated,
+            color=payload.color,
+        )
+    except LivePlayError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc))
+
+
+@app.post("/api/play/challenge/respond")
+def respond_live_challenge(payload: PlayChallengeRespondPayload):
+    try:
+        return LivePlayManager.get_instance().respond_challenge(
+            challenge_id=payload.challenge_id,
+            accept=payload.accept,
+        )
+    except LivePlayError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc))
+
+
+@app.post("/api/play/move")
+def submit_live_move(payload: PlayMovePayload):
+    try:
+        return LivePlayManager.get_instance().submit_move(
+            game_id=payload.game_id,
+            move_uci=payload.move_uci,
+            offer_draw=payload.offer_draw,
+        )
+    except LivePlayError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc))
+
+
+@app.post("/api/play/action")
+def submit_live_action(payload: PlayActionPayload):
+    try:
+        return LivePlayManager.get_instance().game_action(
+            game_id=payload.game_id,
+            action=payload.action,
+        )
+    except LivePlayError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc))
+
+
+# --------------------------------------------------------------------------- #
+# Full-Game Stockfish 19 Analysis & Guided Repertoire Sequence Endpoints
+# --------------------------------------------------------------------------- #
+
+
+@app.get("/api/analysis/{game_id}")
+def get_game_analysis(
+    game_id: str = Path(..., min_length=1, max_length=64),
+    depth: Optional[int] = Query(None, ge=MIN_ANALYSIS_DEPTH, le=MAX_ANALYSIS_DEPTH),
+    force: bool = Query(False),
+    cached_only: bool = Query(False),
+):
+    _enforce_fair_play()
+    if cached_only:
+        with closing_db() as conn:
+            row = conn.execute("SELECT * FROM games WHERE id = ?", (game_id,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Game not found.")
+        g = dict(row)
+        if g.get("analysis_json"):
+            try:
+                parsed = json.loads(g["analysis_json"])
+                if isinstance(parsed, dict):
+                    parsed["cached"] = True
+                    return {"status": "ready", "analysis": parsed}
+            except Exception:
+                pass
+        return {
+            "status": "pending",
+            "game": {
+                "id": g["id"],
+                "white_player": g.get("white_player") or "White",
+                "black_player": g.get("black_player") or "Black",
+                "white_rating": g.get("white_rating") or 0,
+                "black_rating": g.get("black_rating") or 0,
+                "user_color": g.get("user_color") or "white",
+                "speed": g.get("speed") or "rapid",
+                "rated": bool(g.get("rated")),
+                "result": g.get("result") or "draw",
+                "opening_name": g.get("opening_name") or "Standard Opening",
+                "eco": g.get("eco") or "",
+                "moves_san": g.get("moves_san") or "",
+            },
+        }
+
+    try:
+        report = analyze_full_game_sync(game_id=game_id, depth=depth, force=force)
+        return {"status": "ready", "analysis": report}
+    except EngineBusy:
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "Stockfish engine pool is busy. Retry shortly."},
+            headers={"Retry-After": str(ENGINE_BUSY_RETRY_AFTER)},
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@app.get("/api/analysis/{game_id}/stream")
+async def stream_full_game_analysis(
+    request: Request,
+    game_id: str = Path(..., min_length=1, max_length=64),
+    depth: Optional[int] = Query(None, ge=MIN_ANALYSIS_DEPTH, le=MAX_ANALYSIS_DEPTH),
+    force: bool = Query(False),
+):
+    _enforce_fair_play()
+    return StreamingResponse(
+        stream_game_analysis(game_id=game_id, depth=depth, force=force, request=request),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.post("/api/analysis/preview_sequence")
+def preview_analysis_sequence(payload: SequencePreviewPayload):
+    _enforce_fair_play()
+    try:
+        return preview_sequence_for_repertoire(repertoire=payload.repertoire, moves=payload.moves)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.post("/api/analysis/save_sequence")
+def save_analysis_sequence(payload: SequenceSavePayload):
+    _enforce_fair_play()
+    try:
+        return save_sequence_to_repertoire(
+            repertoire=payload.repertoire,
+            moves=payload.moves,
+            study_name=payload.study_name,
+            replace_conflicts=payload.replace_conflicts,
+            prioritize_for_training=payload.prioritize_for_training,
+            note=payload.note,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 # --------------------------------------------------------------------------- #

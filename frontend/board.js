@@ -12,6 +12,8 @@ class InteractiveChessboard {
         this.options = Object.assign({
             orientation: 'white',
             interactive: true,
+            movableColor: null,      // 'w' | 'b' | null (null = both sides)
+            promptPromotion: false,  // show Q/R/B/N chooser on pawn promotion
             pieceTheme: '/assets/pieces/{piece}.svg',
             onMove: null, // callback (source, target, promo) => bool
             onArrowsChange: null,    // callback (arrows) => void -- the *persisted* arrows
@@ -543,6 +545,7 @@ class InteractiveChessboard {
         }
 
         if (e.button !== 0) return; // Only primary button for piece moves
+        if (this.options.movableColor && this.chess.turn() !== this.options.movableColor) return;
 
         const sqEl = e.target.closest('.square');
         if (!sqEl) return;
@@ -552,8 +555,13 @@ class InteractiveChessboard {
         if (this.selectedSquare) {
             const move = this.legalMovesFromSelected.find(m => m.to === sq);
             if (move) {
-                const promo = move.promotion || (move.piece === 'p' && (sq[1] === '8' || sq[1] === '1') ? 'q' : undefined);
-                this._executeMove(move.from, move.to, promo, true);
+                const isPawnPromo = Boolean(move.promotion || (move.piece === 'p' && (sq[1] === '8' || sq[1] === '1')));
+                if (isPawnPromo && this.options.promptPromotion) {
+                    this._openPromotionChooser(move.from, move.to, true);
+                } else {
+                    const promo = isPawnPromo ? (move.promotion || 'q') : undefined;
+                    this._executeMove(move.from, move.to, promo, true);
+                }
                 this._dragState = null;
                 return;
             }
@@ -682,8 +690,13 @@ class InteractiveChessboard {
                 if (toSq && toSq !== this._dragState.fromSq) {
                     const move = this.legalMovesFromSelected.find(m => m.from === this._dragState.fromSq && m.to === toSq);
                     if (move) {
-                        const promo = move.promotion || (move.piece === 'p' && (toSq[1] === '8' || toSq[1] === '1') ? 'q' : undefined);
-                        this._executeMove(move.from, move.to, promo, false);
+                        const isPawnPromo = Boolean(move.promotion || (move.piece === 'p' && (toSq[1] === '8' || toSq[1] === '1')));
+                        if (isPawnPromo && this.options.promptPromotion) {
+                            this._openPromotionChooser(move.from, move.to, false);
+                        } else {
+                            const promo = isPawnPromo ? (move.promotion || 'q') : undefined;
+                            this._executeMove(move.from, move.to, promo, false);
+                        }
                     } else {
                         this.selectedSquare = null;
                         this.legalMovesFromSelected = [];
@@ -888,6 +901,50 @@ class InteractiveChessboard {
             window.chessAudio.playCapture();
         } else {
             window.chessAudio.playMove();
+        }
+    }
+
+    _openPromotionChooser(from, to, animated) {
+        this._closePromotionChooser();
+        const colorPrefix = this.chess.turn() === 'w' ? 'w' : 'b';
+        const overlay = document.createElement('div');
+        overlay.className = 'promo-chooser-overlay';
+        const strip = document.createElement('div');
+        strip.className = 'promo-chooser-strip';
+
+        ['q', 'r', 'b', 'n'].forEach(pieceCode => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'promo-chooser-btn';
+            const img = document.createElement('img');
+            img.src = this.options.pieceTheme.replace('{piece}', `${colorPrefix}${pieceCode.toUpperCase()}`);
+            img.alt = pieceCode.toUpperCase();
+            btn.appendChild(img);
+            btn.addEventListener('pointerdown', (ev) => {
+                ev.stopPropagation();
+                ev.preventDefault();
+                this._closePromotionChooser();
+                this._executeMove(from, to, pieceCode, animated);
+            });
+            strip.appendChild(btn);
+        });
+
+        overlay.addEventListener('pointerdown', (ev) => {
+            ev.stopPropagation();
+            this._closePromotionChooser();
+            this.selectedSquare = null;
+            this.legalMovesFromSelected = [];
+            this.render();
+        });
+        overlay.appendChild(strip);
+        this.boardEl.appendChild(overlay);
+        this._promoOverlay = overlay;
+    }
+
+    _closePromotionChooser() {
+        if (this._promoOverlay) {
+            try { this._promoOverlay.remove(); } catch (_) {}
+            this._promoOverlay = null;
         }
     }
 

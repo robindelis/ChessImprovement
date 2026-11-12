@@ -21,8 +21,12 @@
         </div>
 
         <nav class="studio-tabs" aria-label="Workspace">
-            <button class="nav-tab active" data-tab="repertoire" type="button">Builder</button>
-            <button class="nav-tab" data-tab="rep-trainer" type="button">Trainer</button>
+            <button class="nav-tab" data-tab="play" id="navTabPlay" type="button">
+                Play <span id="navPlayLiveDot" class="live-tab-dot" style="display:none;" aria-hidden="true"></span>
+            </button>
+            <button class="nav-tab" data-tab="analysis" id="navTabAnalysis" type="button">Analysis</button>
+            <button class="nav-tab active" data-tab="repertoire" id="navTabBuilder" type="button">Builder</button>
+            <button class="nav-tab" data-tab="rep-trainer" id="navTabTrainer" type="button">Trainer</button>
         </nav>
 
         <div class="header-actions">
@@ -41,6 +45,341 @@
     </header>
 
     <main class="studio-main">
+        <!-- LIVE PLAY (LICHESS BOARD + CLOCKS) -->
+        <section id="viewPlay" class="view-section">
+            <div class="repertoire-layout play-layout">
+                <div class="repertoire-board-col">
+                    <div class="player-clock-bar card-panel" id="playTopBar">
+                        <div class="player-clock-ident">
+                            <span class="swatch swatch-black" id="playTopSwatch"></span>
+                            <span class="player-clock-name" id="playTopName">Opponent</span>
+                            <span class="rating-pill" id="playTopRating">--</span>
+                        </div>
+                        <div class="digital-clock" id="playTopClock">10:00</div>
+                    </div>
+
+                    <div id="playBoard"></div>
+
+                    <div class="player-clock-bar card-panel" id="playBottomBar">
+                        <div class="player-clock-ident">
+                            <span class="swatch swatch-white" id="playBottomSwatch"></span>
+                            <span class="player-clock-name" id="playBottomName">You</span>
+                            <span class="rating-pill" id="playBottomRating">--</span>
+                        </div>
+                        <div class="digital-clock" id="playBottomClock">10:00</div>
+                    </div>
+
+                    <div class="board-transport-row">
+                        <div class="transport-cluster">
+                            <button id="btnPlayFlip" class="btn-secondary btn-sm" type="button">Flip</button>
+                        </div>
+                        <div class="transport-cluster">
+                            <div class="board-size-control-group">
+                                <button type="button" class="btn-board-size btn-board-size-dec" title="Smaller board">−</button>
+                                <span id="playBoardSizeLabel" class="board-size-display-val">---</span>
+                                <button type="button" class="btn-board-size btn-board-size-inc" title="Larger board">+</button>
+                                <button type="button" class="btn-board-size btn-board-size-fit" title="Fit to window">Fit</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="repertoire-sidebar-col">
+                    <!-- Auth Warning Banner (when missing board:play) -->
+                    <div id="playAuthGate" class="card-panel play-auth-gate" style="display:none;">
+                        <div class="play-auth-row">
+                            <span id="playAuthGateMsg">Connect Lichess with Play permission</span>
+                            <button id="btnPlayConnectLichess" type="button" class="btn-primary btn-sm">Sign in with Lichess</button>
+                        </div>
+                    </div>
+
+                    <!-- Incoming Challenges Strip -->
+                    <div id="playIncomingChallenges" class="card-panel play-challenges-strip" style="display:none;"></div>
+
+                    <!-- Lobby Card -->
+                    <div id="playLobbyCard" class="card-panel play-lobby-card">
+                        <div class="panel-header">
+                            <div class="repertoire-color-toggle">
+                                <button type="button" class="rep-toggle-btn active" id="btnPlayTabPool" data-mode="pool">Quick Pairing</button>
+                                <button type="button" class="rep-toggle-btn" id="btnPlayTabAi" data-mode="ai">vs Stockfish</button>
+                                <button type="button" class="rep-toggle-btn" id="btnPlayTabUser" data-mode="user">Challenge</button>
+                            </div>
+                            <span id="playLobbyStatus" class="mono-muted">Lichess</span>
+                        </div>
+
+                        <div class="play-lobby-body">
+                            <div class="play-options-bar">
+                                <div class="repertoire-color-toggle" id="playRatedToggleWrap">
+                                    <button type="button" class="rep-toggle-btn active" id="btnPlayRated" data-rated="true">Rated</button>
+                                    <button type="button" class="rep-toggle-btn" id="btnPlayCasual" data-rated="false">Casual</button>
+                                </div>
+                                <div class="repertoire-color-toggle">
+                                    <button type="button" class="rep-toggle-btn" id="btnPlayColorWhite" data-color="white" title="White">W</button>
+                                    <button type="button" class="rep-toggle-btn active" id="btnPlayColorRandom" data-color="random" title="Random">±</button>
+                                    <button type="button" class="rep-toggle-btn" id="btnPlayColorBlack" data-color="black" title="Black">B</button>
+                                </div>
+                            </div>
+
+                            <!-- Pool Presets (Rapid & Classical via Board API) -->
+                            <div id="playModePool" class="play-mode-pane">
+                                <div class="seek-grid" id="playSeekGrid">
+                                    <button type="button" class="seek-tile" data-min="10" data-inc="0">
+                                        <span class="seek-tc">10 + 0</span>
+                                        <span class="seek-cat">Rapid</span>
+                                    </button>
+                                    <button type="button" class="seek-tile" data-min="10" data-inc="5">
+                                        <span class="seek-tc">10 + 5</span>
+                                        <span class="seek-cat">Rapid</span>
+                                    </button>
+                                    <button type="button" class="seek-tile" data-min="15" data-inc="10">
+                                        <span class="seek-tc">15 + 10</span>
+                                        <span class="seek-cat">Rapid</span>
+                                    </button>
+                                    <button type="button" class="seek-tile" data-min="20" data-inc="0">
+                                        <span class="seek-tc">20 + 0</span>
+                                        <span class="seek-cat">Rapid</span>
+                                    </button>
+                                    <button type="button" class="seek-tile" data-min="30" data-inc="0">
+                                        <span class="seek-tc">30 + 0</span>
+                                        <span class="seek-cat">Classical</span>
+                                    </button>
+                                    <button type="button" class="seek-tile" data-min="30" data-inc="20">
+                                        <span class="seek-tc">30 + 20</span>
+                                        <span class="seek-cat">Classical</span>
+                                    </button>
+                                </div>
+
+                                <div id="playSeekingBanner" class="play-seeking-banner" style="display:none;">
+                                    <div class="play-seeking-left">
+                                        <span class="sync-pulse-dot" aria-hidden="true"></span>
+                                        <span id="playSeekingLabel" class="mono-bold">Seeking 10+0...</span>
+                                    </div>
+                                    <button type="button" id="btnPlayCancelSeek" class="btn-secondary btn-xs">Cancel</button>
+                                </div>
+                            </div>
+
+                            <!-- vs Stockfish AI -->
+                            <div id="playModeAi" class="play-mode-pane" style="display:none;">
+                                <div class="form-field">
+                                    <label for="playAiLevelSelect">Stockfish Level</label>
+                                    <select id="playAiLevelSelect">
+                                        <option value="1">Level 1</option>
+                                        <option value="2">Level 2</option>
+                                        <option value="3">Level 3</option>
+                                        <option value="4">Level 4</option>
+                                        <option value="5" selected>Level 5</option>
+                                        <option value="6">Level 6</option>
+                                        <option value="7">Level 7</option>
+                                        <option value="8">Level 8</option>
+                                    </select>
+                                </div>
+                                <div class="form-field">
+                                    <label for="playAiClockSelect">Clock</label>
+                                    <select id="playAiClockSelect">
+                                        <option value="180,0">3 + 0 (Blitz)</option>
+                                        <option value="180,2">3 + 2 (Blitz)</option>
+                                        <option value="300,0">5 + 0 (Blitz)</option>
+                                        <option value="300,3">5 + 3 (Blitz)</option>
+                                        <option value="600,0" selected>10 + 0 (Rapid)</option>
+                                        <option value="900,10">15 + 10 (Rapid)</option>
+                                    </select>
+                                </div>
+                                <button type="button" id="btnPlayStartAi" class="btn-primary">Start Game</button>
+                            </div>
+
+                            <!-- Direct Challenge -->
+                            <div id="playModeUser" class="play-mode-pane" style="display:none;">
+                                <div class="form-field">
+                                    <label for="playChallengeUsername">Lichess Username</label>
+                                    <input type="text" id="playChallengeUsername" placeholder="Opponent username">
+                                </div>
+                                <div class="form-field">
+                                    <label for="playUserClockSelect">Clock</label>
+                                    <select id="playUserClockSelect">
+                                        <option value="180,0">3 + 0 (Blitz)</option>
+                                        <option value="180,2">3 + 2 (Blitz)</option>
+                                        <option value="300,0">5 + 0 (Blitz)</option>
+                                        <option value="300,3">5 + 3 (Blitz)</option>
+                                        <option value="600,0" selected>10 + 0 (Rapid)</option>
+                                        <option value="600,5">10 + 5 (Rapid)</option>
+                                        <option value="900,10">15 + 10 (Rapid)</option>
+                                    </select>
+                                </div>
+                                <button type="button" id="btnPlaySendChallenge" class="btn-primary">Send Challenge</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Active / Finished Game Card -->
+                    <div id="playGameCard" class="card-panel play-game-card" style="display:none;">
+                        <div class="panel-header">
+                            <div class="panel-header-left">
+                                <span class="panel-title" id="playGameHeaderTitle">Live Game</span>
+                                <span id="playGameSpeedBadge" class="badge-pill">RAPID</span>
+                            </div>
+                            <span id="playGameTurnStatus" class="mono-bold">Your Turn</span>
+                        </div>
+
+                        <div id="playDrawOfferStrip" class="play-draw-offer-strip" style="display:none;">
+                            <span>Opponent offered a draw</span>
+                            <div class="play-draw-actions">
+                                <button type="button" id="btnPlayAcceptDraw" class="btn-primary btn-xs">Accept</button>
+                                <button type="button" id="btnPlayDeclineDraw" class="btn-secondary btn-xs">Decline</button>
+                            </div>
+                        </div>
+
+                        <div id="playMoveList" class="score-sheet-grid play-move-sheet"></div>
+
+                        <div id="playActiveControls" class="play-controls-footer">
+                            <button type="button" id="btnPlayAbort" class="btn-secondary btn-sm">Abort</button>
+                            <button type="button" id="btnPlayOfferDraw" class="btn-secondary btn-sm">Offer Draw</button>
+                            <button type="button" id="btnPlayResign" class="btn-danger btn-sm">Resign</button>
+                        </div>
+
+                        <div id="playFinishedControls" class="play-finished-footer" style="display:none;">
+                            <div id="playResultSummary" class="play-result-headline">--</div>
+                            <div class="play-finished-btns">
+                                <button type="button" id="btnPlayAnalyzeFinished" class="btn-primary">Analyze &amp; Add to Repertoire &rarr;</button>
+                                <button type="button" id="btnPlayNewSeek" class="btn-secondary">New Game</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- POST-GAME STOCKFISH 19 ANALYSIS & GUIDED REPERTOIRE COACH -->
+        <section id="viewAnalysis" class="view-section">
+            <div class="repertoire-top-bar">
+                <div class="toolbar-cluster">
+                    <div class="study-selector-wrap">
+                        <select id="analysisGameSelect" aria-label="Select game">
+                            <option value="">Recent Games...</option>
+                        </select>
+                        <button id="btnAnalysisSyncGames" type="button" class="btn-secondary btn-sm" title="Fetch latest Lichess games">Sync</button>
+                    </div>
+
+                    <div class="rep-header-title-box">
+                        <span id="analysisGameTitle" class="opening-headline">Select a game</span>
+                        <span id="analysisOpeningEco" class="opening-eco-tag"></span>
+                    </div>
+                </div>
+
+                <div class="coverage-box">
+                    <div class="accuracy-strip" id="analysisAccuracyStrip" style="display:none;">
+                        <span class="acc-pill acc-white">W <strong id="analysisWhiteAcc">--%</strong></span>
+                        <span class="acc-pill acc-black">B <strong id="analysisBlackAcc">--%</strong></span>
+                    </div>
+
+                    <div class="inline-field">
+                        <label for="analysisDepthSelect">Depth</label>
+                        <select id="analysisDepthSelect">
+                            <option value="14">14</option>
+                            <option value="16">16</option>
+                            <option value="18">18</option>
+                            <option value="19" selected>19</option>
+                            <option value="20">20</option>
+                            <option value="22">22</option>
+                            <option value="24">24</option>
+                            <option value="26">26</option>
+                        </select>
+                    </div>
+
+                    <button id="btnRunGameAnalysis" class="btn-primary btn-sm" type="button">Analyze</button>
+                    <span id="analysisProgressBadge" class="mono-muted" style="display:none;">0%</span>
+                </div>
+            </div>
+
+            <div class="repertoire-layout">
+                <div class="repertoire-board-col">
+                    <div class="board-eval-container">
+                        <div class="eval-bar-wrapper" id="analysisEvalBarWrapper" title="Stockfish 19 Evaluation">
+                            <div class="eval-bar-fill" id="analysisEvalBarFill" style="height: 50%;"></div>
+                            <div class="eval-bar-label equal" id="analysisEvalBarLabel">+0.0</div>
+                        </div>
+                        <div id="analysisBoard"></div>
+                    </div>
+
+                    <div class="eval-graph-card card-panel" id="analysisEvalGraphCard">
+                        <svg id="analysisEvalSvg" viewBox="0 0 600 76" preserveAspectRatio="none" aria-label="Evaluation curve"></svg>
+                    </div>
+
+                    <div class="board-transport-row">
+                        <div class="transport-cluster">
+                            <button id="btnAnalysisStart" class="btn-secondary btn-sm" type="button" title="Start">⏮</button>
+                            <button id="btnAnalysisPrev" class="btn-secondary btn-sm" type="button" title="Previous">◀</button>
+                            <button id="btnAnalysisNext" class="btn-secondary btn-sm" type="button" title="Next">▶</button>
+                            <button id="btnAnalysisEnd" class="btn-secondary btn-sm" type="button" title="End">⏭</button>
+                        </div>
+                        <div class="transport-cluster">
+                            <button id="btnAnalysisPrevMistake" class="btn-secondary btn-sm" type="button" title="Previous Critical Moment">◀ Key</button>
+                            <button id="btnAnalysisNextMistake" class="btn-secondary btn-sm" type="button" title="Next Critical Moment">Key ▶</button>
+                            <button id="btnAnalysisFlip" class="btn-secondary btn-sm" type="button">Flip</button>
+                            <div class="board-size-control-group">
+                                <button type="button" class="btn-board-size btn-board-size-dec" title="Smaller board">−</button>
+                                <span id="analysisBoardSizeLabel" class="board-size-display-val">---</span>
+                                <button type="button" class="btn-board-size btn-board-size-inc" title="Larger board">+</button>
+                                <button type="button" class="btn-board-size btn-board-size-fit" title="Fit to window">Fit</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="repertoire-sidebar-col">
+                    <!-- Guided Coach & MultiPV / Explorer Guidance -->
+                    <div class="card-panel analysis-coach-card" id="analysisCoachCard">
+                        <div class="panel-header">
+                            <div class="panel-header-left">
+                                <span class="panel-title" id="analysisCoachTitle">Guided Review</span>
+                                <span id="analysisLiveDepthTag" class="muted-tag">SF 19</span>
+                            </div>
+                            <div id="analysisClassSummary" class="analysis-class-summary"></div>
+                        </div>
+
+                        <div class="analysis-coach-body">
+                            <div id="analysisMomentCallout" class="analysis-moment-callout">
+                                Select a game or finish a match to run full Stockfish 19 review.
+                            </div>
+
+                            <div id="analysisCandidatesWrap" class="analysis-candidates-wrap">
+                                <div class="candidates-header-row">
+                                    <span id="analysisCandidatesHeader">Engine &amp; 2000+ Guidance</span>
+                                    <button type="button" id="btnAnalysisWatchRefutation" class="btn-secondary btn-xs" style="display:none;">Watch Refutation</button>
+                                </div>
+                                <div id="analysisCandidatesList" class="analysis-candidates-list"></div>
+                            </div>
+
+                            <!-- Interactive Sequence Sandbox -> Save to Repertoire -->
+                            <div id="analysisSequencePanel" class="analysis-sequence-panel" style="display:none;">
+                                <div class="seq-panel-head">
+                                    <span id="analysisSeqDiffBadge" class="badge-pill text-emerald">+0 new moves</span>
+                                    <button type="button" id="btnAnalysisResetSandbox" class="btn-secondary btn-xs">Back to Game</button>
+                                </div>
+                                <div id="analysisSeqBreadcrumbs" class="seq-breadcrumbs mono"></div>
+                                <div class="seq-save-controls">
+                                    <select id="analysisTargetStudySelect" aria-label="Target study">
+                                        <option value="">No Study</option>
+                                    </select>
+                                    <button type="button" id="btnAnalysisSaveToRep" class="btn-primary btn-sm">Add to Repertoire</button>
+                                    <button type="button" id="btnAnalysisTrainNow" class="btn-secondary btn-sm">Train Line</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Critical Moments + Annotated Score Sheet -->
+                    <div class="card-panel repertoire-sidebar-card">
+                        <div class="panel-header">
+                            <span class="panel-title">Score Sheet</span>
+                            <button type="button" id="btnAnalysisAddOpeningPrefix" class="btn-secondary btn-xs" title="Load current position into sequence builder">+ Build Sequence Here</button>
+                        </div>
+                        <div id="analysisCriticalPills" class="analysis-critical-pills"></div>
+                        <div id="analysisMoveSheet" class="score-sheet-grid analysis-move-sheet"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <!-- REPERTOIRE BUILDER -->
         <section id="viewRepertoire" class="view-section active">
             <div class="repertoire-top-bar">
@@ -571,6 +910,13 @@
             <div class="studio-modal-body">
                 <form id="settingsForm" class="settings-form">
                     <div class="form-field">
+                        <div class="settings-oauth-row">
+                            <button type="button" id="btnSettingsOAuthLichess" class="btn-primary btn-sm">Sign in with Lichess (Play + Sync)</button>
+                            <span id="settingsScopeBadge" class="muted-tag">Checking...</span>
+                        </div>
+                    </div>
+
+                    <div class="form-field">
                         <label for="inputUsername">Lichess Username</label>
                         <input type="text" id="inputUsername" placeholder="RobiDeli">
                     </div>
@@ -578,6 +924,19 @@
                     <div class="form-field">
                         <label for="inputToken">Lichess API Token</label>
                         <input type="password" id="inputToken" placeholder="lip_...">
+                    </div>
+
+                    <div class="form-field">
+                        <label for="inputAnalysisDepth">Default Analysis Depth</label>
+                        <select id="inputAnalysisDepth">
+                            <option value="14">Depth 14</option>
+                            <option value="16">Depth 16</option>
+                            <option value="18">Depth 18</option>
+                            <option value="19" selected>Depth 19</option>
+                            <option value="20">Depth 20</option>
+                            <option value="22">Depth 22</option>
+                            <option value="24">Depth 24</option>
+                        </select>
                     </div>
 
                     <div class="form-field">
@@ -752,8 +1111,10 @@
         </dialog>
     </main>
 
-    <script src="/repertoire_builder.js?v=20261110_1"></script>
-    <script src="/repertoire_trainer.js?v=20261110_1"></script>
-    <script src="/app.js?v=20261110_1"></script>
+    <script src="/repertoire_builder.js?v=20261112_1"></script>
+    <script src="/repertoire_trainer.js?v=20261112_1"></script>
+    <script src="/live_play.js?v=20261112_1"></script>
+    <script src="/game_analysis.js?v=20261112_1"></script>
+    <script src="/app.js?v=20261112_1"></script>
 </body>
 </html>
