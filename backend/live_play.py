@@ -282,6 +282,7 @@ class LivePlayManager:
         increment: int = 0,
         rated: bool = True,
         color: str = "random",
+        rating_range: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Create a Lichess Board API pool seek (`POST /api/board/seek`) or open lobby challenge (`POST /api/challenge/open`)."""
         client = self._require_client()
@@ -292,12 +293,16 @@ class LivePlayManager:
         self._ensure_event_stream()
 
         clean_color = color if color in ("white", "black", "random") else "random"
+        clean_range = rating_range.strip() if isinstance(rating_range, str) and rating_range.strip() else None
+        est_seconds = float(minutes) * 60 + 40 * int(increment)
         cancel_ev = threading.Event()
         seek_meta = {
             "minutes": minutes,
             "increment": int(increment),
             "rated": bool(rated),
             "color": clean_color,
+            "rating_range": clean_range,
+            "pool_eligible": est_seconds >= 480,
             "started_at": int(time.time() * 1000),
         }
         with self._lock:
@@ -311,7 +316,6 @@ class LivePlayManager:
         # For Bullet & Blitz (< 480s total estimated time), Lichess Board API rejects /api/board/seek
         # with 'Invalid time control'. We dispatch via Lichess's official open challenge API
         # (POST /api/challenge/open), making the challenge public in the Lichess lobby.
-        est_seconds = float(minutes) * 60 + 40 * int(increment)
         target_fn = self._run_seek_stream if est_seconds >= 480 else self._run_seek_open_challenge
 
         t = threading.Thread(
@@ -330,6 +334,8 @@ class LivePlayManager:
             "increment": str(seek_meta["increment"]),
             "variant": "standard",
         }
+        if seek_meta.get("rating_range"):
+            form["ratingRange"] = str(seek_meta["rating_range"])
         if seek_meta["color"] in ("white", "black"):
             form["color"] = seek_meta["color"]
 
@@ -337,7 +343,10 @@ class LivePlayManager:
         try:
             resp = requests.post(
                 f"{client.base_url}/api/board/seek",
-                headers={**client.headers, "Accept": "text/plain"},
+                headers={
+                    **client.headers,
+                    "Accept": "application/x-ndjson, application/json, */*",
+                },
                 data=form,
                 stream=True,
                 timeout=(STREAM_CONNECT_TIMEOUT, STREAM_READ_TIMEOUT),
@@ -358,9 +367,32 @@ class LivePlayManager:
                 self._broadcast("seek_error")
                 return
 
-            for _ in resp.iter_lines():
+            for line in resp.iter_lines(decode_unicode=True):
                 if cancel_ev.is_set():
                     break
+                if not line:
+                    continue
+                try:
+                    ev = json.loads(line)
+                except Exception:
+                    continue
+                if isinstance(ev, dict):
+                    game_id = str(ev.get("gameId") or ev.get("id") or "").strip()
+                    if game_id:
+                        with self._lock:
+                            self._seeking = False
+                            self._seek_info = None
+                        self.attach_game_stream(game_id, client=client, seed=ev)
+                        break
+
+            # If stream closed without cancel, wait briefly for event stream gameStart
+            if not cancel_ev.is_set():
+                wait_deadline = time.time() + 3.0
+                while time.time() < wait_deadline and not cancel_ev.is_set():
+                    with self._lock:
+                        if self._active_game is not None:
+                            break
+                    time.sleep(0.1)
         except Exception as exc:
             if not cancel_ev.is_set():
                 logger.debug("Seek connection closed: %s", redact(exc, client.token))
@@ -373,10 +405,10 @@ class LivePlayManager:
             with self._lock:
                 if self._seek_resp is resp:
                     self._seek_resp = None
-                if self._seek_cancel is cancel_ev and self._seeking:
+                if self._seek_cancel is cancel_ev and self._seeking and self._active_game is None:
                     self._seeking = False
                     self._seek_info = None
-            self._broadcast("seek_ended")
+                    self._broadcast("seek_ended")
 
     def _run_seek_open_challenge(self, client: LichessClient, seek_meta: Dict[str, Any], cancel_ev: threading.Event) -> None:
         mins = float(seek_meta.get("minutes", 10))
@@ -388,6 +420,8 @@ class LivePlayManager:
             "clock.increment": str(inc),
             "variant": "standard",
         }
+        if seek_meta.get("rating_range"):
+            form["ratingRange"] = str(seek_meta["rating_range"])
         if seek_meta.get("color") in ("white", "black"):
             form["color"] = seek_meta["color"]
 
@@ -460,7 +494,7 @@ class LivePlayManager:
         finally:
             with self._lock:
                 to_cancel = None
-                if self._seek_cancel is cancel_ev and self._seeking:
+                if self._seek_cancel is cancel_ev and self._seeking and self._active_game is None:
                     self._seeking = False
                     self._seek_info = None
                 if self._open_challenge_id:
@@ -471,7 +505,8 @@ class LivePlayManager:
                     requests.post(f"{client.base_url}/api/challenge/{to_cancel}/cancel", headers=client.headers, timeout=ACTION_TIMEOUT)
                 except Exception:
                     pass
-            self._broadcast("seek_ended")
+            if self._active_game is None:
+                self._broadcast("seek_ended")
 
     def cancel_seek(self) -> Dict[str, Any]:
         with self._lock:

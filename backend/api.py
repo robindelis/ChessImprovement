@@ -12,7 +12,7 @@ from fastapi import FastAPI, HTTPException, Path, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from starlette.datastructures import MutableHeaders
 from starlette.routing import Match
 
@@ -650,6 +650,23 @@ class PlaySeekPayload(BaseModel):
     increment: int = Field(0, ge=0, le=180)
     rated: bool = True
     color: Literal["white", "black", "random"] = "random"
+    rating_range: Optional[str] = Field(None, max_length=32)
+
+    @field_validator("rating_range")
+    @classmethod
+    def validate_rating_range(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        v = v.strip()
+        if not v:
+            return None
+        parts = v.split("-")
+        if len(parts) != 2 or not parts[0].isdigit() or not parts[1].isdigit():
+            raise ValueError("rating_range must be formatted as 'min-max' (e.g. '1945-2045')")
+        min_r, max_r = int(parts[0]), int(parts[1])
+        if min_r < 400 or max_r > 3500 or min_r > max_r:
+            raise ValueError("rating_range must be between 400 and 3500 with min <= max")
+        return f"{min_r}-{max_r}"
 
 
 class PlayChallengePayload(BaseModel):
@@ -1506,6 +1523,7 @@ def start_live_seek(payload: PlaySeekPayload):
             increment=payload.increment,
             rated=payload.rated,
             color=payload.color,
+            rating_range=payload.rating_range,
         )
     except LivePlayError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc))

@@ -202,16 +202,58 @@ class TestOAuthAndLivePlayPlatform(unittest.TestCase):
         mock_open_ch = MagicMock(status_code=201)
         mock_open_ch.content = b'{"challenge":{"id":"chBlitz01","url":"https://lichess.org/chBlitz01"}}'
         mock_open_ch.json.return_value = {"challenge": {"id": "chBlitz01", "url": "https://lichess.org/chBlitz01"}}
-        with patch("backend.live_play.requests.post", return_value=mock_open_ch):
-            blitz_res = self.client.post("/api/play/seek", json={"minutes": 3, "increment": 0, "rated": True, "color": "random"})
+        with patch("backend.live_play.requests.post", return_value=mock_open_ch) as mock_post:
+            blitz_res = self.client.post("/api/play/seek", json={
+                "minutes": 3,
+                "increment": 0,
+                "rated": True,
+                "color": "random",
+                "rating_range": "1912-2012"
+            })
             self.assertEqual(blitz_res.status_code, 200)
             st = blitz_res.json()
             self.assertTrue(st["seeking"])
             self.assertEqual(st["seek"]["minutes"], 3)
+            self.assertEqual(st["seek"]["rating_range"], "1912-2012")
+            self.assertFalse(st["seek"]["pool_eligible"])
+
+            # Verify ratingRange was sent in form data to open challenge
+            call_kwargs = mock_post.call_args[1]
+            self.assertEqual(call_kwargs["data"].get("ratingRange"), "1912-2012")
+
             # Cancel seek cleanly
             cancel_res = self.client.post("/api/play/seek/cancel")
             self.assertEqual(cancel_res.status_code, 200)
             self.assertFalse(cancel_res.json()["seeking"])
+
+        # Rapid pool seek (10+0) with rating range dispatched to /api/board/seek with Accept: ndjson
+        mock_stream_resp = MagicMock(status_code=200)
+        mock_stream_resp.iter_lines.return_value = []
+        with patch("backend.live_play.requests.post", return_value=mock_stream_resp) as mock_board_post:
+            rapid_res = self.client.post("/api/play/seek", json={
+                "minutes": 10,
+                "increment": 0,
+                "rated": True,
+                "color": "white",
+                "rating_range": "1945-2045"
+            })
+            self.assertEqual(rapid_res.status_code, 200)
+            st_rapid = rapid_res.json()
+            self.assertTrue(st_rapid["seeking"])
+            self.assertEqual(st_rapid["seek"]["rating_range"], "1945-2045")
+            self.assertTrue(st_rapid["seek"]["pool_eligible"])
+
+            # Verify board seek was called with ratingRange and Accept header
+            board_call = mock_board_post.call_args[1]
+            self.assertEqual(board_call["data"].get("ratingRange"), "1945-2045")
+            self.assertIn("application/x-ndjson", board_call["headers"].get("Accept", ""))
+            self.client.post("/api/play/seek/cancel")
+
+        # Rating range validation: invalid formats or inverted bounds are rejected
+        inv_res1 = self.client.post("/api/play/seek", json={"minutes": 10, "rating_range": "invalid"})
+        self.assertEqual(inv_res1.status_code, 422)
+        inv_res2 = self.client.post("/api/play/seek", json={"minutes": 10, "rating_range": "2100-1900"})
+        self.assertEqual(inv_res2.status_code, 422)
 
         # Also verify Bullet seek (1+0) is accepted
         with patch("backend.live_play.requests.post", return_value=mock_open_ch):

@@ -129,6 +129,28 @@
                                     <button type="button" class="rep-toggle-btn" data-filter="rapid">Rapid</button>
                                     <button type="button" class="rep-toggle-btn" data-filter="classical">Classical</button>
                                 </div>
+
+                                <div class="play-rating-range-row" id="playRatingRangeRow">
+                                    <div class="range-label-group">
+                                        <span class="range-title">Opponent Rating</span>
+                                        <span id="playRatingRangeDisplay" class="range-bracket-badge mono-bold">&plusmn;50 (1945&ndash;2045)</span>
+                                    </div>
+                                    <div class="range-controls-cluster">
+                                        <div class="range-stepper-cluster">
+                                            <button type="button" id="btnPlayRangeMinus" class="range-step-btn" title="Decrease rating range (&minus;25)">&minus;</button>
+                                            <span id="playRangeDeltaLabel" class="range-delta-value">&plusmn;50</span>
+                                            <button type="button" id="btnPlayRangePlus" class="range-step-btn" title="Increase rating range (+25)">+</button>
+                                        </div>
+                                        <div class="repertoire-color-toggle range-preset-toggle" id="playRangePresets">
+                                            <button type="button" class="rep-toggle-btn" data-range="25">&plusmn;25</button>
+                                            <button type="button" class="rep-toggle-btn active" data-range="50">&plusmn;50</button>
+                                            <button type="button" class="rep-toggle-btn" data-range="100">&plusmn;100</button>
+                                            <button type="button" class="rep-toggle-btn" data-range="200">&plusmn;200</button>
+                                            <button type="button" class="rep-toggle-btn" data-range="any">Any</button>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <div class="seek-grid" id="playSeekGrid">
                                     <button type="button" class="seek-tile" data-min="1" data-inc="0" data-speed="bullet">
                                         <span class="seek-tc">1 + 0</span>
@@ -185,8 +207,13 @@
                                         <span class="sync-pulse-dot" aria-hidden="true"></span>
                                         <span id="playSeekingLabel" class="mono-bold">Seeking 10+0...</span>
                                         <a id="playSeekingLink" class="mono-muted text-xs" target="_blank" rel="noopener" style="display:none; margin-left:0.4rem; text-decoration:underline;">Lichess &UpperRightArrow;</a>
+                                        <button type="button" id="btnPlayInstantAiFallback" class="btn-primary btn-xs" style="display:none; margin-left:0.5rem;">Play Stockfish AI (Instant)</button>
                                     </div>
                                     <button type="button" id="btnPlayCancelSeek" class="btn-secondary btn-xs">Cancel</button>
+                                </div>
+
+                                <div class="play-pool-info-hint" id="playPoolInfoHint">
+                                    <strong>Instant Pool Matchmaking:</strong> Rapid (10+0, 15+10, 20+0) &amp; Classical queue directly into the live Lichess pool with your configured rating range (&plusmn;50 default). Blitz &amp; Bullet use open lobby challenges or instant Stockfish AI games.
                                 </div>
                             </div>
 

@@ -2027,8 +2027,117 @@ input[type="checkbox"], input[type="radio"] {
 .seek-speed-filters {
     display: flex;
     gap: 0.35rem;
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.45rem;
     flex-wrap: wrap;
+}
+
+.play-rating-range-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    padding: 0.6rem 0.75rem;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    margin-bottom: 0.45rem;
+}
+
+.range-label-group {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.range-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+}
+
+.range-bracket-badge {
+    font-size: 0.78rem;
+    color: var(--accent-primary);
+    background: var(--accent-primary-glow);
+    padding: 0.15rem 0.5rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(91, 155, 213, 0.25);
+}
+
+.range-controls-cluster {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.range-stepper-cluster {
+    display: inline-flex;
+    align-items: center;
+    background: var(--bg-dark);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+.range-step-btn {
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 0.95rem;
+    font-weight: 700;
+    width: 28px;
+    height: 28px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.14s ease, color 0.14s ease;
+}
+
+.range-step-btn:hover {
+    background: var(--bg-card-hover);
+    color: var(--accent-primary);
+}
+
+.range-step-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.range-delta-value {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 0 0.45rem;
+    min-width: 48px;
+    text-align: center;
+    color: var(--text-primary);
+}
+
+.range-preset-toggle {
+    display: inline-flex;
+    gap: 0.2rem;
+}
+
+.range-preset-toggle .rep-toggle-btn {
+    padding: 0.22rem 0.5rem;
+    font-size: 0.74rem;
+}
+
+.play-pool-info-hint {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    line-height: 1.35;
+    padding: 0.45rem 0.6rem;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: var(--radius-sm);
+    border-left: 3px solid var(--accent-primary);
 }
 
 .seek-grid {

@@ -16,6 +16,8 @@ class LivePlayController {
         this.clockSkewMs = 0;
         this.selectedRated = true;
         this.selectedColor = 'random';
+        this.selectedRatingDelta = 50;
+        this.currentSpeedFilter = 'all';
         this.lobbyMode = 'pool';
         this.orientation = 'white';
         this.resignConfirmUntil = 0;
@@ -107,6 +109,7 @@ class LivePlayController {
             seekFilters.querySelectorAll('button[data-filter]').forEach(btn => {
                 btn.addEventListener('click', () => {
                     const filter = btn.dataset.filter || 'all';
+                    this.currentSpeedFilter = filter;
                     seekFilters.querySelectorAll('button[data-filter]').forEach(b => {
                         b.classList.toggle('active', b === btn);
                     });
@@ -114,11 +117,42 @@ class LivePlayController {
                         const match = filter === 'all' || tile.dataset.speed === filter;
                         tile.style.display = match ? 'flex' : 'none';
                     });
+                    this._updateRatingRangeDisplay(filter === 'all' ? 'rapid' : filter);
+                });
+            });
+        }
+
+        document.getElementById('btnPlayRangeMinus')?.addEventListener('click', () => {
+            if (this.selectedRatingDelta === null) {
+                this.selectedRatingDelta = 200;
+            } else {
+                this.selectedRatingDelta = Math.max(25, this.selectedRatingDelta - 25);
+            }
+            this._updateRatingRangeDisplay();
+        });
+
+        document.getElementById('btnPlayRangePlus')?.addEventListener('click', () => {
+            if (this.selectedRatingDelta === null) {
+                this.selectedRatingDelta = 50;
+            } else {
+                this.selectedRatingDelta = Math.min(500, this.selectedRatingDelta + 25);
+            }
+            this._updateRatingRangeDisplay();
+        });
+
+        const presetsWrap = document.getElementById('playRangePresets');
+        if (presetsWrap) {
+            presetsWrap.querySelectorAll('button[data-range]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const r = btn.dataset.range;
+                    this.selectedRatingDelta = r === 'any' ? null : parseInt(r, 10);
+                    this._updateRatingRangeDisplay();
                 });
             });
         }
 
         document.getElementById('btnPlayCancelSeek')?.addEventListener('click', () => this.cancelSeek());
+        document.getElementById('btnPlayInstantAiFallback')?.addEventListener('click', () => this.fallbackToInstantAi());
         document.getElementById('btnPlayStartAi')?.addEventListener('click', () => this.startAiChallenge());
         document.getElementById('btnPlaySendChallenge')?.addEventListener('click', () => this.sendUserChallenge());
         document.getElementById('btnPlayConnectLichess')?.addEventListener('click', () => window.app?.startLichessOAuth());
@@ -180,7 +214,37 @@ class LivePlayController {
             if (!res.ok) return;
             this.auth = await res.json();
             this._renderAuthGate();
+            this._updateRatingRangeDisplay();
         } catch (_) {}
+    }
+
+    _updateRatingRangeDisplay(targetSpeed = null) {
+        const speed = targetSpeed || (this.currentSpeedFilter === 'all' ? 'rapid' : this.currentSpeedFilter);
+        const userPerfs = this.auth?.perfs || {};
+        const catRating = userPerfs[speed]?.rating || (speed === 'blitz' ? 1962 : 1995);
+
+        const deltaLbl = document.getElementById('playRangeDeltaLabel');
+        const displayLbl = document.getElementById('playRatingRangeDisplay');
+
+        if (this.selectedRatingDelta === null) {
+            if (deltaLbl) deltaLbl.textContent = 'Any';
+            if (displayLbl) displayLbl.textContent = 'Any Rating (No restriction)';
+        } else {
+            const d = this.selectedRatingDelta;
+            const minR = Math.max(600, catRating - d);
+            const maxR = Math.min(3000, catRating + d);
+            if (deltaLbl) deltaLbl.textContent = `\u00b1${d}`;
+            if (displayLbl) displayLbl.textContent = `\u00b1${d} (${minR}\u2013${maxR})`;
+        }
+
+        const presetsWrap = document.getElementById('playRangePresets');
+        if (presetsWrap) {
+            presetsWrap.querySelectorAll('button[data-range]').forEach(btn => {
+                const r = btn.dataset.range;
+                const active = this.selectedRatingDelta === null ? r === 'any' : String(this.selectedRatingDelta) === r;
+                btn.classList.toggle('active', active);
+            });
+        }
     }
 
     _renderAuthGate() {
@@ -319,7 +383,13 @@ class LivePlayController {
         if (seeking && lbl) {
             const s = this.state.seek;
             const speedName = s.minutes < 3 ? 'Bullet' : (s.minutes < 10 ? 'Blitz' : (s.minutes < 25 ? 'Rapid' : 'Classical'));
-            lbl.textContent = `Seeking ${s.minutes}+${s.increment} ${speedName} (${s.rated ? 'Rated' : 'Casual'})...`;
+            const rangeText = s.rating_range ? ` [${s.rating_range}]` : '';
+            const typeText = s.pool_eligible ? 'Pool' : 'Open Lobby';
+            lbl.textContent = `Seeking ${s.minutes}+${s.increment} ${speedName} (${typeText}, ${s.rated ? 'Rated' : 'Casual'}${rangeText})...`;
+        }
+        const fallbackBtn = document.getElementById('btnPlayInstantAiFallback');
+        if (fallbackBtn) {
+            fallbackBtn.style.display = (seeking && !this.state.seek?.pool_eligible) ? 'inline-flex' : 'none';
         }
         const linkEl = document.getElementById('playSeekingLink');
         if (linkEl) {
@@ -597,6 +667,15 @@ class LivePlayController {
         if (this.state.seeking && this.state.seek?.minutes === minutes && this.state.seek?.increment === increment) {
             return this.cancelSeek();
         }
+        const speedCategory = minutes < 3 ? 'bullet' : (minutes < 10 ? 'blitz' : (minutes < 25 ? 'rapid' : 'classical'));
+        let ratingRange = null;
+        if (this.selectedRatingDelta !== null) {
+            const userPerfs = this.auth?.perfs || {};
+            const rating = userPerfs[speedCategory]?.rating || (speedCategory === 'blitz' ? 1962 : 1995);
+            const minR = Math.max(600, rating - this.selectedRatingDelta);
+            const maxR = Math.min(3000, rating + this.selectedRatingDelta);
+            ratingRange = `${minR}-${maxR}`;
+        }
         try {
             const res = await fetch('/api/play/seek', {
                 method: 'POST',
@@ -605,7 +684,8 @@ class LivePlayController {
                     minutes,
                     increment,
                     rated: this.selectedRated,
-                    color: this.selectedColor
+                    color: this.selectedColor,
+                    rating_range: ratingRange
                 })
             });
             const data = await res.json().catch(() => ({}));
@@ -616,6 +696,34 @@ class LivePlayController {
             this._applyServerState(data);
         } catch (e) {
             window.showToast?.(`Seek error: ${e.message}`, '#ef4444');
+        }
+    }
+
+    async fallbackToInstantAi() {
+        const s = this.state.seek;
+        const limitSec = s ? Math.round(parseFloat(s.minutes) * 60) : 600;
+        const incSec = s ? parseInt(s.increment, 10) : 0;
+        await this.cancelSeek();
+        try {
+            const res = await fetch('/api/play/challenge', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    mode: 'ai',
+                    ai_level: 5,
+                    clock_limit_sec: limitSec,
+                    increment_sec: incSec,
+                    color: this.selectedColor
+                })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                window.showToast?.(data.detail || 'Could not start AI game', '#ef4444');
+                return;
+            }
+            this._applyServerState(data);
+        } catch (e) {
+            window.showToast?.(`AI game error: ${e.message}`, '#ef4444');
         }
     }
 
