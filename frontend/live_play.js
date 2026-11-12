@@ -152,7 +152,6 @@ class LivePlayController {
         }
 
         document.getElementById('btnPlayCancelSeek')?.addEventListener('click', () => this.cancelSeek());
-        document.getElementById('btnPlayInstantAiFallback')?.addEventListener('click', () => this.fallbackToInstantAi());
         document.getElementById('btnPlayStartAi')?.addEventListener('click', () => this.startAiChallenge());
         document.getElementById('btnPlaySendChallenge')?.addEventListener('click', () => this.sendUserChallenge());
         document.getElementById('btnPlayConnectLichess')?.addEventListener('click', () => window.app?.startLichessOAuth());
@@ -382,24 +381,9 @@ class LivePlayController {
         if (banner) banner.style.display = seeking ? 'flex' : 'none';
         if (seeking && lbl) {
             const s = this.state.seek;
-            const speedName = s.minutes < 3 ? 'Bullet' : (s.minutes < 10 ? 'Blitz' : (s.minutes < 25 ? 'Rapid' : 'Classical'));
-            const rangeText = s.rating_range ? ` [${s.rating_range}]` : '';
-            const typeText = s.pool_eligible ? 'Pool' : 'Open Lobby';
-            lbl.textContent = `Seeking ${s.minutes}+${s.increment} ${speedName} (${typeText}, ${s.rated ? 'Rated' : 'Casual'}${rangeText})...`;
-        }
-        const fallbackBtn = document.getElementById('btnPlayInstantAiFallback');
-        if (fallbackBtn) {
-            fallbackBtn.style.display = (seeking && !this.state.seek?.pool_eligible) ? 'inline-flex' : 'none';
-        }
-        const linkEl = document.getElementById('playSeekingLink');
-        if (linkEl) {
-            const url = this.state.seek?.challenge_url;
-            if (url) {
-                linkEl.href = url;
-                linkEl.style.display = 'inline';
-            } else {
-                linkEl.style.display = 'none';
-            }
+            const speedName = s.minutes < 25 ? 'Rapid' : 'Classical';
+            const rangeText = s.rating_range ? ` (Opponents: ${s.rating_range})` : '';
+            lbl.textContent = `Actively seeking ${s.minutes}+${s.increment} ${speedName} in live Lichess pool${rangeText}...`;
         }
         document.querySelectorAll('#playSeekGrid .seek-tile').forEach(tile => {
             const active = seeking
@@ -696,34 +680,6 @@ class LivePlayController {
             this._applyServerState(data);
         } catch (e) {
             window.showToast?.(`Seek error: ${e.message}`, '#ef4444');
-        }
-    }
-
-    async fallbackToInstantAi() {
-        const s = this.state.seek;
-        const limitSec = s ? Math.round(parseFloat(s.minutes) * 60) : 600;
-        const incSec = s ? parseInt(s.increment, 10) : 0;
-        await this.cancelSeek();
-        try {
-            const res = await fetch('/api/play/challenge', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    mode: 'ai',
-                    ai_level: 5,
-                    clock_limit_sec: limitSec,
-                    increment_sec: incSec,
-                    color: this.selectedColor
-                })
-            });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) {
-                window.showToast?.(data.detail || 'Could not start AI game', '#ef4444');
-                return;
-            }
-            this._applyServerState(data);
-        } catch (e) {
-            window.showToast?.(`AI game error: ${e.message}`, '#ef4444');
         }
     }
 

@@ -198,35 +198,7 @@ class TestOAuthAndLivePlayPlatform(unittest.TestCase):
             self.assertTrue(st["can_play"])
 
     def test_board_api_seek_validation_live_clocks_fair_play_lock_and_persistence(self):
-        # 1. Blitz and Bullet seeks are supported (dispatched to open challenge API)
-        mock_open_ch = MagicMock(status_code=201)
-        mock_open_ch.content = b'{"challenge":{"id":"chBlitz01","url":"https://lichess.org/chBlitz01"}}'
-        mock_open_ch.json.return_value = {"challenge": {"id": "chBlitz01", "url": "https://lichess.org/chBlitz01"}}
-        with patch("backend.live_play.requests.post", return_value=mock_open_ch) as mock_post:
-            blitz_res = self.client.post("/api/play/seek", json={
-                "minutes": 3,
-                "increment": 0,
-                "rated": True,
-                "color": "random",
-                "rating_range": "1912-2012"
-            })
-            self.assertEqual(blitz_res.status_code, 200)
-            st = blitz_res.json()
-            self.assertTrue(st["seeking"])
-            self.assertEqual(st["seek"]["minutes"], 3)
-            self.assertEqual(st["seek"]["rating_range"], "1912-2012")
-            self.assertFalse(st["seek"]["pool_eligible"])
-
-            # Verify ratingRange was sent in form data to open challenge
-            call_kwargs = mock_post.call_args[1]
-            self.assertEqual(call_kwargs["data"].get("ratingRange"), "1912-2012")
-
-            # Cancel seek cleanly
-            cancel_res = self.client.post("/api/play/seek/cancel")
-            self.assertEqual(cancel_res.status_code, 200)
-            self.assertFalse(cancel_res.json()["seeking"])
-
-        # Rapid pool seek (10+0) with rating range dispatched to /api/board/seek with Accept: ndjson
+        # 1. Active online pool matchmaking: Rapid (10+0) with rating range dispatched to /api/board/seek
         mock_stream_resp = MagicMock(status_code=200)
         mock_stream_resp.iter_lines.return_value = []
         with patch("backend.live_play.requests.post", return_value=mock_stream_resp) as mock_board_post:
@@ -241,13 +213,23 @@ class TestOAuthAndLivePlayPlatform(unittest.TestCase):
             st_rapid = rapid_res.json()
             self.assertTrue(st_rapid["seeking"])
             self.assertEqual(st_rapid["seek"]["rating_range"], "1945-2045")
-            self.assertTrue(st_rapid["seek"]["pool_eligible"])
 
             # Verify board seek was called with ratingRange and Accept header
             board_call = mock_board_post.call_args[1]
             self.assertEqual(board_call["data"].get("ratingRange"), "1945-2045")
             self.assertIn("application/x-ndjson", board_call["headers"].get("Accept", ""))
-            self.client.post("/api/play/seek/cancel")
+            cancel_res = self.client.post("/api/play/seek/cancel")
+            self.assertEqual(cancel_res.status_code, 200)
+            self.assertFalse(cancel_res.json()["seeking"])
+
+        # Sub-8 minute pool seeks (Blitz/Bullet) are rejected with 400 because Lichess restricts automated pool entry
+        # and we never create dead open lobby challenges!
+        blitz_res = self.client.post("/api/play/seek", json={"minutes": 3, "increment": 0})
+        self.assertEqual(blitz_res.status_code, 400)
+        self.assertIn("at least 8 minutes", blitz_res.json()["detail"])
+        bullet_res = self.client.post("/api/play/seek", json={"minutes": 1, "increment": 0})
+        self.assertEqual(bullet_res.status_code, 400)
+        self.assertIn("at least 8 minutes", bullet_res.json()["detail"])
 
         # Rating range validation: invalid formats or inverted bounds are rejected
         inv_res1 = self.client.post("/api/play/seek", json={"minutes": 10, "rating_range": "invalid"})
@@ -255,14 +237,18 @@ class TestOAuthAndLivePlayPlatform(unittest.TestCase):
         inv_res2 = self.client.post("/api/play/seek", json={"minutes": 10, "rating_range": "2100-1900"})
         self.assertEqual(inv_res2.status_code, 422)
 
-        # Also verify Bullet seek (1+0) is accepted
-        with patch("backend.live_play.requests.post", return_value=mock_open_ch):
-            bullet_res = self.client.post("/api/play/seek", json={"minutes": 1, "increment": 0, "rated": True, "color": "random"})
-            self.assertEqual(bullet_res.status_code, 200)
-            st_bullet = bullet_res.json()
-            self.assertTrue(st_bullet["seeking"])
-            self.assertEqual(st_bullet["seek"]["minutes"], 1)
-            self.client.post("/api/play/seek/cancel")
+        # Meanwhile, Bullet and Blitz are fully supported in AI challenges and Direct challenges!
+        mock_ai_resp = MagicMock(status_code=201, content=b'{"id":"aiGame123"}')
+        mock_ai_resp.json.return_value = {"id": "aiGame123"}
+        with patch("backend.live_play.requests.post", return_value=mock_ai_resp):
+            ai_blitz = self.client.post("/api/play/challenge", json={
+                "mode": "ai",
+                "ai_level": 5,
+                "clock_limit_sec": 180,
+                "increment_sec": 0,
+                "color": "random",
+            })
+            self.assertEqual(ai_blitz.status_code, 200)
 
         # 2. Simulate Lichess `gameFull` frame starting a live 10+0 Rapid game
         game_id = "zzLiveTrap01"

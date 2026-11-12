@@ -120,12 +120,10 @@
                                 </div>
                             </div>
 
-                            <!-- Pool Presets (Bullet, Blitz, Rapid & Classical) -->
+                            <!-- Active Online Pool Matchmaking (Rapid & Classical) -->
                             <div id="playModePool" class="play-mode-pane">
                                 <div class="seek-speed-filters" id="playSeekFilters">
                                     <button type="button" class="rep-toggle-btn active" data-filter="all">All</button>
-                                    <button type="button" class="rep-toggle-btn" data-filter="bullet">Bullet</button>
-                                    <button type="button" class="rep-toggle-btn" data-filter="blitz">Blitz</button>
                                     <button type="button" class="rep-toggle-btn" data-filter="rapid">Rapid</button>
                                     <button type="button" class="rep-toggle-btn" data-filter="classical">Classical</button>
                                 </div>
@@ -152,34 +150,6 @@
                                 </div>
 
                                 <div class="seek-grid" id="playSeekGrid">
-                                    <button type="button" class="seek-tile" data-min="1" data-inc="0" data-speed="bullet">
-                                        <span class="seek-tc">1 + 0</span>
-                                        <span class="seek-cat cat-bullet">Bullet</span>
-                                    </button>
-                                    <button type="button" class="seek-tile" data-min="1" data-inc="1" data-speed="bullet">
-                                        <span class="seek-tc">1 + 1</span>
-                                        <span class="seek-cat cat-bullet">Bullet</span>
-                                    </button>
-                                    <button type="button" class="seek-tile" data-min="2" data-inc="1" data-speed="bullet">
-                                        <span class="seek-tc">2 + 1</span>
-                                        <span class="seek-cat cat-bullet">Bullet</span>
-                                    </button>
-                                    <button type="button" class="seek-tile" data-min="3" data-inc="0" data-speed="blitz">
-                                        <span class="seek-tc">3 + 0</span>
-                                        <span class="seek-cat cat-blitz">Blitz</span>
-                                    </button>
-                                    <button type="button" class="seek-tile" data-min="3" data-inc="2" data-speed="blitz">
-                                        <span class="seek-tc">3 + 2</span>
-                                        <span class="seek-cat cat-blitz">Blitz</span>
-                                    </button>
-                                    <button type="button" class="seek-tile" data-min="5" data-inc="0" data-speed="blitz">
-                                        <span class="seek-tc">5 + 0</span>
-                                        <span class="seek-cat cat-blitz">Blitz</span>
-                                    </button>
-                                    <button type="button" class="seek-tile" data-min="5" data-inc="3" data-speed="blitz">
-                                        <span class="seek-tc">5 + 3</span>
-                                        <span class="seek-cat cat-blitz">Blitz</span>
-                                    </button>
                                     <button type="button" class="seek-tile" data-min="10" data-inc="0" data-speed="rapid">
                                         <span class="seek-tc">10 + 0</span>
                                         <span class="seek-cat cat-rapid">Rapid</span>
@@ -205,15 +175,13 @@
                                 <div id="playSeekingBanner" class="play-seeking-banner" style="display:none;">
                                     <div class="play-seeking-left">
                                         <span class="sync-pulse-dot" aria-hidden="true"></span>
-                                        <span id="playSeekingLabel" class="mono-bold">Seeking 10+0...</span>
-                                        <a id="playSeekingLink" class="mono-muted text-xs" target="_blank" rel="noopener" style="display:none; margin-left:0.4rem; text-decoration:underline;">Lichess &UpperRightArrow;</a>
-                                        <button type="button" id="btnPlayInstantAiFallback" class="btn-primary btn-xs" style="display:none; margin-left:0.5rem;">Play Stockfish AI (Instant)</button>
+                                        <span id="playSeekingLabel" class="mono-bold">Actively seeking in live pool...</span>
                                     </div>
                                     <button type="button" id="btnPlayCancelSeek" class="btn-secondary btn-xs">Cancel</button>
                                 </div>
 
                                 <div class="play-pool-info-hint" id="playPoolInfoHint">
-                                    <strong>Instant Pool Matchmaking:</strong> Rapid (10+0, 15+10, 20+0) &amp; Classical queue directly into the live Lichess pool with your configured rating range (&plusmn;50 default). Blitz &amp; Bullet use open lobby challenges or instant Stockfish AI games.
+                                    <strong>Active Online Matchmaking:</strong> Queues directly into the live Lichess matchmaking pool and pairs with an online opponent in your rating range (&plusmn;50 default). Lichess restricts automated pool entry to Rapid &amp; Classical (&ge;8 min).
                                 </div>
                             </div>
 
