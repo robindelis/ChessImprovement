@@ -198,10 +198,29 @@ class TestOAuthAndLivePlayPlatform(unittest.TestCase):
             self.assertTrue(st["can_play"])
 
     def test_board_api_seek_validation_live_clocks_fair_play_lock_and_persistence(self):
-        # 1. Blitz random pool seek is cleanly rejected per Lichess Board API rules
-        blitz_res = self.client.post("/api/play/seek", json={"minutes": 3, "increment": 0, "rated": True, "color": "random"})
-        self.assertEqual(blitz_res.status_code, 400)
-        self.assertIn("Rapid", blitz_res.json()["detail"])
+        # 1. Blitz and Bullet seeks are supported (dispatched to open challenge API)
+        mock_open_ch = MagicMock(status_code=201)
+        mock_open_ch.content = b'{"challenge":{"id":"chBlitz01","url":"https://lichess.org/chBlitz01"}}'
+        mock_open_ch.json.return_value = {"challenge": {"id": "chBlitz01", "url": "https://lichess.org/chBlitz01"}}
+        with patch("backend.live_play.requests.post", return_value=mock_open_ch):
+            blitz_res = self.client.post("/api/play/seek", json={"minutes": 3, "increment": 0, "rated": True, "color": "random"})
+            self.assertEqual(blitz_res.status_code, 200)
+            st = blitz_res.json()
+            self.assertTrue(st["seeking"])
+            self.assertEqual(st["seek"]["minutes"], 3)
+            # Cancel seek cleanly
+            cancel_res = self.client.post("/api/play/seek/cancel")
+            self.assertEqual(cancel_res.status_code, 200)
+            self.assertFalse(cancel_res.json()["seeking"])
+
+        # Also verify Bullet seek (1+0) is accepted
+        with patch("backend.live_play.requests.post", return_value=mock_open_ch):
+            bullet_res = self.client.post("/api/play/seek", json={"minutes": 1, "increment": 0, "rated": True, "color": "random"})
+            self.assertEqual(bullet_res.status_code, 200)
+            st_bullet = bullet_res.json()
+            self.assertTrue(st_bullet["seeking"])
+            self.assertEqual(st_bullet["seek"]["minutes"], 1)
+            self.client.post("/api/play/seek/cancel")
 
         # 2. Simulate Lichess `gameFull` frame starting a live 10+0 Rapid game
         game_id = "zzLiveTrap01"
@@ -272,6 +291,65 @@ class TestOAuthAndLivePlayPlatform(unittest.TestCase):
             conn.execute("DELETE FROM blunders WHERE game_id = ?", (game_id,))
             conn.execute("DELETE FROM games WHERE id = ?", (game_id,))
             conn.commit()
+
+    def test_blitz_and_bullet_ai_and_user_challenges(self):
+        # 1. Start Bullet AI challenge (1+0 -> 60s)
+        mock_ai_resp = MagicMock(status_code=201)
+        mock_ai_resp.content = b'{"id":"gameAiBullet01","speed":"bullet","rated":false,"color":"white"}'
+        mock_ai_resp.json.return_value = {"id": "gameAiBullet01", "speed": "bullet", "rated": False, "color": "white"}
+        with patch("backend.live_play.requests.post", return_value=mock_ai_resp) as post_mock, \
+             patch.object(self.mgr, "attach_game_stream") as attach_mock:
+            res = self.client.post("/api/play/challenge", json={
+                "mode": "ai",
+                "ai_level": 3,
+                "clock_limit_sec": 60,
+                "increment_sec": 0,
+                "color": "random"
+            })
+            self.assertEqual(res.status_code, 200)
+            self.assertIn("/api/challenge/ai", post_mock.call_args[0][0])
+            self.assertEqual(post_mock.call_args[1]["data"]["clock.limit"], "60")
+            self.assertEqual(post_mock.call_args[1]["data"]["clock.increment"], "0")
+            attach_mock.assert_called_once()
+
+        # 2. Start Blitz AI challenge (3+2 -> 180s, 2s inc)
+        mock_ai_blitz = MagicMock(status_code=201)
+        mock_ai_blitz.content = b'{"id":"gameAiBlitz02","speed":"blitz","rated":false,"color":"black"}'
+        mock_ai_blitz.json.return_value = {"id": "gameAiBlitz02", "speed": "blitz", "rated": False, "color": "black"}
+        with patch("backend.live_play.requests.post", return_value=mock_ai_blitz) as post_mock, \
+             patch.object(self.mgr, "attach_game_stream") as attach_mock:
+            res = self.client.post("/api/play/challenge", json={
+                "mode": "ai",
+                "ai_level": 5,
+                "clock_limit_sec": 180,
+                "increment_sec": 2,
+                "color": "black"
+            })
+            self.assertEqual(res.status_code, 200)
+            self.assertEqual(post_mock.call_args[1]["data"]["clock.limit"], "180")
+            self.assertEqual(post_mock.call_args[1]["data"]["clock.increment"], "2")
+            self.assertEqual(post_mock.call_args[1]["data"]["color"], "black")
+
+        # 3. Direct user challenge with Bullet (2+1 -> 120s, 1s inc)
+        mock_user_ch = MagicMock(status_code=200)
+        mock_user_ch.content = b'{"challenge":{"id":"chUserBullet01"}}'
+        mock_user_ch.json.return_value = {"challenge": {"id": "chUserBullet01"}}
+        with patch("backend.live_play.requests.post", return_value=mock_user_ch) as post_mock:
+            res = self.client.post("/api/play/challenge", json={
+                "mode": "user",
+                "username": "MagnusCarlsen",
+                "clock_limit_sec": 120,
+                "increment_sec": 1,
+                "rated": True,
+                "color": "random"
+            })
+            self.assertEqual(res.status_code, 200)
+            self.assertIn("/api/challenge/MagnusCarlsen", post_mock.call_args[0][0])
+            self.assertEqual(post_mock.call_args[1]["data"]["clock.limit"], "120")
+            self.assertEqual(post_mock.call_args[1]["data"]["clock.increment"], "1")
+            self.assertEqual(post_mock.call_args[1]["data"]["rated"], "true")
+            st = res.json()
+            self.assertEqual(st["outgoing_challenge"]["dest_user"], "MagnusCarlsen")
 
 
 class TestFullGameAnalysisAndTrapToRepertoireFlow(unittest.TestCase):

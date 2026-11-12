@@ -5,7 +5,7 @@ import math
 import os
 import re
 import time
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, Union
 
 import chess
 from fastapi import FastAPI, HTTPException, Path, Query, Request
@@ -646,7 +646,7 @@ class SettingsPayload(BaseModel):
 
 
 class PlaySeekPayload(BaseModel):
-    minutes: int = Field(10, ge=1, le=180)
+    minutes: Union[int, float] = Field(10, ge=0.5, le=180)
     increment: int = Field(0, ge=0, le=180)
     rated: bool = True
     color: Literal["white", "black", "random"] = "random"
@@ -656,7 +656,7 @@ class PlayChallengePayload(BaseModel):
     mode: Literal["ai", "user"] = "ai"
     ai_level: int = Field(5, ge=1, le=8)
     username: Optional[str] = Field("", max_length=MAX_USERNAME_LEN)
-    clock_limit_sec: int = Field(600, ge=60, le=10800)
+    clock_limit_sec: int = Field(600, ge=30, le=10800)
     increment_sec: int = Field(0, ge=0, le=180)
     rated: bool = False
     color: Literal["white", "black", "random"] = "random"

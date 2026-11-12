@@ -95,9 +95,25 @@ class LivePlayController {
         if (seekGrid) {
             seekGrid.querySelectorAll('.seek-tile').forEach(tile => {
                 tile.addEventListener('click', () => {
-                    const mins = parseInt(tile.dataset.min || '10', 10);
+                    const mins = parseFloat(tile.dataset.min || '10');
                     const inc = parseInt(tile.dataset.inc || '0', 10);
                     this.startSeek(mins, inc);
+                });
+            });
+        }
+
+        const seekFilters = document.getElementById('playSeekFilters');
+        if (seekFilters) {
+            seekFilters.querySelectorAll('button[data-filter]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const filter = btn.dataset.filter || 'all';
+                    seekFilters.querySelectorAll('button[data-filter]').forEach(b => {
+                        b.classList.toggle('active', b === btn);
+                    });
+                    document.querySelectorAll('#playSeekGrid .seek-tile').forEach(tile => {
+                        const match = filter === 'all' || tile.dataset.speed === filter;
+                        tile.style.display = match ? 'flex' : 'none';
+                    });
                 });
             });
         }
@@ -302,7 +318,18 @@ class LivePlayController {
         if (banner) banner.style.display = seeking ? 'flex' : 'none';
         if (seeking && lbl) {
             const s = this.state.seek;
-            lbl.textContent = `Seeking ${s.minutes}+${s.increment} (${s.rated ? 'Rated' : 'Casual'})...`;
+            const speedName = s.minutes < 3 ? 'Bullet' : (s.minutes < 10 ? 'Blitz' : (s.minutes < 25 ? 'Rapid' : 'Classical'));
+            lbl.textContent = `Seeking ${s.minutes}+${s.increment} ${speedName} (${s.rated ? 'Rated' : 'Casual'})...`;
+        }
+        const linkEl = document.getElementById('playSeekingLink');
+        if (linkEl) {
+            const url = this.state.seek?.challenge_url;
+            if (url) {
+                linkEl.href = url;
+                linkEl.style.display = 'inline';
+            } else {
+                linkEl.style.display = 'none';
+            }
         }
         document.querySelectorAll('#playSeekGrid .seek-tile').forEach(tile => {
             const active = seeking
@@ -509,7 +536,13 @@ class LivePlayController {
         const g = this.state.game;
         if (!g) {
             const s = this.state.seek;
-            const defaultStr = s ? `${s.minutes}:00` : '10:00';
+            let defaultStr = '10:00';
+            if (s && s.minutes !== undefined && s.minutes !== null) {
+                const totalSec = Math.round(parseFloat(s.minutes) * 60);
+                const m = Math.floor(totalSec / 60);
+                const sec = totalSec % 60;
+                defaultStr = `${m}:${sec < 10 ? '0' : ''}${sec}`;
+            }
             topClock.textContent = defaultStr;
             botClock.textContent = defaultStr;
             topClock.className = 'digital-clock';

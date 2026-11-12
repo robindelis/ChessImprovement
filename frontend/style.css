@@ -2024,6 +2024,13 @@ input[type="checkbox"], input[type="radio"] {
     gap: 0.7rem;
 }
 
+.seek-speed-filters {
+    display: flex;
+    gap: 0.35rem;
+    margin-bottom: 0.75rem;
+    flex-wrap: wrap;
+}
+
 .seek-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -2035,7 +2042,7 @@ input[type="checkbox"], input[type="radio"] {
     background: var(--bg-panel);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
-    padding: 0.9rem 0.5rem;
+    padding: 0.85rem 0.45rem;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -2062,6 +2069,19 @@ input[type="checkbox"], input[type="radio"] {
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.04em;
+    font-weight: 600;
+}
+.seek-cat.cat-bullet {
+    color: #f59e0b;
+}
+.seek-cat.cat-blitz {
+    color: #eab308;
+}
+.seek-cat.cat-rapid {
+    color: #10b981;
+}
+.seek-cat.cat-classical {
+    color: #60a5fa;
 }
 
 .play-seeking-banner {

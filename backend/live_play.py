@@ -7,7 +7,7 @@ import json
 import logging
 import threading
 import time
-from typing import Any, AsyncGenerator, Dict, List, Optional, Set, Tuple
+from typing import Any, AsyncGenerator, Dict, List, Optional, Set, Tuple, Union
 
 import chess
 import requests
@@ -48,6 +48,7 @@ class LivePlayManager:
         self._seek_info: Optional[Dict[str, Any]] = None
         self._seek_cancel = threading.Event()
         self._seek_resp: Optional[Any] = None
+        self._open_challenge_id: Optional[str] = None
 
         self._event_thread: Optional[threading.Thread] = None
         self._event_stop = threading.Event()
@@ -230,6 +231,7 @@ class LivePlayManager:
                     self._seeking = False
                     self._seek_info = None
                     self._outgoing_challenge = None
+                    self._open_challenge_id = None
                 self.attach_game_stream(game_id, client=client, seed=game_obj)
         elif ev_type == "gameFinish":
             game_obj = ev.get("game") or {}
@@ -276,44 +278,44 @@ class LivePlayManager:
 
     def start_seek(
         self,
-        minutes: int = 10,
+        minutes: Union[int, float] = 10,
         increment: int = 0,
         rated: bool = True,
         color: str = "random",
     ) -> Dict[str, Any]:
-        """Create a Lichess Board API lobby seek (`POST /api/board/seek`)."""
+        """Create a Lichess Board API pool seek (`POST /api/board/seek`) or open lobby challenge (`POST /api/challenge/open`)."""
         client = self._require_client()
         if self.is_live_game_active():
             raise LivePlayError("A live game is already in progress.", 409)
 
-        # Board API matchmaking restriction: Rapid (total estimated >= 480s) & Classical
-        est_seconds = int(minutes) * 60 + 40 * int(increment)
-        if est_seconds < 480:
-            raise LivePlayError(
-                "Lichess's official Board API restricts random pool seeks to Rapid (10+0, 10+5, 15+10) and Classical. "
-                "Use Direct Challenge or Play vs AI for Blitz.",
-                400,
-            )
-
         self.cancel_seek()
         self._ensure_event_stream()
 
+        clean_color = color if color in ("white", "black", "random") else "random"
         cancel_ev = threading.Event()
         seek_meta = {
-            "minutes": int(minutes),
+            "minutes": minutes,
             "increment": int(increment),
             "rated": bool(rated),
-            "color": color if color in ("white", "black", "random") else "random",
+            "color": clean_color,
             "started_at": int(time.time() * 1000),
         }
         with self._lock:
             self._seeking = True
             self._seek_info = seek_meta
             self._seek_cancel = cancel_ev
+            self._open_challenge_id = None
         self._broadcast("seek_started")
 
+        # Board API matchmaking pool restriction: Rapid (total estimated >= 480s) & Classical.
+        # For Bullet & Blitz (< 480s total estimated time), Lichess Board API rejects /api/board/seek
+        # with 'Invalid time control'. We dispatch via Lichess's official open challenge API
+        # (POST /api/challenge/open), making the challenge public in the Lichess lobby.
+        est_seconds = float(minutes) * 60 + 40 * int(increment)
+        target_fn = self._run_seek_stream if est_seconds >= 480 else self._run_seek_open_challenge
+
         t = threading.Thread(
-            target=self._run_seek_stream,
+            target=target_fn,
             args=(client, seek_meta, cancel_ev),
             name="lichess-seek",
             daemon=True,
@@ -344,6 +346,9 @@ class LivePlayManager:
                 self._seek_resp = resp
             if resp.status_code != 200:
                 err_txt = (resp.text or "")[:180]
+                if resp.status_code == 400 and ("time control" in err_txt.lower() or "invalid" in err_txt.lower()) and not cancel_ev.is_set():
+                    logger.info("Board seek rejected with time control constraint; falling back to open lobby challenge")
+                    return self._run_seek_open_challenge(client, seek_meta, cancel_ev)
                 logger.warning("Seek rejected (%s): %s", resp.status_code, redact(err_txt, client.token))
                 with self._lock:
                     if self._seek_cancel is cancel_ev:
@@ -373,6 +378,101 @@ class LivePlayManager:
                     self._seek_info = None
             self._broadcast("seek_ended")
 
+    def _run_seek_open_challenge(self, client: LichessClient, seek_meta: Dict[str, Any], cancel_ev: threading.Event) -> None:
+        mins = float(seek_meta.get("minutes", 10))
+        inc = int(seek_meta.get("increment", 0))
+        limit_sec = int(round(mins * 60))
+        form: Dict[str, Any] = {
+            "rated": "true" if seek_meta.get("rated") else "false",
+            "clock.limit": str(limit_sec),
+            "clock.increment": str(inc),
+            "variant": "standard",
+        }
+        if seek_meta.get("color") in ("white", "black"):
+            form["color"] = seek_meta["color"]
+
+        ch_id: Optional[str] = None
+        try:
+            resp = requests.post(
+                f"{client.base_url}/api/challenge/open",
+                headers=client.headers,
+                data=form,
+                timeout=ACTION_TIMEOUT,
+            )
+            if resp.status_code not in (200, 201):
+                err_txt = (resp.text or "")[:180]
+                logger.warning("Open challenge seek rejected (%s): %s", resp.status_code, redact(err_txt, client.token))
+                with self._lock:
+                    if self._seek_cancel is cancel_ev:
+                        self._seeking = False
+                        self._seek_info = None
+                        self._last_error = f"Lichess rejected seek ({resp.status_code}): {err_txt}"
+                self._broadcast("seek_error")
+                return
+
+            data = resp.json() if resp.content else {}
+            ch = data.get("challenge") or data
+            ch_id = str(ch.get("id") or "").strip()
+            ch_url = str(ch.get("url") or (f"{client.base_url}/{ch_id}" if ch_id else ""))
+            with self._lock:
+                if self._seek_cancel is not cancel_ev or not self._seeking:
+                    if ch_id:
+                        try:
+                            requests.post(f"{client.base_url}/api/challenge/{ch_id}/cancel", headers=client.headers, timeout=ACTION_TIMEOUT)
+                        except Exception:
+                            pass
+                    return
+                self._open_challenge_id = ch_id
+                if self._seek_info:
+                    self._seek_info["challenge_id"] = ch_id
+                    self._seek_info["challenge_url"] = ch_url
+            self._broadcast("seek_started")
+
+            wait_start = time.time()
+            while not cancel_ev.is_set():
+                with self._lock:
+                    if not self._seeking or self._active_game is not None:
+                        break
+                if time.time() - wait_start > 300:
+                    logger.info("Open challenge seek %s timed out after 300s", ch_id)
+                    with self._lock:
+                        if self._seek_cancel is cancel_ev and self._seeking:
+                            self._seeking = False
+                            self._seek_info = None
+                            self._last_error = "Seek timed out: no opponent joined."
+                    if ch_id:
+                        try:
+                            requests.post(f"{client.base_url}/api/challenge/{ch_id}/cancel", headers=client.headers, timeout=ACTION_TIMEOUT)
+                        except Exception:
+                            pass
+                    self._broadcast("seek_ended")
+                    return
+                cancel_ev.wait(0.5)
+        except Exception as exc:
+            if not cancel_ev.is_set():
+                logger.debug("Open challenge seek error: %s", redact(exc, client.token))
+                with self._lock:
+                    if self._seek_cancel is cancel_ev:
+                        self._seeking = False
+                        self._seek_info = None
+                        self._last_error = f"Seek error: {exc}"
+                self._broadcast("seek_error")
+        finally:
+            with self._lock:
+                to_cancel = None
+                if self._seek_cancel is cancel_ev and self._seeking:
+                    self._seeking = False
+                    self._seek_info = None
+                if self._open_challenge_id:
+                    to_cancel = self._open_challenge_id
+                    self._open_challenge_id = None
+            if to_cancel and cancel_ev.is_set():
+                try:
+                    requests.post(f"{client.base_url}/api/challenge/{to_cancel}/cancel", headers=client.headers, timeout=ACTION_TIMEOUT)
+                except Exception:
+                    pass
+            self._broadcast("seek_ended")
+
     def cancel_seek(self) -> Dict[str, Any]:
         with self._lock:
             self._seeking = False
@@ -380,11 +480,24 @@ class LivePlayManager:
             self._seek_cancel.set()
             resp = self._seek_resp
             self._seek_resp = None
+            open_ch_id = self._open_challenge_id
+            self._open_challenge_id = None
         if resp is not None:
             try:
                 resp.close()
             except Exception:
                 pass
+        if open_ch_id:
+            try:
+                client = self._client
+                if client and client.token:
+                    requests.post(
+                        f"{client.base_url}/api/challenge/{open_ch_id}/cancel",
+                        headers=client.headers,
+                        timeout=ACTION_TIMEOUT,
+                    )
+            except Exception as exc:
+                logger.debug("Failed to cancel open challenge %s: %s", open_ch_id, exc)
         self._broadcast("seek_canceled")
         return self.snapshot()
 
@@ -410,7 +523,7 @@ class LivePlayManager:
         if mode == "ai":
             form: Dict[str, Any] = {
                 "level": str(max(1, min(8, int(ai_level)))),
-                "clock.limit": str(max(60, min(10800, int(clock_limit_sec)))),
+                "clock.limit": str(max(30, min(10800, int(clock_limit_sec)))),
                 "clock.increment": str(max(0, min(180, int(increment_sec)))),
                 "color": clean_color,
                 "variant": "standard",
@@ -422,7 +535,7 @@ class LivePlayManager:
                 raise LivePlayError("Enter a Lichess username to challenge.", 400)
             form = {
                 "rated": "true" if rated else "false",
-                "clock.limit": str(max(60, min(10800, int(clock_limit_sec)))),
+                "clock.limit": str(max(30, min(10800, int(clock_limit_sec)))),
                 "clock.increment": str(max(0, min(180, int(increment_sec)))),
                 "color": clean_color,
                 "variant": "standard",
@@ -500,6 +613,16 @@ class LivePlayManager:
                 my_color = str(seed.get("color") or "white").lower()
                 opp = seed.get("opponent") or {}
                 my_name = get_setting("lichess_username") or "You"
+                tc = seed.get("timeControl") or seed.get("clock") or {}
+                if isinstance(tc, dict) and "limit" in tc:
+                    init_time_ms = int(tc.get("limit") or 600) * 1000
+                    init_inc_ms = int(tc.get("increment") or 0) * 1000
+                elif isinstance(tc, dict) and "initial" in tc:
+                    init_time_ms = int(tc.get("initial") or 600_000)
+                    init_inc_ms = int(tc.get("increment") or 0)
+                else:
+                    init_time_ms = 600_000
+                    init_inc_ms = 0
                 self._active_game = {
                     "id": game_id,
                     "speed": seed.get("speed") or "rapid",
@@ -513,10 +636,10 @@ class LivePlayManager:
                     "fen": seed.get("fen") or chess.STARTING_FEN,
                     "turn": "white",
                     "moves": [],
-                    "wtime_ms": 600_000,
-                    "btime_ms": 600_000,
-                    "winc_ms": 0,
-                    "binc_ms": 0,
+                    "wtime_ms": init_time_ms,
+                    "btime_ms": init_time_ms,
+                    "winc_ms": init_inc_ms,
+                    "binc_ms": init_inc_ms,
                     "clock_synced_at_ms": int(time.time() * 1000),
                     "status": "started",
                     "winner": None,

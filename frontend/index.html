@@ -120,32 +120,63 @@
                                 </div>
                             </div>
 
-                            <!-- Pool Presets (Rapid & Classical via Board API) -->
+                            <!-- Pool Presets (Bullet, Blitz, Rapid & Classical) -->
                             <div id="playModePool" class="play-mode-pane">
+                                <div class="seek-speed-filters" id="playSeekFilters">
+                                    <button type="button" class="rep-toggle-btn active" data-filter="all">All</button>
+                                    <button type="button" class="rep-toggle-btn" data-filter="bullet">Bullet</button>
+                                    <button type="button" class="rep-toggle-btn" data-filter="blitz">Blitz</button>
+                                    <button type="button" class="rep-toggle-btn" data-filter="rapid">Rapid</button>
+                                    <button type="button" class="rep-toggle-btn" data-filter="classical">Classical</button>
+                                </div>
                                 <div class="seek-grid" id="playSeekGrid">
-                                    <button type="button" class="seek-tile" data-min="10" data-inc="0">
+                                    <button type="button" class="seek-tile" data-min="1" data-inc="0" data-speed="bullet">
+                                        <span class="seek-tc">1 + 0</span>
+                                        <span class="seek-cat cat-bullet">Bullet</span>
+                                    </button>
+                                    <button type="button" class="seek-tile" data-min="1" data-inc="1" data-speed="bullet">
+                                        <span class="seek-tc">1 + 1</span>
+                                        <span class="seek-cat cat-bullet">Bullet</span>
+                                    </button>
+                                    <button type="button" class="seek-tile" data-min="2" data-inc="1" data-speed="bullet">
+                                        <span class="seek-tc">2 + 1</span>
+                                        <span class="seek-cat cat-bullet">Bullet</span>
+                                    </button>
+                                    <button type="button" class="seek-tile" data-min="3" data-inc="0" data-speed="blitz">
+                                        <span class="seek-tc">3 + 0</span>
+                                        <span class="seek-cat cat-blitz">Blitz</span>
+                                    </button>
+                                    <button type="button" class="seek-tile" data-min="3" data-inc="2" data-speed="blitz">
+                                        <span class="seek-tc">3 + 2</span>
+                                        <span class="seek-cat cat-blitz">Blitz</span>
+                                    </button>
+                                    <button type="button" class="seek-tile" data-min="5" data-inc="0" data-speed="blitz">
+                                        <span class="seek-tc">5 + 0</span>
+                                        <span class="seek-cat cat-blitz">Blitz</span>
+                                    </button>
+                                    <button type="button" class="seek-tile" data-min="5" data-inc="3" data-speed="blitz">
+                                        <span class="seek-tc">5 + 3</span>
+                                        <span class="seek-cat cat-blitz">Blitz</span>
+                                    </button>
+                                    <button type="button" class="seek-tile" data-min="10" data-inc="0" data-speed="rapid">
                                         <span class="seek-tc">10 + 0</span>
-                                        <span class="seek-cat">Rapid</span>
+                                        <span class="seek-cat cat-rapid">Rapid</span>
                                     </button>
-                                    <button type="button" class="seek-tile" data-min="10" data-inc="5">
+                                    <button type="button" class="seek-tile" data-min="10" data-inc="5" data-speed="rapid">
                                         <span class="seek-tc">10 + 5</span>
-                                        <span class="seek-cat">Rapid</span>
+                                        <span class="seek-cat cat-rapid">Rapid</span>
                                     </button>
-                                    <button type="button" class="seek-tile" data-min="15" data-inc="10">
+                                    <button type="button" class="seek-tile" data-min="15" data-inc="10" data-speed="rapid">
                                         <span class="seek-tc">15 + 10</span>
-                                        <span class="seek-cat">Rapid</span>
+                                        <span class="seek-cat cat-rapid">Rapid</span>
                                     </button>
-                                    <button type="button" class="seek-tile" data-min="20" data-inc="0">
+                                    <button type="button" class="seek-tile" data-min="20" data-inc="0" data-speed="rapid">
                                         <span class="seek-tc">20 + 0</span>
-                                        <span class="seek-cat">Rapid</span>
+                                        <span class="seek-cat cat-rapid">Rapid</span>
                                     </button>
-                                    <button type="button" class="seek-tile" data-min="30" data-inc="0">
+                                    <button type="button" class="seek-tile" data-min="30" data-inc="0" data-speed="classical">
                                         <span class="seek-tc">30 + 0</span>
-                                        <span class="seek-cat">Classical</span>
-                                    </button>
-                                    <button type="button" class="seek-tile" data-min="30" data-inc="20">
-                                        <span class="seek-tc">30 + 20</span>
-                                        <span class="seek-cat">Classical</span>
+                                        <span class="seek-cat cat-classical">Classical</span>
                                     </button>
                                 </div>
 
@@ -153,6 +184,7 @@
                                     <div class="play-seeking-left">
                                         <span class="sync-pulse-dot" aria-hidden="true"></span>
                                         <span id="playSeekingLabel" class="mono-bold">Seeking 10+0...</span>
+                                        <a id="playSeekingLink" class="mono-muted text-xs" target="_blank" rel="noopener" style="display:none; margin-left:0.4rem; text-decoration:underline;">Lichess &UpperRightArrow;</a>
                                     </div>
                                     <button type="button" id="btnPlayCancelSeek" class="btn-secondary btn-xs">Cancel</button>
                                 </div>
@@ -176,12 +208,16 @@
                                 <div class="form-field">
                                     <label for="playAiClockSelect">Clock</label>
                                     <select id="playAiClockSelect">
+                                        <option value="60,0">1 + 0 (Bullet)</option>
+                                        <option value="60,1">1 + 1 (Bullet)</option>
+                                        <option value="120,1">2 + 1 (Bullet)</option>
                                         <option value="180,0">3 + 0 (Blitz)</option>
                                         <option value="180,2">3 + 2 (Blitz)</option>
                                         <option value="300,0">5 + 0 (Blitz)</option>
                                         <option value="300,3">5 + 3 (Blitz)</option>
                                         <option value="600,0" selected>10 + 0 (Rapid)</option>
                                         <option value="900,10">15 + 10 (Rapid)</option>
+                                        <option value="1800,0">30 + 0 (Classical)</option>
                                     </select>
                                 </div>
                                 <button type="button" id="btnPlayStartAi" class="btn-primary">Start Game</button>
@@ -196,6 +232,9 @@
                                 <div class="form-field">
                                     <label for="playUserClockSelect">Clock</label>
                                     <select id="playUserClockSelect">
+                                        <option value="60,0">1 + 0 (Bullet)</option>
+                                        <option value="60,1">1 + 1 (Bullet)</option>
+                                        <option value="120,1">2 + 1 (Bullet)</option>
                                         <option value="180,0">3 + 0 (Blitz)</option>
                                         <option value="180,2">3 + 2 (Blitz)</option>
                                         <option value="300,0">5 + 0 (Blitz)</option>
@@ -203,6 +242,7 @@
                                         <option value="600,0" selected>10 + 0 (Rapid)</option>
                                         <option value="600,5">10 + 5 (Rapid)</option>
                                         <option value="900,10">15 + 10 (Rapid)</option>
+                                        <option value="1800,0">30 + 0 (Classical)</option>
                                     </select>
                                 </div>
                                 <button type="button" id="btnPlaySendChallenge" class="btn-primary">Send Challenge</button>
